@@ -83,6 +83,14 @@ function getHfBase() {
     const el = document.getElementById("hfBase");
     if (el && el.value && el.value.trim()) v = el.value.trim();
   }
+  // 4) fallback: placeholder (recommended default)
+  if (!v) {
+    const el = document.getElementById("hfBase");
+    const ph = (el && el.getAttribute("placeholder")) ? el.getAttribute("placeholder").trim() : "";
+    if (ph.startsWith("http")) v = ph;
+  }
+  // 5) hard default (this project)
+  if (!v) v = "https://mazzgogo-tango-cho.hf.space";
   return v;
 }
 
@@ -222,9 +230,26 @@ function setupSettings() {
   const appToken = document.getElementById("appToken");
   const saveAppTokenBtn = document.getElementById("saveAppTokenBtn");
   const connStatus = document.getElementById("connStatus");
+  const testConnBtn = document.getElementById("testConnBtn");
 
   hfBase.value = getHfBase();
   appToken.value = getAppToken();
+
+  function safeSetItem(key, value) {
+    try {
+      localStorage.setItem(key, value);
+      return true;
+    } catch (e) {
+      setMsg("保存できません：ブラウザのストレージが無効/制限されています。PWAを削除→再インストールで直ることがあります。", "err");
+      return false;
+    }
+  }
+
+  let _debounceTimer = null;
+  function debounce(fn, ms=300) {
+    clearTimeout(_debounceTimer);
+    _debounceTimer = setTimeout(fn, ms);
+  }
 
   function updateConnBadge() {
     const v = (hfBase.value || '').trim();
@@ -234,33 +259,61 @@ function setupSettings() {
   updateConnBadge();
 
   saveHfBaseBtn?.addEventListener("click", () => {
-    localStorage.setItem(HF_BASE_KEY, hfBase.value.trim());
-    updateConnBadge();
-    setMsg("HF Spaces API Base を保存しました。", "ok");
+    const v = (hfBase.value || "").trim();
+    if (!v) return setMsg("HF Spaces API Base を入力してください。", "err");
+    if (safeSetItem(HF_BASE_KEY, v)) {
+      updateConnBadge();
+      setMsg("HF Spaces API Base を保存しました。", "ok");
+    }
   });
   saveAppTokenBtn?.addEventListener("click", () => {
-    localStorage.setItem(HF_TOKEN_KEY, appToken.value.trim());
-    setMsg("APP_TOKEN を保存しました。", "ok");
+    const v = (appToken.value || "").trim();
+    if (safeSetItem(HF_TOKEN_KEY, v)) {
+      setMsg("APP_TOKEN を保存しました。", "ok");
+    }
   });
 
 
-  // Auto-save (user may forget pressing "保存")
-  hfBase.addEventListener("blur", () => {
-    localStorage.setItem(HF_BASE_KEY, hfBase.value.trim());
-    updateConnBadge();
-  });
-  hfBase.addEventListener("change", () => {
-    localStorage.setItem(HF_BASE_KEY, hfBase.value.trim());
-    updateConnBadge();
+    });
+
+
+  // Auto-save (入力するだけで保存される)
+  hfBase.addEventListener("input", () => {
+    debounce(() => {
+      const v = (hfBase.value || "").trim();
+      safeSetItem(HF_BASE_KEY, v);
+      updateConnBadge();
+    }, 250);
   });
 
-  appToken.addEventListener("blur", () => {
-    localStorage.setItem(HF_TOKEN_KEY, appToken.value.trim());
+  appToken.addEventListener("input", () => {
+    debounce(() => {
+      const v = (appToken.value || "").trim();
+      safeSetItem(HF_TOKEN_KEY, v);
+    }, 250);
   });
-  appToken.addEventListener("change", () => {
-    localStorage.setItem(HF_TOKEN_KEY, appToken.value.trim());
+
+  // Connection test
+  testConnBtn?.addEventListener("click", async () => {
+    const base = getHfBase();
+    if (!base) return setMsg("HF Spaces API Base が未設定です。", "err");
+    try {
+      const token = getAppToken();
+      const res = await fetch(`${base.replace(/\/$/, "")}/health`, {
+        method: "GET",
+        headers: { ...(token ? { "X-App-Token": token } : {}) },
+      });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      const data = await res.json();
+      if (data && data.ok) setMsg("接続OK：/health が応答しました。", "ok");
+      else setMsg("接続はできましたが応答が想定外です。", "err");
+    } catch (e) {
+      setMsg(`接続NG：${String(e.message || e)}`, "err");
+    }
   });
+
 }
+
 
 function setupAddForm() {
   const wordEl = document.getElementById("word");
