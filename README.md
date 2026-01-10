@@ -93,9 +93,9 @@ Spacesにサーバー側コードを置き、Secretsを設定します。
 アプリ内「⚙️ 接続設定」で以下を設定して保存します。
 
 - **HF Spaces API Base**  
-  例：`https://mazzgogo-tango-cho.hf.space`
+  お問い合わせください
 - **APP_TOKEN**（Spacesで設定した場合のみ）  
-  例：`tangocho`
+  お問い合わせください
 
 ---
 
