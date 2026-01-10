@@ -1,4 +1,4 @@
-const CACHE = "tango-cho-cache-v2.5-root";
+const CACHE = "tango-cho-cache-v2.6-root";
 const ASSETS = [
   "./",
   "./index.html",
