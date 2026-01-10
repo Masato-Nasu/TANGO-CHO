@@ -91,13 +91,15 @@
 
         <label class="field-label" for="example">例文（任意）</label>
         <textarea id="example" rows="2" placeholder="例: I was curious about it."></textarea>
-        <div class="field-row" style="margin-top:10px; flex-wrap:wrap">
-          <button id="exampleGenBtn" class="secondary-btn" type="button">例文自動生成（短）</button>
+
+        
+        <div class="field-row" style="margin-top:10px;">
+          <button id="exampleGenBtn" class="secondary-btn" type="button">例文自動生成（自然）</button>
           <button id="exampleAltBtn" class="secondary-btn" type="button">別案</button>
           <button id="exampleClearBtn" class="secondary-btn" type="button">例文クリア</button>
         </div>
-
-        <label class="field-label" for="memo">メモ（任意）</label>
+        <div id="exampleStatus" class="status-line"></div>
+<label class="field-label" for="memo">メモ（任意）</label>
         <textarea id="memo" rows="2" placeholder="ニュアンス・使い分けなど"></textarea>
 
 
@@ -186,5 +188,6 @@
       });
     }
   </script>
+<div class="footer" style="opacity:.7;font-size:12px;text-align:center;padding:12px">v3.5.3</div>
 </body>
 </html>
