@@ -130,6 +130,34 @@ async function translateToJaViaSpace(word) {
   return data.translated || "";
 }
 
+async function translateTextViaSpace(text, targetLang = "JA") {
+  const base = getHfBase();
+  if (!base) throw new Error("HF Spaces API Base が未設定です（⚙️接続設定）。");
+  const token = getAppToken();
+
+  const res = await fetch(`${base.replace(/\/$/, "")}/translate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { "X-App-Token": token } : {}),
+    },
+    body: JSON.stringify({ text, target_lang: targetLang }),
+  });
+
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const j = await res.json();
+      detail = j?.detail ? ` (${j.detail})` : "";
+    } catch (_) {}
+    throw new Error(`翻訳に失敗: ${res.status}${detail}`);
+  }
+
+  const data = await res.json();
+  return String(data?.translated || "").trim();
+}
+
+
 async function fetchSynonymsViaSpace(word, max = 8) {
   const base = getHfBase();
   if (!base) throw new Error("HF Spaces API Base が未設定です（⚙️接続設定）。");
@@ -239,6 +267,7 @@ function setupAddForm() {
   const meaningEl = document.getElementById("meaning");
   const statusEl = document.getElementById("status");
   const exampleEl = document.getElementById("example");
+  const exampleGenBtn = document.getElementById("exampleGenBtn");
   const memoEl = document.getElementById("memo");
   const tagsEl = document.getElementById("tags");
   const synonymsEl = document.getElementById("synonyms");
@@ -268,6 +297,66 @@ function setupAddForm() {
     setState("未翻訳");
     if (!afterSave) setMsg("", "");
   }
+
+  function looksLikeVerb(w) {
+    const wl = w.toLowerCase();
+    return wl === "be" || wl === "have" || wl === "do" ||
+      wl.endsWith("ate") || wl.endsWith("ify") || wl.endsWith("ise") || wl.endsWith("ize") ||
+      wl.endsWith("ing") || wl.endsWith("ed");
+  }
+
+  function looksLikeAdverb(w) {
+    return w.toLowerCase().endsWith("ly");
+  }
+
+  function looksLikeNoun(w) {
+    const wl = w.toLowerCase();
+    return wl.endsWith("tion") || wl.endsWith("sion") || wl.endsWith("ment") || wl.endsWith("ness") ||
+           wl.endsWith("ity") || wl.endsWith("ship") || wl.endsWith("ism") || wl.endsWith("er") || wl.endsWith("or");
+  }
+
+  function buildShortExample(word) {
+    const w = word.trim();
+    if (!w) return "";
+    if (/\s/.test(w)) {
+      return `I keep hearing the phrase "${w}".`;
+    }
+    if (looksLikeAdverb(w)) {
+      return `She spoke ${w} during the meeting.`;
+    }
+    if (looksLikeVerb(w)) {
+      return `I ${w.toLowerCase()} this every day.`;
+    }
+    if (looksLikeNoun(w)) {
+      return `This is a helpful ${w}.`;
+    }
+    return `I am ${w} about how it works.`;
+  }
+
+  async function generateExample() {
+    const w = wordEl.value.trim();
+    if (!w) {
+      setMsg("例文生成の前に英単語を入力してください。", "err");
+      return;
+    }
+    const en = buildShortExample(w);
+    if (!en) return;
+
+    try {
+      setMsg("例文を生成中…", "ok");
+      const ja = await translateTextViaSpace(en, "JA");
+      exampleEl.value = `EN: ${en}\nJA: ${ja}`;
+      setMsg("例文を自動生成しました。", "ok");
+    } catch (e) {
+      exampleEl.value = `EN: ${en}`;
+      setMsg(String(e && e.message ? e.message : "例文生成に失敗しました。"), "err");
+    }
+  }
+
+  if (exampleGenBtn) {
+    exampleGenBtn.addEventListener("click", generateExample);
+  }
+
 
   function enterEditMode(item) {
     editId = item.id;
