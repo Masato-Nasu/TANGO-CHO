@@ -11,26 +11,25 @@
 <body>
   <header class="app-header">
     <h1>TANGO-CHO</h1>
-    <p class="app-subtitle">コピー→調べる→単語帳→分類→後で復習</p>
+    <p class="app-subtitle">調べる＋手入力を1画面に統合 / 単語帳 / 4択クイズ</p>
   </header>
 
   <nav class="tab-bar">
-    <button class="tab-button active" data-section="searchSection">検索</button>
-    <button class="tab-button" data-section="manualSection">手入力</button>
+    <button class="tab-button active" data-section="addSection">追加</button>
     <button class="tab-button" data-section="listSection">単語帳</button>
+    <button class="tab-button" data-section="quizSection">クイズ</button>
   </nav>
 
   <main class="main">
-    <section id="searchSection" class="section active">
-      <h2>検索</h2>
-      <p class="section-description">
-        英単語を入力すると、HF Spaces（DeepL）経由で日本語訳を取得します。
-      </p>
+    <section id="addSection" class="section active">
+      <h2>追加（検索＋手入力）</h2>
 
-      <div class="card">
+      <details class="card" id="settingsCard">
+        <summary class="summary">⚙️ 接続設定（HF Spaces）</summary>
+
         <label class="field-label" for="hfBase">HF Spaces API Base（例：https://xxxxx.hf.space）</label>
         <div class="field-row">
-          <input id="hfBase" type="text" placeholder="https://xxxxx.hf.space" />
+          <input id="hfBase" type="text" placeholder="https://mazzgogo-tango-cho.hf.space" />
           <button id="saveHfBaseBtn" class="secondary-btn">保存</button>
         </div>
 
@@ -39,64 +38,52 @@
           <input id="appToken" type="text" placeholder="未設定なら空でOK" />
           <button id="saveAppTokenBtn" class="secondary-btn">保存</button>
         </div>
-      </div>
+
+        <p class="note">※ DeepLキーはSpacesのSecrets（DEEPL_KEY）に入れてください。PWAには不要です。</p>
+      </details>
 
       <div class="card">
-        <label class="field-label" for="searchWord">英単語</label>
         <div class="field-row">
-          <input id="searchWord" type="text" placeholder="例: curious" autocomplete="off" />
-          <button id="searchBtn" class="primary-btn">検索</button>
+          <div style="flex:1;">
+            <label class="field-label" for="word">英単語</label>
+            <input id="word" type="text" placeholder="例: curious" autocomplete="off" />
+          </div>
+          <button id="ttsBtn" class="ghost-btn" title="発音">🔊</button>
         </div>
 
-        <div id="searchResult" class="search-result"></div>
-
-        <div id="addFromSearchArea" class="add-from-search hidden">
-          <h3>単語帳に追加</h3>
-
-          <label class="field-label" for="addMeaningFromSearch">日本語訳</label>
-          <input id="addMeaningFromSearch" type="text" placeholder="自動入力されます（編集可）" />
-
-          <label class="field-label" for="addStatusFromSearch">カテゴリ</label>
-          <select id="addStatusFromSearch" class="select">
-            <option value="default">デフォルト</option>
-            <option value="forgot">覚えてない</option>
-            <option value="learned">覚えた</option>
-          </select>
-
-          <label class="field-label" for="addMemoFromSearch">メモ（任意）</label>
-          <textarea id="addMemoFromSearch" rows="2" placeholder="ニュアンスや用法など"></textarea>
-
-          <button id="saveFromSearchBtn" class="secondary-btn full-width">保存</button>
+        <div class="field-row" style="margin-top:10px;">
+          <button id="translateBtn" class="primary-btn">翻訳（DeepL）</button>
+          <button id="clearBtn" class="ghost-btn">クリア</button>
+          <div class="pill" id="translateState">未翻訳</div>
         </div>
-      </div>
-    </section>
 
-    <section id="manualSection" class="section">
-      <h2>手入力</h2>
-      <div class="card">
-        <label class="field-label" for="manualWord">英単語</label>
-        <input id="manualWord" type="text" placeholder="例: encounter" />
+        <label class="field-label" for="meaning">日本語訳（編集可）</label>
+        <input id="meaning" type="text" placeholder="翻訳ボタンで自動入力 / 手入力もOK" />
 
-        <label class="field-label" for="manualMeaning">日本語訳</label>
-        <input id="manualMeaning" type="text" placeholder="例: 出会う / 遭遇する" />
+        <div class="two-col">
+          <div>
+            <label class="field-label" for="status">カテゴリ</label>
+            <select id="status" class="select">
+              <option value="default">デフォルト</option>
+              <option value="forgot">覚えてない</option>
+              <option value="learned">覚えた</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label" for="tags">タグ（任意・カンマ区切り）</label>
+            <input id="tags" type="text" placeholder="例: TOEIC, business" />
+          </div>
+        </div>
 
-        <label class="field-label" for="manualStatus">カテゴリ</label>
-        <select id="manualStatus" class="select">
-          <option value="default">デフォルト</option>
-          <option value="forgot">覚えてない</option>
-          <option value="learned">覚えた</option>
-        </select>
+        <label class="field-label" for="example">例文（任意）</label>
+        <textarea id="example" rows="2" placeholder="例: I was curious about it."></textarea>
 
-        <label class="field-label" for="manualExample">例文（任意）</label>
-        <textarea id="manualExample" rows="2" placeholder="例: I encountered an old friend."></textarea>
+        <label class="field-label" for="memo">メモ（任意）</label>
+        <textarea id="memo" rows="2" placeholder="ニュアンス・使い分けなど"></textarea>
 
-        <label class="field-label" for="manualMemo">メモ（任意）</label>
-        <textarea id="manualMemo" rows="2"></textarea>
+        <button id="saveBtn" class="secondary-btn full-width">単語帳に保存</button>
 
-        <label class="field-label" for="manualTags">タグ（任意・カンマ区切り）</label>
-        <input id="manualTags" type="text" placeholder="例: TOEIC, business" />
-
-        <button id="manualSaveBtn" class="primary-btn full-width">単語帳に追加</button>
+        <div id="msg" class="msg"></div>
       </div>
     </section>
 
@@ -117,6 +104,41 @@
         </div>
 
         <div id="wordList" class="word-list"></div>
+      </div>
+    </section>
+
+    <section id="quizSection" class="section">
+      <h2>クイズ（4択）</h2>
+
+      <div class="card">
+        <div class="two-col">
+          <div>
+            <label class="field-label" for="quizMode">出題モード</label>
+            <select id="quizMode" class="select">
+              <option value="en2ja">英 → 日</option>
+              <option value="ja2en">日 → 英</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label" for="quizPool">出題カテゴリ</label>
+            <select id="quizPool" class="select">
+              <option value="all">全て</option>
+              <option value="forgot">覚えてない</option>
+              <option value="default">デフォルト</option>
+              <option value="learned">覚えた</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-row" style="margin-top:10px;">
+          <button id="startQuizBtn" class="primary-btn">出題</button>
+          <button id="nextQuizBtn" class="ghost-btn" disabled>次へ</button>
+          <div class="pill" id="scorePill">0 / 0</div>
+        </div>
+
+        <div id="quizArea" class="quiz-area">
+          <p class="note">※ 4択クイズは、単語が最低4つ必要です。</p>
+        </div>
       </div>
     </section>
   </main>

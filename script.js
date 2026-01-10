@@ -9,6 +9,10 @@ const STATUS_LABEL = {
   learned: "覚えた",
 };
 
+function nowIso() {
+  return new Date().toISOString();
+}
+
 function loadWords() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -19,6 +23,7 @@ function loadWords() {
     return [];
   }
 }
+
 function saveWords(words) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
 }
@@ -35,6 +40,15 @@ function speak(text) {
   window.speechSynthesis.speak(u);
 }
 
+function setMsg(text, kind) {
+  const el = document.getElementById("msg");
+  if (!el) return;
+  el.className = "msg";
+  el.textContent = text || "";
+  if (kind === "ok") el.classList.add("ok");
+  if (kind === "err") el.classList.add("err");
+}
+
 function getHfBase() {
   return (localStorage.getItem(HF_BASE_KEY) || "").trim();
 }
@@ -44,7 +58,7 @@ function getAppToken() {
 
 async function translateToJaViaSpace(word) {
   const base = getHfBase();
-  if (!base) throw new Error("HF Spaces API Base が未設定です。");
+  if (!base) throw new Error("HF Spaces API Base が未設定です（⚙️接続設定）。");
   const token = getAppToken();
 
   const res = await fetch(`${base.replace(/\/$/, "")}/translate`, {
@@ -74,11 +88,13 @@ function setupTabs() {
       secs.forEach((s) => s.classList.remove("active"));
       b.classList.add("active");
       document.getElementById(id)?.classList.add("active");
+      // When entering list tab, rerender to reflect any changes
+      if (id === "listSection") renderWordList();
     });
   });
 }
 
-function setupHfSettings() {
+function setupSettings() {
   const hfBase = document.getElementById("hfBase");
   const saveHfBaseBtn = document.getElementById("saveHfBaseBtn");
   const appToken = document.getElementById("appToken");
@@ -89,11 +105,87 @@ function setupHfSettings() {
 
   saveHfBaseBtn.addEventListener("click", () => {
     localStorage.setItem(HF_BASE_KEY, hfBase.value.trim());
-    alert("HF Spaces API Base を保存しました。");
+    setMsg("HF Spaces API Base を保存しました。", "ok");
   });
   saveAppTokenBtn.addEventListener("click", () => {
     localStorage.setItem(HF_TOKEN_KEY, appToken.value.trim());
-    alert("APP_TOKEN を保存しました。");
+    setMsg("APP_TOKEN を保存しました。", "ok");
+  });
+}
+
+function setupAddForm() {
+  const wordEl = document.getElementById("word");
+  const meaningEl = document.getElementById("meaning");
+  const statusEl = document.getElementById("status");
+  const exampleEl = document.getElementById("example");
+  const memoEl = document.getElementById("memo");
+  const tagsEl = document.getElementById("tags");
+  const translateBtn = document.getElementById("translateBtn");
+  const saveBtn = document.getElementById("saveBtn");
+  const clearBtn = document.getElementById("clearBtn");
+  const ttsBtn = document.getElementById("ttsBtn");
+  const statePill = document.getElementById("translateState");
+
+  function setState(text) {
+    if (!statePill) return;
+    statePill.textContent = text;
+  }
+
+  ttsBtn.addEventListener("click", () => {
+    const w = wordEl.value.trim();
+    if (w) speak(w);
+  });
+
+  clearBtn.addEventListener("click", () => {
+    wordEl.value = "";
+    meaningEl.value = "";
+    statusEl.value = "default";
+    exampleEl.value = "";
+    memoEl.value = "";
+    tagsEl.value = "";
+    setState("未翻訳");
+    setMsg("", "");
+  });
+
+  translateBtn.addEventListener("click", async () => {
+    const w = wordEl.value.trim();
+    if (!w) return setMsg("英単語を入力してください。", "err");
+
+    setMsg("翻訳中...", "");
+    setState("翻訳中");
+    try {
+      const ja = await translateToJaViaSpace(w);
+      meaningEl.value = ja;
+      setMsg("翻訳しました（編集できます）。", "ok");
+      setState("翻訳済み");
+    } catch (e) {
+      setMsg(String(e.message || e), "err");
+      setState("失敗");
+    }
+  });
+
+  saveBtn.addEventListener("click", () => {
+    const w = wordEl.value.trim();
+    const m = meaningEl.value.trim();
+    if (!w) return setMsg("英単語が空です。", "err");
+    if (!m) return setMsg("日本語訳が空です（翻訳 or 手入力してください）。", "err");
+
+    const words = loadWords();
+    const createdAt = nowIso();
+    words.push({
+      id: `${createdAt}-${Math.random().toString(36).slice(2, 8)}`,
+      word: w,
+      meaning: m,
+      status: statusEl.value || "default",
+      example: exampleEl.value.trim(),
+      memo: memoEl.value.trim(),
+      tags: tagsEl.value.trim(),
+      source: "add",
+      createdAt,
+    });
+    saveWords(words);
+    setMsg("保存しました。", "ok");
+    renderWordList();
   });
 }
 
@@ -101,14 +193,15 @@ function renderWordList() {
   const listEl = document.getElementById("wordList");
   const countEl = document.getElementById("wordCount");
   const filter = (localStorage.getItem(FILTER_KEY) || "all").trim();
+  const all = loadWords();
 
-  let words = loadWords().sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
-  if (filter !== "all") {
-    words = words.filter((w) => (w.status || "default") === filter);
-  }
+  if (countEl) countEl.textContent = String(all.length);
+  if (!listEl) return;
+
+  let words = [...all].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+  if (filter !== "all") words = words.filter((w) => (w.status || "default") === filter);
 
   listEl.innerHTML = "";
-  countEl.textContent = String(loadWords().length);
 
   if (words.length === 0) {
     listEl.innerHTML = `<p style="font-size:0.85rem;color:#888;">該当する単語がありません。</p>`;
@@ -146,12 +239,12 @@ function renderWordList() {
     `;
     status.value = w.status || "default";
     status.addEventListener("change", () => {
-      const all = loadWords();
-      const idx = all.findIndex((x) => x.id === w.id);
+      const allWords = loadWords();
+      const idx = allWords.findIndex((x) => x.id === w.id);
       if (idx >= 0) {
-        all[idx].status = status.value;
-        saveWords(all);
-        renderWordList();
+        allWords[idx].status = status.value;
+        saveWords(allWords);
+        renderWordList(); // filter might hide/show
       }
     });
 
@@ -169,9 +262,8 @@ function renderWordList() {
     meta.className = "word-meta";
     const created = w.createdAt ? new Date(w.createdAt).toLocaleString() : "";
     const tags = w.tags ? ` / タグ: ${w.tags}` : "";
-    const src = w.source ? ` / from: ${w.source}` : "";
     const st = ` / ${STATUS_LABEL[w.status || "default"]}`;
-    meta.textContent = `登録: ${created}${tags}${src}${st}`;
+    meta.textContent = `登録: ${created}${tags}${st}`;
 
     const actions = document.createElement("div");
     actions.className = "word-actions";
@@ -212,6 +304,7 @@ function renderWordList() {
 
 function setupFilter() {
   const sel = document.getElementById("statusFilter");
+  if (!sel) return;
   sel.value = (localStorage.getItem(FILTER_KEY) || "all").trim();
   sel.addEventListener("change", () => {
     localStorage.setItem(FILTER_KEY, sel.value);
@@ -221,6 +314,7 @@ function setupFilter() {
 
 function setupExport() {
   const btn = document.getElementById("exportBtn");
+  if (!btn) return;
   btn.addEventListener("click", () => {
     const words = loadWords();
     const blob = new Blob([JSON.stringify(words, null, 2)], { type: "application/json" });
@@ -237,146 +331,256 @@ function setupExport() {
   });
 }
 
-function setupSearch() {
-  const input = document.getElementById("searchWord");
-  const btn = document.getElementById("searchBtn");
-  const result = document.getElementById("searchResult");
-  const addArea = document.getElementById("addFromSearchArea");
+// --------------------
+// Quiz (4-choice)
+// --------------------
+let quizState = {
+  active: false,
+  current: null,
+  answered: false,
+  correct: 0,
+  total: 0,
+};
 
-  const meaningInput = document.getElementById("addMeaningFromSearch");
-  const memoInput = document.getElementById("addMemoFromSearch");
-  const statusSel = document.getElementById("addStatusFromSearch");
-  const saveBtn = document.getElementById("saveFromSearchBtn");
-
-  async function show(word) {
-    const w = (word || "").trim();
-    if (!w) {
-      result.innerHTML = `<p class="search-error">英単語を入力してください。</p>`;
-      addArea.classList.add("hidden");
-      return;
-    }
-
-    result.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-        <div>
-          <div style="font-size:1.1rem;font-weight:700;">${w}</div>
-          <div style="font-size:0.85rem;color:#bbb;">翻訳中...</div>
-        </div>
-        <button class="tts-btn" id="ttsBtnNow">🔊 発音</button>
-      </div>
-      <div style="margin-top:6px;">HF Spaces → DeepL で日本語訳を取得しています</div>
-    `;
-    document.getElementById("ttsBtnNow")?.addEventListener("click", () => speak(w));
-
-    addArea.classList.remove("hidden");
-    meaningInput.value = "";
-    memoInput.value = "";
-    statusSel.value = "default";
-
-    try {
-      const ja = await translateToJaViaSpace(w);
-      result.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-          <div>
-            <div style="font-size:1.1rem;font-weight:700;">${w}</div>
-            <div style="font-size:0.85rem;color:#bbb;">DeepL 翻訳</div>
-          </div>
-          <button class="tts-btn" id="ttsBtnNow">🔊 発音</button>
-        </div>
-        <div style="margin-top:6px;"><b>日本語:</b> ${ja}</div>
-      `;
-      document.getElementById("ttsBtnNow")?.addEventListener("click", () => speak(w));
-      meaningInput.value = ja;
-    } catch (e) {
-      result.innerHTML = `<p class="search-error">${String(e.message || e)}</p>`;
-    }
+function choiceShuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
   }
-
-  btn.addEventListener("click", () => show(input.value));
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      show(input.value);
-    }
-  });
-
-  saveBtn.addEventListener("click", () => {
-    const word = input.value.trim();
-    const meaning = meaningInput.value.trim();
-    const memo = memoInput.value.trim();
-    const status = statusSel.value;
-
-    if (!word) return alert("英単語が空です。");
-    if (!meaning) return alert("日本語訳が空です。");
-
-    const now = new Date().toISOString();
-    const words = loadWords();
-    words.push({
-      id: `${now}-${Math.random().toString(36).slice(2, 8)}`,
-      word,
-      meaning,
-      memo,
-      example: "",
-      tags: "",
-      source: "search",
-      status,
-      createdAt: now,
-    });
-    saveWords(words);
-    renderWordList();
-    alert("保存しました。");
-  });
+  return a;
 }
 
-function setupManual() {
-  const word = document.getElementById("manualWord");
-  const meaning = document.getElementById("manualMeaning");
-  const status = document.getElementById("manualStatus");
-  const example = document.getElementById("manualExample");
-  const memo = document.getElementById("manualMemo");
-  const tags = document.getElementById("manualTags");
-  const save = document.getElementById("manualSaveBtn");
+function weightedPick(items, weightFn) {
+  const weights = items.map(weightFn);
+  const sum = weights.reduce((s, w) => s + w, 0);
+  if (sum <= 0) return items[Math.floor(Math.random() * items.length)];
+  let r = Math.random() * sum;
+  for (let i = 0; i < items.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return items[i];
+  }
+  return items[items.length - 1];
+}
 
-  save.addEventListener("click", () => {
-    const w = word.value.trim();
-    const m = meaning.value.trim();
-    if (!w) return alert("英単語を入力してください。");
-    if (!m) return alert("日本語訳を入力してください。");
+function getPoolWords(pool) {
+  const all = loadWords();
+  if (pool === "all") return all;
+  return all.filter(w => (w.status || "default") === pool);
+}
 
-    const now = new Date().toISOString();
-    const words = loadWords();
-    words.push({
-      id: `${now}-${Math.random().toString(36).slice(2, 8)}`,
-      word: w,
-      meaning: m,
-      status: status.value,
-      example: example.value.trim(),
-      memo: memo.value.trim(),
-      tags: tags.value.trim(),
-      source: "manual",
-      createdAt: now,
-    });
-    saveWords(words);
-    renderWordList();
+function statusWeight(st) {
+  if (st === "forgot") return 3;
+  if (st === "default") return 2;
+  if (st === "learned") return 1;
+  return 2;
+}
 
-    word.value = "";
-    meaning.value = "";
-    status.value = "default";
-    example.value = "";
-    memo.value = "";
-    tags.value = "";
-    alert("保存しました。");
+function buildQuestion(mode, pool) {
+  const poolWords = getPoolWords(pool);
+  if (poolWords.length < 4) return { error: "4択クイズには、同じ出題カテゴリ内に単語が最低4つ必要です。" };
+
+  const target = weightedPick(poolWords, w => statusWeight(w.status || "default"));
+
+  const prompt = mode === "en2ja" ? target.word : (target.meaning || "");
+  const correct = mode === "en2ja" ? (target.meaning || "") : target.word;
+
+  // distractors
+  const others = poolWords.filter(w => w.id !== target.id);
+  const seen = new Set([correct]);
+  const distract = [];
+  const keyOf = (w) => mode === "en2ja" ? (w.meaning || "") : (w.word || "");
+  const shuffled = choiceShuffle(others);
+
+  for (const w of shuffled) {
+    const k = keyOf(w);
+    if (!k) continue;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    distract.push(k);
+    if (distract.length >= 3) break;
+  }
+
+  if (distract.length < 3) {
+    return { error: "4択の選択肢を作れませんでした（訳/単語の重複が多い可能性）。別カテゴリを選ぶか、単語数を増やしてください。" };
+  }
+
+  const choices = choiceShuffle([correct, ...distract]);
+
+  return { target, mode, prompt, correct, choices };
+}
+
+function renderQuiz() {
+  const area = document.getElementById("quizArea");
+  const score = document.getElementById("scorePill");
+  const nextBtn = document.getElementById("nextQuizBtn");
+  if (!area || !score || !nextBtn) return;
+
+  score.textContent = `${quizState.correct} / ${quizState.total}`;
+
+  if (!quizState.active || !quizState.current) {
+    area.innerHTML = `<p class="note">「出題」を押すと始まります。※ 4択クイズは、単語が最低4つ必要です。</p>`;
+    nextBtn.disabled = true;
+    return;
+  }
+
+  const q = quizState.current;
+  if (q.error) {
+    area.innerHTML = `<p class="note" style="color:#ff4f4f;">${q.error}</p>`;
+    nextBtn.disabled = true;
+    return;
+  }
+
+  const modeLabel = q.mode === "en2ja" ? "英 → 日" : "日 → 英";
+  const promptLabel = q.mode === "en2ja" ? "この英単語の意味は？" : "この日本語に対応する英単語は？";
+
+  area.innerHTML = `
+    <p class="quiz-mini">${modeLabel}</p>
+    <p class="quiz-q">${promptLabel}<br><span style="font-size:1.25rem;">${escapeHtml(q.prompt)}</span></p>
+    <div class="quiz-choices" id="choices"></div>
+    <div class="quiz-foot" id="quizFoot"></div>
+  `;
+
+  const choicesEl = document.getElementById("choices");
+  const footEl = document.getElementById("quizFoot");
+  choicesEl.innerHTML = "";
+
+  q.choices.forEach((c) => {
+    const b = document.createElement("button");
+    b.className = "choice-btn";
+    b.textContent = c;
+    b.disabled = quizState.answered;
+    b.addEventListener("click", () => onAnswer(c));
+    choicesEl.appendChild(b);
+  });
+
+  footEl.innerHTML = `<span class="quiz-mini">出題元カテゴリ: ${STATUS_LABEL[q.target.status || "default"]}</span>`;
+  nextBtn.disabled = !quizState.answered;
+}
+
+function escapeHtml(s) {
+  return String(s || "").replace(/[&<>"']/g, (m) => ({
+    "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#039;"
+  }[m]));
+}
+
+function onAnswer(selected) {
+  if (!quizState.current || quizState.answered) return;
+  quizState.answered = true;
+  quizState.total += 1;
+
+  const q = quizState.current;
+  const isCorrect = selected === q.correct;
+  if (isCorrect) quizState.correct += 1;
+
+  // mark buttons
+  const btns = Array.from(document.querySelectorAll(".choice-btn"));
+  btns.forEach((b) => {
+    const txt = b.textContent;
+    if (txt === q.correct) b.classList.add("correct");
+    if (txt === selected && !isCorrect) b.classList.add("wrong");
+    b.disabled = true;
+  });
+
+  // footer actions
+  const footEl = document.getElementById("quizFoot");
+  if (footEl) {
+    const msg = document.createElement("div");
+    msg.className = "quiz-mini";
+    msg.style.marginTop = "6px";
+    msg.textContent = isCorrect ? "正解！" : `不正解（正解: ${q.correct}）`;
+    footEl.appendChild(msg);
+
+    const actions = document.createElement("div");
+    actions.style.display = "flex";
+    actions.style.gap = "8px";
+    actions.style.alignItems = "center";
+    actions.style.flexWrap = "wrap";
+    actions.style.marginTop = "10px";
+
+    const speakBtn = document.createElement("button");
+    speakBtn.className = "small-btn";
+    speakBtn.textContent = "🔊 発音";
+    speakBtn.addEventListener("click", () => q.target.word && speak(q.target.word));
+
+    const markForgot = document.createElement("button");
+    markForgot.className = "small-btn danger";
+    markForgot.textContent = "覚えてないへ";
+    markForgot.addEventListener("click", () => updateWordStatus(q.target.id, "forgot"));
+
+    const markLearned = document.createElement("button");
+    markLearned.className = "small-btn accent";
+    markLearned.textContent = "覚えたへ";
+    markLearned.addEventListener("click", () => updateWordStatus(q.target.id, "learned"));
+
+    actions.appendChild(speakBtn);
+    actions.appendChild(markForgot);
+    actions.appendChild(markLearned);
+    footEl.appendChild(actions);
+  }
+
+  const score = document.getElementById("scorePill");
+  if (score) score.textContent = `${quizState.correct} / ${quizState.total}`;
+
+  const nextBtn = document.getElementById("nextQuizBtn");
+  if (nextBtn) nextBtn.disabled = false;
+}
+
+function updateWordStatus(id, status) {
+  const all = loadWords();
+  const idx = all.findIndex(w => w.id === id);
+  if (idx >= 0) {
+    all[idx].status = status;
+    saveWords(all);
+    // update label in footer
+    const footEl = document.getElementById("quizFoot");
+    if (footEl && quizState.current) {
+      const lbl = STATUS_LABEL[status] || status;
+      const info = footEl.querySelector(".quiz-mini");
+      if (info) info.textContent = `出題元カテゴリ: ${lbl}`;
+    }
+  }
+}
+
+function nextQuestion() {
+  const mode = document.getElementById("quizMode")?.value || "en2ja";
+  const pool = document.getElementById("quizPool")?.value || "all";
+  quizState.current = buildQuestion(mode, pool);
+  quizState.answered = false;
+  quizState.active = true;
+  renderQuiz();
+}
+
+function setupQuiz() {
+  const startBtn = document.getElementById("startQuizBtn");
+  const nextBtn = document.getElementById("nextQuizBtn");
+  if (!startBtn || !nextBtn) return;
+
+  startBtn.addEventListener("click", () => {
+    quizState.active = true;
+    quizState.current = null;
+    quizState.answered = false;
+    // keep score (or reset?). Better to reset on new start.
+    quizState.correct = 0;
+    quizState.total = 0;
+    nextQuestion();
+  });
+
+  nextBtn.addEventListener("click", () => {
+    nextQuestion();
   });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   setupTabs();
-  setupHfSettings();
-  setupSearch();
-  setupManual();
+  setupSettings();
+  setupAddForm();
   setupFilter();
   setupExport();
+  setupQuiz();
+
   renderWordList();
+  renderQuiz();
 
   document.getElementById("ttsTestBtn")?.addEventListener("click", () => speak("Hello, this is a test."));
 });
