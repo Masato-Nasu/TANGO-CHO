@@ -113,25 +113,6 @@ Spacesにサーバー側コードを置き、Secretsを設定します。
 
 ---
 
-## 🔧 トラブルシューティング
-
-### PWAが更新されない / ロゴが変わらない
-PWAはキャッシュが強いです。
-
-1. いったんアプリを終了 → 再起動  
-2. ブラウザで開いて **ハードリロード（Ctrl+F5）**  
-3. それでもダメなら **PWAを削除→再インストール**（OSアイコンのキャッシュ対策）
-
-### 翻訳が動かない（Spacesエラー）
-- `{"detail":"DEEPL_KEY is not set..."}`  
-  → SpacesのSecretsに `DEEPL_KEY` が入っていない or 再起動していない  
-- `401 Invalid app token`  
-  → `APP_TOKEN` が違う / PWA側のAPP_TOKEN未設定  
-- `DeepL error 403/4xx`  
-  → Free/Pro endpoint不一致やキー不正の可能性
-
----
-
 ## 📁 データについて
 - 単語帳は **端末内（localStorage）** に保存されます
 - 端末を変えるとデータは引き継げません（同期なし）
