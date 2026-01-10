@@ -40,16 +40,19 @@
           <input id="hfBase" type="text" placeholder="https://mazzgogo-tango-cho.hf.space" />
           <button id="saveHfBaseBtn" class="secondary-btn" type="button">保存</button>
         </div>
+        <div id="hfBaseStatus" class="status-line"></div>
 
         <label class="field-label" for="appToken">APP_TOKEN（Spacesで設定した場合のみ）</label>
         <div class="field-row">
           <input id="appToken" type="text" placeholder="未設定なら空でOK" />
           <button id="saveAppTokenBtn" class="secondary-btn" type="button">保存</button>
         </div>
+        <div id="appTokenStatus" class="status-line"></div>
 
         <div class="btn-row" style="margin-top:10px">
           <button id="testConnBtn" class="secondary-btn" type="button">接続テスト（/health）</button>
         </div>
+        <div id="testConnStatus" class="status-line"></div>
         <div style="height:8px"></div>
 
         <p class="note">※ DeepLキーはSpacesのSecrets（DEEPL_KEY）に入れてください。PWAには不要です。</p>
@@ -180,6 +183,7 @@
   <footer class="app-footer">
     <button id="ttsTestBtn" class="ghost-btn small">🔊 テスト</button>
     <span class="footer-text">発音: Web Speech API / 翻訳: HF Spaces → DeepL</span>
+    <span class="footer-text" data-version>v3.6.5</span>
   </footer>
 
   <script src="script.js"></script>

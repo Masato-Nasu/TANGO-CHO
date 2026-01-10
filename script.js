@@ -58,6 +58,29 @@ function setMsg(text, kind) {
   if (kind === "err") el.classList.add("err");
 }
 
+function setStatusLine(id, text, type = "") {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text || "";
+  el.classList.remove("ok","err");
+  if (type) el.classList.add(type);
+}
+
+window.addEventListener("error", (e) => {
+  try {
+    const msg = e?.message ? String(e.message) : "Unknown error";
+    setStatusLine("testConnStatus", `JSエラー: ${msg}`, "err");
+  } catch (_) {}
+});
+
+window.addEventListener("unhandledrejection", (e) => {
+  try {
+    const msg = e?.reason?.message ? String(e.reason.message) : String(e.reason || "Unhandled rejection");
+    setStatusLine("testConnStatus", `Promiseエラー: ${msg}`, "err");
+  } catch (_) {}
+});
+
+
 function setListMsg(text, kind) {
   const el = document.getElementById("listMsg");
   if (!el) return;
@@ -238,9 +261,15 @@ function setupSettings() {
   const saveAppTokenBtn = document.getElementById("saveAppTokenBtn");
   const connStatus = document.getElementById("connStatus");
   const testConnBtn = document.getElementById("testConnBtn");
+  const hfBaseStatus = document.getElementById("hfBaseStatus");
+  const appTokenStatus = document.getElementById("appTokenStatus");
+  const testConnStatus = document.getElementById("testConnStatus");
 
   hfBase.value = getHfBase();
   appToken.value = getAppToken();
+  setStatusLine("hfBaseStatus", hfBase.value ? `保存済み：${hfBase.value}` : "未保存：HF Base 未設定", hfBase.value ? "ok" : "err");
+  setStatusLine("appTokenStatus", appToken.value ? `保存済み：${appToken.value}` : "未設定（空）", "");
+  setStatusLine("testConnStatus", "", "");
 
   function safeSetItem(key, value) {
     try {

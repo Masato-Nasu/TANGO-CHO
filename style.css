@@ -113,3 +113,16 @@ details summary::-webkit-details-marker{display:none}
 
 /* example button spacing */
 #exampleGenBtn{ margin-bottom: 6px; }
+
+.status-line{
+  margin-top:8px;
+  padding:10px 12px;
+  border-radius:14px;
+  border:1px solid var(--border);
+  background: rgba(255,255,255,0.03);
+  font-size:14px;
+  line-height:1.4;
+  word-break: break-word;
+}
+.status-line.ok{ border-color: rgba(0,200,150,0.6); }
+.status-line.err{ border-color: rgba(255,100,100,0.6); }
