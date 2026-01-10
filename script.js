@@ -130,37 +130,6 @@ async function translateToJaViaSpace(word) {
   return data.translated || "";
 }
 
-// ===== Example sentence generator (short) =====
-function aOrAn(word) {
-  const w = String(word || "").trim().toLowerCase();
-  if (!w) return "a";
-  // Simple vowel rule + a few common exceptions
-  if (/^(honest|hour|heir|herb)/.test(w)) return "an";
-  if (/^(uni|use|user|euro)/.test(w)) return "a";
-  return /^[aeiou]/.test(w) ? "an" : "a";
-}
-
-function guessPos(word) {
-  const w = String(word || "").trim().toLowerCase();
-  if (!w) return "noun";
-  if (w.endsWith("ly")) return "adverb";
-  if (/(ing|ed|en|ize|ise|ify|fy|s)$/.test(w)) return "verb"; // heuristic
-  if (/(ous|ful|able|ible|ive|al|ic|less|y|ish)$/.test(w)) return "adj";
-  return "noun";
-}
-
-function generateExampleEn(word) {
-  const w = String(word || "").trim();
-  if (!w) return "";
-  const pos = guessPos(w);
-  if (pos === "adverb") return `He did it ${w}.`;
-  if (pos === "verb") return `I ${w} every day.`;
-  if (pos === "adj") return `It is ${w}.`;
-  // noun
-  const art = aOrAn(w);
-  return `This is ${art} ${w}.`;
-}
-
 async function fetchSynonymsViaSpace(word, max = 8) {
   const base = getHfBase();
   if (!base) throw new Error("HF Spaces API Base が未設定です（⚙️接続設定）。");
@@ -270,13 +239,14 @@ function setupAddForm() {
   const meaningEl = document.getElementById("meaning");
   const statusEl = document.getElementById("status");
   const exampleEl = document.getElementById("example");
+  const exampleGenBtn = document.getElementById("exampleGenBtn");
+  const exampleAltBtn = document.getElementById("exampleAltBtn");
+  const exampleClearBtn = document.getElementById("exampleClearBtn");
   const memoEl = document.getElementById("memo");
   const tagsEl = document.getElementById("tags");
   const synonymsEl = document.getElementById("synonyms");
   const synFetchBtn = document.getElementById("synFetchBtn");
   const translateBtn = document.getElementById("translateBtn");
-  const exampleGenBtn = document.getElementById("exampleGenBtn");
-  const exampleClearBtn = document.getElementById("exampleClearBtn");
   const saveBtn = document.getElementById("saveBtn");
   const clearBtn = document.getElementById("clearBtn");
   const ttsBtn = document.getElementById("ttsBtn");
@@ -353,6 +323,92 @@ function setupAddForm() {
     clearForm(false);
   });
 
+
+
+// --- Example sentence generator (short, 1 sentence) ---
+const EX_TPL = {
+  adjective: [
+    "I felt {w} about the result.",
+    "She seemed {w} after hearing the news.",
+    "The idea sounded {w} at first.",
+    "He stayed {w} during the interview.",
+    "I became {w} when I saw it."
+  ],
+  noun: [
+    "Her {w} helped her learn quickly.",
+    "We talked about {w} during the meeting.",
+    "I noticed {w} in the article I was reading.",
+    "His {w} surprised everyone.",
+    "The {w} changed the way I think."
+  ],
+  adverb: [
+    "She spoke {w} and clearly.",
+    "He worked {w} all day.",
+    "They listened {w} to the instructions.",
+    "I tried to explain it {w}.",
+    "The team responded {w} to the request."
+  ],
+  verb: [
+    "They decided to {w} the plan tomorrow.",
+    "Please {w} this carefully.",
+    "I will {w} it after lunch.",
+    "We need to {w} the problem step by step.",
+    "He tried to {w} the mistake quickly."
+  ],
+  any: [
+    "I looked up the word “{w}” while reading.",
+    "I saw “{w}” in a sentence and checked the meaning.",
+    "I want to remember the word “{w}”.",
+    "I wrote down “{w}” in my vocabulary list.",
+    "I practiced using “{w}” today."
+  ],
+};
+
+function guessPos(word) {
+  const w = String(word || "").trim().toLowerCase();
+  if (!w) return "any";
+  if (w.includes(" ")) return "any";
+  if (w.startsWith("to ")) return "verb";
+  if (w.endsWith("ly")) return "adverb";
+  if (/(tion|sion|ment|ness|ity|ship|age|ance|ence|ism|ist|ure|hood|dom|acy|ery)$/.test(w)) return "noun";
+  if (/(able|ible|ous|ive|ful|less|al|ic|ish|ary|y)$/.test(w)) return "adjective";
+  return "any";
+}
+
+function pickExampleSentence(word, forceAlt=false) {
+  const pos = guessPos(word);
+  const list = []
+    .concat(EX_TPL[pos] || [])
+    .concat(EX_TPL.any);
+
+  const key = "tangoChoExampleIdx:" + String(word || "").trim().toLowerCase();
+  let idx = parseInt(localStorage.getItem(key) || "0", 10);
+  if (!Number.isFinite(idx)) idx = 0;
+  if (forceAlt) idx += 1; // next candidate
+
+  const tpl = list[idx % list.length];
+  localStorage.setItem(key, String((idx + 1) % 999999));
+
+  let s = tpl.replaceAll("{w}", String(word).trim());
+  if (!/[.!?]$/.test(s)) s += ".";
+  return s;
+}
+
+async function generateExample(forceAlt=false) {
+  const w = wordEl.value.trim();
+  if (!w) return setMsg("英単語を入力してください。", "err");
+
+  setMsg("例文を作成中...", "");
+  try {
+    const en = pickExampleSentence(w, forceAlt);
+    // Use the same DeepL relay (Spaces) to translate the sentence
+    const ja = await translateToJaViaSpace(en);
+    exampleEl.value = `EN: ${en}\nJA: ${ja}`;
+    setMsg("例文を作成しました（編集できます）。", "ok");
+  } catch (e) {
+    setMsg(String(e.message || e), "err");
+  }
+}
   translateBtn.addEventListener("click", async () => {
     const w = wordEl.value.trim();
     if (!w) return setMsg("英単語を入力してください。", "err");
@@ -369,33 +425,6 @@ function setupAddForm() {
       setState("失敗");
     }
   });
-
-// Example: auto-generate (short EN + JA)
-exampleGenBtn?.addEventListener("click", async () => {
-  const w = wordEl.value.trim();
-  if (!w) return setMsg("英単語を入力してください。", "err");
-
-  const en = generateExampleEn(w);
-  if (!en) return setMsg("例文を生成できませんでした。", "err");
-
-  setMsg("例文を生成中…", "");
-  try {
-    const ja = await translateToJaViaSpace(en);
-    // Store both EN/JA in the single field for backward compatibility
-    exampleEl.value = `EN: ${en}\nJA: ${ja || ""}`.trim();
-    setMsg("例文を生成しました（編集できます）。", "ok");
-  } catch (e) {
-    // Even if translation fails, at least provide EN
-    exampleEl.value = `EN: ${en}`;
-    setMsg(String(e.message || e), "err");
-  }
-});
-
-exampleClearBtn?.addEventListener("click", () => {
-  exampleEl.value = "";
-  setMsg("例文をクリアしました。", "ok");
-});
-
 
   async function fillSynonymsIfEmpty(word) {
     if (!synonymsEl) return;
@@ -425,6 +454,16 @@ exampleClearBtn?.addEventListener("click", () => {
     });
   }
 
+
+
+
+// Example buttons
+exampleGenBtn?.addEventListener("click", () => generateExample(false));
+exampleAltBtn?.addEventListener("click", () => generateExample(true));
+exampleClearBtn?.addEventListener("click", () => {
+  exampleEl.value = "";
+  setMsg("例文をクリアしました。", "ok");
+});
 
   saveBtn.addEventListener("click", () => {
     const w = wordEl.value.trim();
