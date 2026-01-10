@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>TANGO-CHO</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#00c896" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>TANGO-CHO</h1>
+    <p class="app-subtitle">調べる＋手入力を1画面に統合 / 単語帳 / 4択クイズ</p>
+  </header>
+
+  <nav class="tab-bar">
+    <button class="tab-button active" data-section="addSection">追加</button>
+    <button class="tab-button" data-section="listSection">単語帳</button>
+    <button class="tab-button" data-section="quizSection">クイズ</button>
+  </nav>
+
+  <main class="main">
+    <section id="addSection" class="section active">
+      <h2>追加（検索＋手入力）</h2>
+
+      <details class="card" id="settingsCard">
+        <summary class="summary">⚙️ 接続設定（HF Spaces）</summary>
+
+        <label class="field-label" for="hfBase">HF Spaces API Base（例：https://xxxxx.hf.space）</label>
+        <div class="field-row">
+          <input id="hfBase" type="text" placeholder="https://mazzgogo-tango-cho.hf.space" />
+          <button id="saveHfBaseBtn" class="secondary-btn">保存</button>
+        </div>
+
+        <label class="field-label" for="appToken">APP_TOKEN（Spacesで設定した場合のみ）</label>
+        <div class="field-row">
+          <input id="appToken" type="text" placeholder="未設定なら空でOK" />
+          <button id="saveAppTokenBtn" class="secondary-btn">保存</button>
+        </div>
+
+        <p class="note">※ DeepLキーはSpacesのSecrets（DEEPL_KEY）に入れてください。PWAには不要です。</p>
+      </details>
+
+      <div class="card">
+        <div class="field-row">
+          <div style="flex:1;">
+            <label class="field-label" for="word">英単語</label>
+            <input id="word" type="text" placeholder="例: curious" autocomplete="off" />
+          </div>
+          <button id="ttsBtn" class="ghost-btn" title="発音">🔊</button>
+        </div>
+
+        <div class="field-row" style="margin-top:10px;">
+          <button id="translateBtn" class="primary-btn">翻訳（DeepL）</button>
+          <button id="clearBtn" class="ghost-btn">クリア</button>
+          <div class="pill" id="translateState">未翻訳</div>
+        </div>
+
+        <label class="field-label" for="meaning">日本語訳（編集可）</label>
+        <input id="meaning" type="text" placeholder="翻訳ボタンで自動入力 / 手入力もOK" />
+
+        <div class="two-col">
+          <div>
+            <label class="field-label" for="status">カテゴリ</label>
+            <select id="status" class="select">
+              <option value="default">デフォルト</option>
+              <option value="forgot">覚えてない</option>
+              <option value="learned">覚えた</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label" for="tags">タグ（任意・カンマ区切り）</label>
+            <input id="tags" type="text" placeholder="例: TOEIC, business" />
+          </div>
+        </div>
+
+        <label class="field-label" for="example">例文（任意）</label>
+        <textarea id="example" rows="2" placeholder="例: I was curious about it."></textarea>
+
+        <label class="field-label" for="memo">メモ（任意）</label>
+        <textarea id="memo" rows="2" placeholder="ニュアンス・使い分けなど"></textarea>
+
+        <button id="saveBtn" class="secondary-btn full-width">単語帳に保存</button>
+
+        <div id="msg" class="msg"></div>
+      </div>
+    </section>
+
+    <section id="listSection" class="section">
+      <h2>単語帳</h2>
+      <div class="card">
+        <div class="list-header">
+          <span>登録語数: <span id="wordCount">0</span></span>
+          <div class="list-controls">
+            <select id="statusFilter" class="select small">
+              <option value="all">全て</option>
+              <option value="forgot">覚えてない</option>
+              <option value="default">デフォルト</option>
+              <option value="learned">覚えた</option>
+            </select>
+            <button id="exportBtn" class="ghost-btn">JSON</button>
+          </div>
+        </div>
+
+        <div id="wordList" class="word-list"></div>
+      </div>
+    </section>
+
+    <section id="quizSection" class="section">
+      <h2>クイズ（4択）</h2>
+
+      <div class="card">
+        <div class="two-col">
+          <div>
+            <label class="field-label" for="quizMode">出題モード</label>
+            <select id="quizMode" class="select">
+              <option value="en2ja">英 → 日</option>
+              <option value="ja2en">日 → 英</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label" for="quizPool">出題カテゴリ</label>
+            <select id="quizPool" class="select">
+              <option value="all">全て</option>
+              <option value="forgot">覚えてない</option>
+              <option value="default">デフォルト</option>
+              <option value="learned">覚えた</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-row" style="margin-top:10px;">
+          <button id="startQuizBtn" class="primary-btn">出題</button>
+          <button id="nextQuizBtn" class="ghost-btn" disabled>次へ</button>
+          <div class="pill" id="scorePill">0 / 0</div>
+        </div>
+
+        <div id="quizArea" class="quiz-area">
+          <p class="note">※ 4択クイズは、単語が最低4つ必要です。</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <button id="ttsTestBtn" class="ghost-btn small">🔊 テスト</button>
+    <span class="footer-text">発音: Web Speech API / 翻訳: HF Spaces → DeepL</span>
+  </footer>
+
+  <script src="script.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./service-worker.js").catch(console.error);
+      });
+    }
+  </script>
+</body>
+</html>
