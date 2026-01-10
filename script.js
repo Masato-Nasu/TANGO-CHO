@@ -150,7 +150,7 @@ function getHfBase() {
   }
   // 5) hard default (this project)
   if (!v) v = "https://mazzgogo-tango-cho.hf.space";
-  return v;
+  return normalizeHfBase(v);
 }
 
 function getAppToken() {
@@ -176,7 +176,7 @@ function getAppToken() {
 }
 
 async function translateToJaViaSpace(word) {
-  const base = getHfBase();
+  const base = normalizeHfBase(getHfBase());
   if (!base) throw new Error("HF Spaces API Base が未設定です（⚙️接続設定）。");
   const token = getAppToken();
 
@@ -198,7 +198,7 @@ async function translateToJaViaSpace(word) {
 }
 
 async function translateTextViaSpace(text, targetLang = "JA") {
-  const base = getHfBase();
+  const base = normalizeHfBase(getHfBase());
   if (!base) throw new Error("HF Spaces API Base が未設定です（⚙️接続設定）。");
   const token = getAppToken();
 
@@ -643,15 +643,24 @@ function setupAddForm() {
     const w = wordEl.value.trim();
     if (!w) return setMsg("英単語を入力してください。", "err");
 
+    setStatusLine("translateDebug", "", "");
     setMsg("翻訳中...", "");
     setState("翻訳中");
     try {
       const ja = await translateToJaViaSpace(w);
+      if (!ja) {
+        setStatusLine("translateDebug", "翻訳結果が空でした（Spacesの応答に translated がありません）", "err");
+        throw new Error("翻訳結果が空です（Spacesの応答が想定外の可能性）。");
+      }
       meaningEl.value = ja;
       setMsg("翻訳しました（編集できます）。", "ok");
+      setStatusLine("translateDebug", `OK: ${w} -> ${ja}`, "ok");
       setState("翻訳済み");
     } catch (e) {
-      setMsg(String(e.message || e), "err");
+      const msg = String(e && (e.message || e) ? (e.message || e) : e);
+      setMsg(msg, "err");
+      setStatusLine("translateDebug", `NG: ${msg}`, "err");
+      try { alert("翻訳NG: " + msg); } catch(_) {}
       setState("失敗");
     }
   });

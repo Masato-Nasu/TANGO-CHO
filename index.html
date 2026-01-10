@@ -79,7 +79,9 @@
           <button id="translateBtn" class="primary-btn">翻訳（DeepL）</button>
           <button id="clearBtn" class="ghost-btn">クリア</button>
           <div class="pill" id="translateState">未翻訳</div>
-        </div>
+        
+        <div id="translateDebug" class="status-line"></div>
+</div>
 
         <label class="field-label" for="meaning">日本語訳（編集可）</label>
         <input id="meaning" type="text" placeholder="翻訳ボタンで自動入力 / 手入力もOK" />
@@ -191,7 +193,7 @@
   <footer class="app-footer">
     <button id="ttsTestBtn" class="ghost-btn small">🔊 テスト</button>
     <span class="footer-text">発音: Web Speech API / 翻訳: HF Spaces → DeepL</span>
-    <span class="footer-text" data-version>v3.6.8</span>
+    <span class="footer-text" data-version>v3.6.9</span>
   </footer>
 
   <script src="script.js"></script>
