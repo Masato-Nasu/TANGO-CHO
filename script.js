@@ -130,6 +130,7 @@ function setupAddForm() {
   const exampleEl = document.getElementById("example");
   const memoEl = document.getElementById("memo");
   const tagsEl = document.getElementById("tags");
+  const synonymsEl = document.getElementById("synonyms");
   const translateBtn = document.getElementById("translateBtn");
   const saveBtn = document.getElementById("saveBtn");
   const clearBtn = document.getElementById("clearBtn");
@@ -141,20 +142,26 @@ function setupAddForm() {
     statePill.textContent = text;
   }
 
-  ttsBtn.addEventListener("click", () => {
-    const w = wordEl.value.trim();
-    if (w) speak(w);
-  });
-
-  clearBtn.addEventListener("click", () => {
+  function clearForm(afterSave=false) {
     wordEl.value = "";
     meaningEl.value = "";
     statusEl.value = "default";
     exampleEl.value = "";
     memoEl.value = "";
     tagsEl.value = "";
+    if (synonymsEl) synonymsEl.value = "";
     setState("未翻訳");
-    setMsg("", "");
+    if (!afterSave) setMsg("", "");
+  }
+
+
+  ttsBtn.addEventListener("click", () => {
+    const w = wordEl.value.trim();
+    if (w) speak(w);
+  });
+
+  clearBtn.addEventListener("click", () => {
+    clearForm(false);
   });
 
   translateBtn.addEventListener("click", async () => {
@@ -190,12 +197,15 @@ function setupAddForm() {
       example: exampleEl.value.trim(),
       memo: memoEl.value.trim(),
       tags: tagsEl.value.trim(),
+      synonyms: synonymsEl ? synonymsEl.value.trim() : "",
       source: "add",
       createdAt,
     });
     saveWords(words);
-    setMsg("保存しました。", "ok");
+    clearForm(true);
+    setMsg("保存しました（入力をクリアしました）。", "ok");
     renderWordList();
+    wordEl.focus();
   });
 }
 
@@ -268,6 +278,14 @@ function renderWordList() {
     meaning.className = "word-meaning";
     meaning.textContent = w.meaning || "";
 
+    const syn = (w.synonyms || "").trim();
+    let synEl = null;
+    if (syn) {
+      synEl = document.createElement("div");
+      synEl.className = "word-synonyms";
+      synEl.textContent = `類似語: ${syn}`;
+    }
+
     const meta = document.createElement("div");
     meta.className = "word-meta";
     const created = w.createdAt ? new Date(w.createdAt).toLocaleString() : "";
@@ -292,6 +310,7 @@ function renderWordList() {
 
     item.appendChild(top);
     item.appendChild(meaning);
+    if (synEl) item.appendChild(synEl);
 
     if (w.example) {
       const ex = document.createElement("div");
@@ -595,6 +614,7 @@ function normalizeImportedItem(x) {
     example: String(x.example || "").trim(),
     memo: String(x.memo || "").trim(),
     tags: String(x.tags || "").trim(),
+    synonyms: String(x.synonyms || "").trim(),
     source: String(x.source || "import"),
     createdAt: String(x.createdAt || new Date().toISOString()),
   };

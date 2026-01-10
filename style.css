@@ -89,3 +89,10 @@ details summary::-webkit-details-marker{display:none}
   border-top:1px solid #141414;background:#050505}
 .footer-text{flex:1}
 @media (max-width:400px){html,body{font-size:22px}}
+
+/* Synonyms line */
+.word-synonyms{
+  margin-top:6px;
+  font-size:0.98rem;
+  color: var(--sub);
+}
