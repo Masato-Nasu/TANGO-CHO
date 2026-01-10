@@ -70,19 +70,6 @@ Import / Export（JSON）：バックアップ＆復元
 ※ 4択の選択肢を作るため、出題カテゴリ内に 最低4単語が必要です。
 足りない場合は「出題カテゴリ＝全て」にすると始めやすいです。
 
-⚙️ 接続（HF Spaces / DeepL）
-
-アプリ内の「⚙️ 接続設定」で以下を設定して保存します。
-
-HF Spaces API Base：例）https://mazzgogo-tango-cho.hf.space
-
-APP_TOKEN：Spaces側で設定している場合のみ（例：tangocho）
-
-起こし（Spaceが寝る対策）
-
-アプリが開いている間、6時間ごとに /health を叩いて起こします（HF_BASEが設定されている場合のみ）。
-※ iOSの仕様上、アプリを完全に閉じている間は動きません。起動時／復帰時にも必要に応じて叩きます。
-
 📲 PWAとしてインストール
 iPhone（iOS）
 
