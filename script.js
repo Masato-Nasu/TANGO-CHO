@@ -88,6 +88,42 @@ async function translateToJaViaSpace(word) {
   return data.translated || "";
 }
 
+async function fetchSynonymsViaSpace(word, max = 8) {
+  const base = getHfBase();
+  if (!base) throw new Error("HF Spaces API Base が未設定です（⚙️接続設定）。");
+  const token = getAppToken();
+
+  const res = await fetch(`${base.replace(/\/$/, "")}/synonyms`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { "X-App-Token": token } : {}),
+    },
+    body: JSON.stringify({ text: word, max }),
+  });
+
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const j = await res.json();
+      detail = j?.detail ? ` (${j.detail})` : "";
+    } catch (_) {}
+    if (res.status === 404) {
+      throw new Error("Spaces側に /synonyms がありません。Spaces を v3.2 に更新してください。");
+    }
+    throw new Error(`類義語取得に失敗: ${res.status}${detail}`);
+  }
+
+  const data = await res.json();
+  const arr = data?.synonyms || [];
+  return Array.isArray(arr) ? arr : [];
+}
+
+async function getSynonymsSmart(word, max = 8) {
+  return await fetchSynonymsViaSpace(word, max);
+}
+
+
 function setupTabs() {
   const btns = document.querySelectorAll(".tab-button");
   const secs = document.querySelectorAll(".section");
@@ -205,7 +241,7 @@ function setupAddForm() {
         synonymsEl.value = syns.slice(0, 8).join(", ");
         setMsg(`類義語を取得しました（${Math.min(8, syns.length)}件）。`, "ok");
       } catch (e) {
-        setMsg("類義語の取得に失敗しました。", "err");
+        setMsg(String(e && e.message ? e.message : "類義語の取得に失敗しました。"), "err");
       }
     });
   }
