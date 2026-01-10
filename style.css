@@ -96,3 +96,11 @@ details summary::-webkit-details-marker{display:none}
   font-size:0.98rem;
   color: var(--sub);
 }
+
+/* inline row for input + button */
+.row{
+  display:flex;
+  gap:10px;
+  align-items:stretch;
+}
+.row > input[type="text"]{flex:1}

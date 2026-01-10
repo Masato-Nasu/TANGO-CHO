@@ -131,6 +131,7 @@ function setupAddForm() {
   const memoEl = document.getElementById("memo");
   const tagsEl = document.getElementById("tags");
   const synonymsEl = document.getElementById("synonyms");
+  const synFetchBtn = document.getElementById("synFetchBtn");
   const translateBtn = document.getElementById("translateBtn");
   const saveBtn = document.getElementById("saveBtn");
   const clearBtn = document.getElementById("clearBtn");
@@ -181,6 +182,35 @@ function setupAddForm() {
     }
   });
 
+  async function fillSynonymsIfEmpty(word) {
+    if (!synonymsEl) return;
+    if (synonymsEl.value.trim()) return; // don't overwrite user input
+    try {
+      const syns = await getSynonymsSmart(word, 8);
+      if (syns.length) {
+        synonymsEl.value = syns.slice(0, 8).join(", ");
+        setMsg(`類義語を自動取得しました（${Math.min(8, syns.length)}件）。`, "ok");
+      }
+    } catch (e) {
+      // silent, avoid annoying
+    }
+  }
+
+  if (synFetchBtn) {
+    synFetchBtn.addEventListener("click", async () => {
+      const w = wordEl.value.trim();
+      if (!w) return setMsg("英単語を入力してください。", "err");
+      try {
+        const syns = await getSynonymsSmart(w, 8);
+        synonymsEl.value = syns.slice(0, 8).join(", ");
+        setMsg(`類義語を取得しました（${Math.min(8, syns.length)}件）。`, "ok");
+      } catch (e) {
+        setMsg("類義語の取得に失敗しました。", "err");
+      }
+    });
+  }
+
+
   saveBtn.addEventListener("click", () => {
     const w = wordEl.value.trim();
     const m = meaningEl.value.trim();
@@ -201,9 +231,45 @@ function setupAddForm() {
       source: "add",
       createdAt,
     });
+
+    // Auto-add synonym cards (comma-separated)
+    const synRaw = (synonymsEl ? synonymsEl.value : "").trim();
+    const synTokens = synRaw
+      ? synRaw.split(/[,、\n\r]+/).map(s => s.trim()).filter(Boolean)
+      : [];
+    // unique + skip self
+    const seen = new Set();
+    const baseLower = w.toLowerCase();
+    const existingKey = new Set(words.map(x => `${String(x.word||"").toLowerCase()}|${String(x.meaning||"")}`));
+    let synAdded = 0;
+
+    for (const t of synTokens) {
+      const tl = t.toLowerCase();
+      if (!t || tl === baseLower) continue;
+      if (seen.has(tl)) continue;
+      seen.add(tl);
+
+      const key = `${tl}|${m}`;
+      if (existingKey.has(key)) continue;
+
+      words.push({
+        id: `${createdAt}-syn-${Math.random().toString(36).slice(2, 8)}`,
+        word: t,
+        meaning: m,
+        status: statusEl.value || "default",
+        example: "",
+        memo: `同義語（${w}）`,
+        tags: tagsEl.value.trim(),
+        synonyms: "",
+        source: "synonym",
+        createdAt,
+      });
+      existingKey.add(key);
+      synAdded += 1;
+    }
     saveWords(words);
     clearForm(true);
-    setMsg("保存しました（入力をクリアしました）。", "ok");
+    setMsg(`保存しました（入力をクリアしました）。${synAdded ? ` 類似語カード +${synAdded}` : ""}`.trim(), "ok");
     renderWordList();
     wordEl.focus();
   });
