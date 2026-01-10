@@ -27,7 +27,14 @@ function loadWords() {
 }
 
 function saveWords(words) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
+    localStorage.setItem("tangoChoLastSavedAt", new Date().toISOString());
+    return true;
+  } catch (e) {
+    console.error("saveWords failed", e);
+    return false;
+  }
 }
 
 function speak(text) {
@@ -650,7 +657,11 @@ function setupAddForm() {
       synAdded += 1;
     }
 
-    saveWords(words);
+    const ok = saveWords(words);
+    if (!ok) {
+      setMsg("保存に失敗しました。端末のストレージが無効/不足の可能性があります。PWAを削除→再インストールで直ることがあります。", "err");
+      return;
+    }
 
     if (editId) {
       exitEditMode(false);
