@@ -1,4 +1,4 @@
-const CACHE = "tango-cho-cache-v3.5.4-no-example";
+const CACHE = "tango-cho-cache-v3.5.5-tagsearch";
 const ASSETS = [
   "./",
   "./index.html",

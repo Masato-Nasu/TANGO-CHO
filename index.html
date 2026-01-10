@@ -121,6 +121,18 @@
             <button id="exportBtn" class="ghost-btn">JSON</button>
           </div>
         </div>
+<div class="search-row">
+  <div>
+    <label class="field-label" for="searchBox">検索（英語 / 日本語 / メモ / タグ）</label>
+    <input id="searchBox" class="input" type="text" placeholder="例: curious / 好奇心 / travel" autocomplete="off" />
+  </div>
+  <div>
+    <label class="field-label" for="tagFilter">タグで絞り込み（任意）</label>
+    <input id="tagFilter" class="input" type="text" list="tagSuggestions" placeholder="例: travel, school" autocomplete="off" />
+    <datalist id="tagSuggestions"></datalist>
+  </div>
+</div>
+
 
         <div id="listMsg" class="msg"></div>
 

@@ -2,6 +2,8 @@ const STORAGE_KEY = "tangoChoWords";
 const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
 const FILTER_KEY = "tangoChoFilter";
+const SEARCH_KEY = "tangoChoSearch";
+const TAGFILTER_KEY = "tangoChoTagFilter";
 
 let editId = null;
 
@@ -10,6 +12,50 @@ const STATUS_LABEL = {
   default: "デフォルト",
   learned: "覚えた",
 };
+
+
+function parseTags(tagStr) {
+  const s = (tagStr || "").trim();
+  if (!s) return [];
+  return s
+    .split(/[\s,、]+/g)
+    .map((t) => t.trim())
+    .filter(Boolean);
+}
+
+function buildTagSuggestions(words) {
+  const dl = document.getElementById("tagSuggestions");
+  if (!dl) return;
+  const set = new Set();
+  for (const w of words || []) {
+    for (const t of parseTags(w.tags)) set.add(t);
+  }
+  const list = Array.from(set).sort((a, b) => a.localeCompare(b));
+  dl.innerHTML = list.map((t) => `<option value="${t.replace(/"/g, "&quot;")}"></option>`).join("");
+}
+
+function containsQuery(wordObj, qLower) {
+  if (!qLower) return true;
+  const fields = [
+    wordObj.word || "",
+    wordObj.meaning || "",
+    wordObj.memo || "",
+    wordObj.tags || "",
+    wordObj.synonyms || "",
+  ];
+  const hay = fields.join(" ").toLowerCase();
+  return hay.includes(qLower);
+}
+
+function containsAllTags(wordObj, requiredTagsLower) {
+  if (!requiredTagsLower || requiredTagsLower.length === 0) return true;
+  const tags = parseTags(wordObj.tags).map((t) => t.toLowerCase());
+  if (tags.length === 0) return false;
+  for (const need of requiredTagsLower) {
+    if (!tags.includes(need)) return false;
+  }
+  return true;
+}
 
 function nowIso() {
   return new Date().toISOString();
@@ -470,7 +516,25 @@ function renderWordList() {
   if (!listEl) return;
 
   let words = [...all].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
-  if (filter !== "all") words = words.filter((w) => (w.status || "default") === filter);
+  
+if (filter !== "all") words = words.filter((w) => (w.status || "default") === filter);
+
+// search / tag filter
+const q = (document.getElementById("searchBox")?.value || (localStorage.getItem(SEARCH_KEY) || "")).trim();
+const qLower = q.toLowerCase();
+const tagQ = (document.getElementById("tagFilter")?.value || (localStorage.getItem(TAGFILTER_KEY) || "")).trim();
+const requiredTagsLower = parseTags(tagQ).map((t) => t.toLowerCase());
+
+buildTagSuggestions(all);
+
+words = words.filter((w) => containsQuery(w, qLower) && containsAllTags(w, requiredTagsLower));
+
+const hasAnyFilter = !!q || (requiredTagsLower.length > 0) || (filter !== "all");
+if (hasAnyFilter) {
+  setListMsg(`表示: ${words.length} / 全体: ${all.length}`, "ok");
+} else {
+  setListMsg("", "");
+}
 
   listEl.innerHTML = "";
 
