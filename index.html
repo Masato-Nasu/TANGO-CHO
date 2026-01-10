@@ -90,7 +90,12 @@
         </div>
 
         <label class="field-label" for="example">例文（任意）</label>
-        <textarea id="example" rows="2" placeholder="例: I was curious about it."></textarea>
+        <textarea id="example" rows="3" placeholder="例文（自動生成できます）\nEN: I was curious about it.\nJA: それについて好奇心がありました。"></textarea>
+        <div class="field-row" style="margin-top:10px;">
+          <button id="exampleGenBtn" class="secondary-btn" type="button">例文自動生成（短）</button>
+          <button id="exampleClearBtn" class="secondary-btn" type="button">例文クリア</button>
+        </div>
+
 
         <label class="field-label" for="memo">メモ（任意）</label>
         <textarea id="memo" rows="2" placeholder="ニュアンス・使い分けなど"></textarea>

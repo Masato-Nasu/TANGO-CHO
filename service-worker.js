@@ -1,4 +1,4 @@
-const CACHE = "tango-cho-cache-v3.5.0-root";
+const CACHE = "tango-cho-cache-v3.5.1-root";
 const ASSETS = [
   "./",
   "./index.html",
@@ -10,10 +10,13 @@ const ASSETS = [
   "./icons/icon-512-v25.png",];
 
 self.addEventListener("install", (e) => {
+  self.skipWaiting();
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));
 });
 
 self.addEventListener("activate", (e) => {
+  e.waitUntil((async () => { await clients.claim(); })());
+
   e.waitUntil(
     caches.keys().then((keys) => Promise.all(keys.map((k) => (k !== CACHE ? caches.delete(k) : null))))
   );

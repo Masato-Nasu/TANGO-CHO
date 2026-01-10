@@ -130,6 +130,37 @@ async function translateToJaViaSpace(word) {
   return data.translated || "";
 }
 
+// ===== Example sentence generator (short) =====
+function aOrAn(word) {
+  const w = String(word || "").trim().toLowerCase();
+  if (!w) return "a";
+  // Simple vowel rule + a few common exceptions
+  if (/^(honest|hour|heir|herb)/.test(w)) return "an";
+  if (/^(uni|use|user|euro)/.test(w)) return "a";
+  return /^[aeiou]/.test(w) ? "an" : "a";
+}
+
+function guessPos(word) {
+  const w = String(word || "").trim().toLowerCase();
+  if (!w) return "noun";
+  if (w.endsWith("ly")) return "adverb";
+  if (/(ing|ed|en|ize|ise|ify|fy|s)$/.test(w)) return "verb"; // heuristic
+  if (/(ous|ful|able|ible|ive|al|ic|less|y|ish)$/.test(w)) return "adj";
+  return "noun";
+}
+
+function generateExampleEn(word) {
+  const w = String(word || "").trim();
+  if (!w) return "";
+  const pos = guessPos(w);
+  if (pos === "adverb") return `He did it ${w}.`;
+  if (pos === "verb") return `I ${w} every day.`;
+  if (pos === "adj") return `It is ${w}.`;
+  // noun
+  const art = aOrAn(w);
+  return `This is ${art} ${w}.`;
+}
+
 async function fetchSynonymsViaSpace(word, max = 8) {
   const base = getHfBase();
   if (!base) throw new Error("HF Spaces API Base が未設定です（⚙️接続設定）。");
@@ -244,6 +275,8 @@ function setupAddForm() {
   const synonymsEl = document.getElementById("synonyms");
   const synFetchBtn = document.getElementById("synFetchBtn");
   const translateBtn = document.getElementById("translateBtn");
+  const exampleGenBtn = document.getElementById("exampleGenBtn");
+  const exampleClearBtn = document.getElementById("exampleClearBtn");
   const saveBtn = document.getElementById("saveBtn");
   const clearBtn = document.getElementById("clearBtn");
   const ttsBtn = document.getElementById("ttsBtn");
@@ -336,6 +369,33 @@ function setupAddForm() {
       setState("失敗");
     }
   });
+
+// Example: auto-generate (short EN + JA)
+exampleGenBtn?.addEventListener("click", async () => {
+  const w = wordEl.value.trim();
+  if (!w) return setMsg("英単語を入力してください。", "err");
+
+  const en = generateExampleEn(w);
+  if (!en) return setMsg("例文を生成できませんでした。", "err");
+
+  setMsg("例文を生成中…", "");
+  try {
+    const ja = await translateToJaViaSpace(en);
+    // Store both EN/JA in the single field for backward compatibility
+    exampleEl.value = `EN: ${en}\nJA: ${ja || ""}`.trim();
+    setMsg("例文を生成しました（編集できます）。", "ok");
+  } catch (e) {
+    // Even if translation fails, at least provide EN
+    exampleEl.value = `EN: ${en}`;
+    setMsg(String(e.message || e), "err");
+  }
+});
+
+exampleClearBtn?.addEventListener("click", () => {
+  exampleEl.value = "";
+  setMsg("例文をクリアしました。", "ok");
+});
+
 
   async function fillSynonymsIfEmpty(word) {
     if (!synonymsEl) return;
