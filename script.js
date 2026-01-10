@@ -3,6 +3,8 @@ const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
 const FILTER_KEY = "tangoChoFilter";
 const SEARCH_KEY = "tangoChoSearch";
+const WAKE_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
+const LAST_WAKE_PING_KEY = "tangoChoLastWakePingAt";
 
 let editId = null;
 
@@ -231,6 +233,67 @@ async function fetchSynonymsViaSpace(word, max = 8) {
   const data = await res.json();
   const arr = data?.synonyms || [];
   return Array.isArray(arr) ? arr : [];
+}
+
+/** HF Spaces を「起こす」ための /health ping（ベストエフォート）
+ * 重要: PWAはバックグラウンドで常時動けないため、
+ * - アプリ起動時 / 復帰時に、前回から6時間以上空いていれば ping
+ * - アプリを開いている間は、6時間ごとに ping
+ * という挙動になります（iOSは特にバックグラウンド実行が制限されます）。
+ */
+async function pingHealthViaSpace(reason = "auto") {
+  const base = getHfBase();
+  if (!base) return false;
+
+  const token = getAppToken();
+  const url = `${base.replace(/\/$/, "")}/health`;
+
+  try {
+    const res = await fetch(url, {
+      method: "GET",
+      headers: {
+        ...(token ? { "X-App-Token": token } : {}),
+      },
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      // silent fail (don't block UX)
+      return false;
+    }
+
+    // consume body (some environments require reading to complete)
+    await res.json().catch(() => res.text().catch(() => ""));
+    localStorage.setItem(LAST_WAKE_PING_KEY, String(Date.now()));
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function setupWakePing() {
+  // immediate check
+  const now = Date.now();
+  const last = parseInt(localStorage.getItem(LAST_WAKE_PING_KEY) || "0", 10) || 0;
+
+  if (now - last > WAKE_INTERVAL_MS) {
+    pingHealthViaSpace("startup");
+  }
+
+  // while the app is open
+  setInterval(() => {
+    pingHealthViaSpace("interval");
+  }, WAKE_INTERVAL_MS);
+
+  // on resume / tab becomes visible
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    const n = Date.now();
+    const l = parseInt(localStorage.getItem(LAST_WAKE_PING_KEY) || "0", 10) || 0;
+    if (n - l > WAKE_INTERVAL_MS) {
+      pingHealthViaSpace("resume");
+    }
+  });
 }
 
 async function getSynonymsSmart(word, max = 8) {
@@ -1030,6 +1093,7 @@ function setupImport() {
 document.addEventListener("DOMContentLoaded", () => {
   setupTabs();
   setupSettings();
+  setupWakePing();
   setupAddForm();
   setupFilter();
   setupSearch();

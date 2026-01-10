@@ -1,4 +1,4 @@
-const CACHE = "tango-cho-cache-v3.5.6-unified-search";
+const CACHE = "tango-cho-cache-v3.5.7-wake-health-6h";
 const ASSETS = [
   "./",
   "./index.html",
