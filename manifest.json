@@ -1,9 +1,0 @@
-{
-  "name": "TANGO-CHO",
-  "short_name": "TANGO-CHO",
-  "lang": "ja",
-  "start_url": "./index.html",
-  "display": "standalone",
-  "background_color": "#050505",
-  "theme_color": "#00c896"
-}
