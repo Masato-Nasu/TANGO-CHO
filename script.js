@@ -333,12 +333,69 @@ function setupAddForm() {
     return `I am ${w} about how it works.`;
   }
 
-  async function generateExample() {
+    async function generateExample() {
     const w = wordEl.value.trim();
     if (!w) {
       setMsg("例文生成の前に英単語を入力してください。", "err");
       return;
     }
+    const en = buildShortExample(w);
+    if (!en) return;
+
+    // Show English immediately (even if API is not configured / network fails)
+    exampleEl.value = `EN: ${en}`;
+    setMsg("例文（EN）を作成しました。JAを翻訳中…", "ok");
+
+    // If HF Base is not set, stop here (EN only)
+    const base = getHfBase();
+    if (!base) {
+      setMsg("接続設定が未設定のため、例文はENのみです（⚙️接続設定でHF Baseを設定してください）。", "err");
+      return;
+    }
+
+    // Translate EN -> JA with a timeout
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 12000);
+
+      const token = getAppToken();
+      const res = await fetch(`${base.replace(/\/$/, "")}/translate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "X-App-Token": token } : {}),
+        },
+        body: JSON.stringify({ text: en, target_lang: "JA" }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timer);
+
+      if (!res.ok) {
+        let detail = "";
+        try {
+          const j = await res.json();
+          detail = j?.detail ? ` (${j.detail})` : "";
+        } catch (_) {}
+        throw new Error(`翻訳に失敗: ${res.status}${detail}`);
+      }
+
+      const data = await res.json();
+      const ja = String(data?.translated || "").trim();
+      if (ja) {
+        exampleEl.value = `EN: ${en}\nJA: ${ja}`;
+        setMsg("例文（EN+JA）を作成しました。", "ok");
+      } else {
+        setMsg("翻訳結果が空でした（ENのみ表示）。", "err");
+      }
+    } catch (e) {
+      // Keep EN, just show error
+      const msg = (e && e.name === "AbortError")
+        ? "翻訳がタイムアウトしました（ENのみ表示）。"
+        : String(e && e.message ? e.message : "例文生成に失敗しました（ENのみ表示）。");
+      setMsg(msg, "err");
+    }
+  }
     const en = buildShortExample(w);
     if (!en) return;
 
