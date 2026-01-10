@@ -2,11 +2,11 @@
   "name": "TANGO-CHO",
   "short_name": "TANGO-CHO",
   "lang": "ja",
-  "start_url": "./index.html?v=2.6",
+  "start_url": "./index.html?v=2.7",
   "display": "standalone",
   "background_color": "#050505",
   "theme_color": "#00c896",
-  "id": "./?v=2.6",
+  "id": "./?v=2.7",
   "scope": "./",
   "icons": [
     {

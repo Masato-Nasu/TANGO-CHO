@@ -49,6 +49,16 @@ function setMsg(text, kind) {
   if (kind === "err") el.classList.add("err");
 }
 
+function setListMsg(text, kind) {
+  const el = document.getElementById("listMsg");
+  if (!el) return;
+  el.className = "msg";
+  el.textContent = text || "";
+  if (kind === "ok") el.classList.add("ok");
+  if (kind === "err") el.classList.add("err");
+}
+
+
 function getHfBase() {
   return (localStorage.getItem(HF_BASE_KEY) || "").trim();
 }
@@ -571,12 +581,82 @@ function setupQuiz() {
   });
 }
 
+
+function normalizeImportedItem(x) {
+  if (!x || typeof x !== "object") return null;
+  const word = String(x.word || "").trim();
+  const meaning = String(x.meaning || "").trim();
+  if (!word || !meaning) return null;
+  return {
+    id: String(x.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
+    word,
+    meaning,
+    status: (x.status === "forgot" || x.status === "default" || x.status === "learned") ? x.status : "default",
+    example: String(x.example || "").trim(),
+    memo: String(x.memo || "").trim(),
+    tags: String(x.tags || "").trim(),
+    source: String(x.source || "import"),
+    createdAt: String(x.createdAt || new Date().toISOString()),
+  };
+}
+
+function setupImport() {
+  const btn = document.getElementById("importBtn");
+  const file = document.getElementById("importFile");
+  if (!btn || !file) return;
+
+  btn.addEventListener("click", () => file.click());
+
+  file.addEventListener("change", async () => {
+    const f = file.files && file.files[0];
+    file.value = ""; // allow re-importing same file
+    if (!f) return;
+
+    try {
+      const text = await f.text();
+      const parsed = JSON.parse(text);
+      const arr = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.words) ? parsed.words : null);
+      if (!arr) throw new Error("JSON形式が不正です（配列を期待）。");
+
+      const incoming = arr.map(normalizeImportedItem).filter(Boolean);
+      if (incoming.length === 0) throw new Error("取り込める単語がありません（word/meaning必須）。");
+
+      const current = loadWords();
+
+      // Merge: prefer id, fallback to (word|meaning)
+      const byId = new Map(current.map(w => [w.id, w]));
+      const byKey = new Map(current.map(w => [`${(w.word||"").toLowerCase()}|${w.meaning||""}`, w]));
+
+      let added = 0;
+      for (const w of incoming) {
+        const key = `${w.word.toLowerCase()}|${w.meaning}`;
+        if (byId.has(w.id)) continue;
+        if (byKey.has(key)) continue;
+
+        current.push(w);
+        byId.set(w.id, w);
+        byKey.set(key, w);
+        added += 1;
+      }
+
+      // ✅ Always persist immediately after upload/import
+      saveWords(current);
+      renderWordList();
+      setListMsg(`Import完了：${added}件 追加しました（重複はスキップ）。`, "ok");
+    } catch (e) {
+      setListMsg(String(e.message || e), "err");
+    }
+  });
+}
+
+
 document.addEventListener("DOMContentLoaded", () => {
   setupTabs();
   setupSettings();
   setupAddForm();
   setupFilter();
   setupExport();
+  setupImport();
   setupQuiz();
 
   renderWordList();

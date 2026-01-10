@@ -107,9 +107,13 @@
               <option value="default">デフォルト</option>
               <option value="learned">覚えた</option>
             </select>
+            <button id="importBtn" class="ghost-btn">Import</button>
+            <input id="importFile" type="file" accept="application/json" style="display:none" />
             <button id="exportBtn" class="ghost-btn">JSON</button>
           </div>
         </div>
+
+        <div id="listMsg" class="msg"></div>
 
         <div id="wordList" class="word-list"></div>
       </div>
