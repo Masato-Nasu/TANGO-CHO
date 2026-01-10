@@ -15,6 +15,10 @@
 
 ---
 
+## 📸 Screenshot
+
+![TANGO-CHO Screenshot](./screenshot1.png)
+
 ## ✨ Features
 
 ### 追加（検索＋手入力を1画面で）
