@@ -1,4 +1,12 @@
 const STORAGE_KEY = "tangoChoWords";
+function safeStorageGet(key) {
+  try { return (localStorage.getItem(key) || ""); }
+  catch (e) { return ""; }
+}
+function safeStorageSet(key, value) {
+  try { localStorage.setItem(key, value); return true; }
+  catch (e) { return false; }
+}
 const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
 const FILTER_KEY = "tangoChoFilter";
@@ -28,7 +36,7 @@ function loadWords() {
 
 function saveWords(words) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
+    if (!safeStorageSet(STORAGE_KEY, JSON.stringify(words))) throw new Error("ストレージ保存に失敗しました");
     localStorage.setItem("tangoChoLastSavedAt", new Date().toISOString());
     return true;
   } catch (e) {
@@ -122,16 +130,16 @@ function normalizeHfBase(vRaw) {
 
 function getHfBase() {
   // 1) primary key
-  let v = (localStorage.getItem(HF_BASE_KEY) || "").trim();
+  let v = (safeStorageGet(HF_BASE_KEY) || "").trim();
 
   // 2) legacy keys migration (older versions)
   if (!v) {
     const legacyKeys = ["tangoChoApiBase", "tangoChoApiBaseUrl", "tangoChoSpaceBase", "tangoChoServerBase"];
     for (const k of legacyKeys) {
-      const t = (localStorage.getItem(k) || "").trim();
+      const t = (safeStorageGet(k) || "").trim();
       if (t) {
         v = t;
-        localStorage.setItem(HF_BASE_KEY, v);
+        safeStorageSet(HF_BASE_KEY, v);
         break;
       }
     }
@@ -154,15 +162,15 @@ function getHfBase() {
 }
 
 function getAppToken() {
-  let v = (localStorage.getItem(HF_TOKEN_KEY) || "").trim();
+  let v = (safeStorageGet(HF_TOKEN_KEY) || "").trim();
 
   if (!v) {
     const legacyKeys = ["tangoChoToken", "tangoChoAppTokenLegacy", "tangoChoApiToken"];
     for (const k of legacyKeys) {
-      const t = (localStorage.getItem(k) || "").trim();
+      const t = (safeStorageGet(k) || "").trim();
       if (t) {
         v = t;
-        localStorage.setItem(HF_TOKEN_KEY, v);
+        safeStorageSet(HF_TOKEN_KEY, v);
         break;
       }
     }
@@ -176,8 +184,9 @@ function getAppToken() {
 }
 
 async function translateToJaViaSpace(word) {
-  const base = normalizeHfBase(getHfBase());
-  if (!base) throw new Error("HF Spaces API Base が未設定です（⚙️接続設定）。");
+  let base = normalizeHfBase(getHfBase());
+  if (!base) base = "https://mazzgogo-tango-cho.hf.space";
+  base = normalizeHfBase(base);
   const token = getAppToken();
 
   const res = await fetch(`${base.replace(/\/$/, "")}/translate`, {
