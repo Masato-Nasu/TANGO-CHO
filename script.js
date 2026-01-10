@@ -306,10 +306,7 @@ function setupAddForm() {
     // ===== Edit mode =====
     if (editId) {
       const idx = words.findIndex(x => x.id === editId);
-      if (idx === -1) {
-        // fallback: treat as new
-        editId = null;
-      } else {
+      if (idx !== -1) {
         const prev = words[idx];
         words[idx] = {
           ...prev,
@@ -328,13 +325,17 @@ function setupAddForm() {
         setMsg("更新しました（入力をクリアしました）。", "ok");
         return;
       }
+      // if target missing, fall through to "add new"
+      editId = null;
     }
 
     // ===== Add new =====
     const createdAt = now;
 
+    const baseId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
     words.push({
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: baseId,
       word: w,
       meaning: m,
       status: statusEl.value || "default",
@@ -345,6 +346,49 @@ function setupAddForm() {
       source: "manual",
       createdAt,
     });
+
+    // Auto-add synonym cards (comma-separated)
+    const synRaw = (synonymsEl ? synonymsEl.value : "").trim();
+    const synTokens = synRaw
+      ? synRaw.split(/[,、\n\r]+/).map(s => s.trim()).filter(Boolean)
+      : [];
+
+    const seen = new Set();
+    const baseLower = w.toLowerCase();
+    const existingKey = new Set(words.map(x => `${String(x.word||"").toLowerCase()}|${String(x.meaning||"")}`));
+    let synAdded = 0;
+
+    for (const t of synTokens) {
+      const tl = t.toLowerCase();
+      if (!t || tl === baseLower) continue;
+      if (seen.has(tl)) continue;
+      seen.add(tl);
+
+      const key = `${tl}|${m}`;
+      if (existingKey.has(key)) continue;
+
+      words.push({
+        id: `${baseId}-syn-${Math.random().toString(36).slice(2, 8)}`,
+        word: t,
+        meaning: m,
+        status: statusEl.value || "default",
+        example: "",
+        memo: `同義語（${w}）`,
+        tags: tagsEl.value.trim(),
+        synonyms: "",
+        source: "synonym",
+        createdAt,
+      });
+      existingKey.add(key);
+      synAdded += 1;
+    }
+
+    saveWords(words);
+    clearForm(true);
+    renderWordList();
+    setMsg(`保存しました（入力をクリアしました）。${synAdded ? ` 類似語カード +${synAdded}` : ""}`.trim(), "ok");
+    wordEl.focus();
+  });
 
 
   });
