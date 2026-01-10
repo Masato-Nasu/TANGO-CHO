@@ -1,4 +1,4 @@
-const CACHE = "tango-cho-cache-v3.6.6-root";
+const CACHE = "tango-cho-cache-v3.6.7-root";
 const ASSETS = [
   "./",
   "./index.html",
@@ -19,9 +19,37 @@ self.addEventListener("activate", (e) => {
   );
 });
 
-self.addEventListener("fetch", (e) => {
-  if (e.request.method !== "GET") return;
-  e.respondWith(
-    caches.match(e.request).then((cached) => cached || fetch(e.request).catch(() => cached))
-  );
+self.addEventListener("fetch", (event) => {
+  const req = event.request;
+
+  // Network-first for navigations (HTML). This prevents "更新されない" by old cached index.
+  if (req.mode === "navigate") {
+    event.respondWith((async () => {
+      try {
+        const fresh = await fetch(req);
+        const cache = await caches.open(CACHE);
+        cache.put(req, fresh.clone());
+        return fresh;
+      } catch (e) {
+        const cached = await caches.match(req);
+        return cached || caches.match("./index.html") || Response.error();
+      }
+    })());
+    return;
+  }
+
+  // For other assets: cache-first, update in background
+  event.respondWith((async () => {
+    const cached = await caches.match(req);
+    if (cached) return cached;
+
+    try {
+      const fresh = await fetch(req);
+      const cache = await caches.open(CACHE);
+      cache.put(req, fresh.clone());
+      return fresh;
+    } catch (e) {
+      return cached || Response.error();
+    }
+  })());
 });

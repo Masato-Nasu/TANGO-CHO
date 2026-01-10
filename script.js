@@ -105,10 +105,16 @@ function normalizeHfBase(vRaw) {
     v = `https://${host}.hf.space`;
   }
 
-  // Ensure scheme
+  // Ensure scheme so URL() can parse
   if (v && !/^https?:\/\//i.test(v)) v = "https://" + v;
 
-  // Remove trailing slash
+  // Strip any path like /health, /translate, etc. Keep only origin.
+  try {
+    const u = new URL(v);
+    v = u.origin;
+  } catch (_) {}
+
+  // Remove trailing slashes
   v = v.replace(/\/+$/, "");
 
   return v;
@@ -290,6 +296,7 @@ function setupSettings() {
   const storageTestBtn = document.getElementById("storageTestBtn");
   const storageTestStatus = document.getElementById("storageTestStatus");
   const currentSettings = document.getElementById("currentSettings");
+  const resetCacheBtn = document.getElementById("resetCacheBtn");
 
   hfBase.value = getHfBase();
   appToken.value = getAppToken();
@@ -390,6 +397,26 @@ LastSaved: ${localStorage.getItem("tangoChoLastSavedAt") || "(なし)"}`, "");
 
 
   // localStorage test (write/read)
+  resetCacheBtn?.addEventListener("click", async () => {
+    try {
+      setStatusLine("testConnStatus", "キャッシュ削除中…", "");
+      if (navigator.serviceWorker) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.unregister()));
+      }
+      if (window.caches) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+      alert("キャッシュを削除しました。再読み込みします。");
+      location.reload();
+    } catch (e) {
+      const msg = String(e && e.message ? e.message : e);
+      setStatusLine("testConnStatus", `キャッシュ削除失敗: ${msg}`, "err");
+      alert("キャッシュ削除に失敗しました: " + msg);
+    }
+  });
+
   storageTestBtn?.addEventListener("click", () => {
     try {
       const k = "tangoChoStorageTest";
