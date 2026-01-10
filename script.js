@@ -129,32 +129,6 @@ async function translateToJaViaSpace(word) {
   const data = await res.json();
   return data.translated || "";
 }
-async function generateExampleViaSpace(word) {
-  const baseRaw = getHfBase();
-  if (!baseRaw) throw new Error("HF Spaces API Base が未設定です（⚙️接続設定）。");
-  const base = baseRaw.replace(/\/+$/, "");
-  const token = getAppToken();
-
-  // Server should provide /example endpoint that generates a natural short sentence.
-  const res = await fetch(`${base}/example`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { "X-App-Token": token } : {}),
-    },
-    body: JSON.stringify({ word }),
-  });
-
-  if (!res.ok) {
-    const msg = await res.text().catch(() => "");
-    throw new Error(`Spaces error: ${res.status} ${msg}`);
-  }
-  const data = await res.json().catch(() => ({}));
-  const en = (data.example_en || "").trim();
-  const ja = (data.example_ja || "").trim();
-  if (!en) throw new Error("例文生成に失敗しました（example_en が空）。Server を更新してください。");
-  return { en, ja };
-}
 
 async function fetchSynonymsViaSpace(word, max = 8) {
   const base = getHfBase();
@@ -264,11 +238,6 @@ function setupAddForm() {
   const wordEl = document.getElementById("word");
   const meaningEl = document.getElementById("meaning");
   const statusEl = document.getElementById("status");
-  const exampleEl = document.getElementById("example");
-  const exampleGenBtn = document.getElementById("exampleGenBtn");
-  const exampleAltBtn = document.getElementById("exampleAltBtn");
-  const exampleClearBtn = document.getElementById("exampleClearBtn");
-  const exampleStatus = document.getElementById("exampleStatus");
   const memoEl = document.getElementById("memo");
   const tagsEl = document.getElementById("tags");
   const synonymsEl = document.getElementById("synonyms");
@@ -282,13 +251,6 @@ function setupAddForm() {
   const editSub = document.getElementById("editSub");
   const cancelEditBtn = document.getElementById("cancelEditBtn");
 
-function setExampleStatus(text, type="") {
-  if (!exampleStatus) return;
-  exampleStatus.textContent = text || "";
-  exampleStatus.classList.remove("ok","err");
-  if (type) exampleStatus.classList.add(type);
-}
-
   function setState(text) {
     if (!statePill) return;
     statePill.textContent = text;
@@ -298,7 +260,6 @@ function setExampleStatus(text, type="") {
     wordEl.value = "";
     meaningEl.value = "";
     statusEl.value = "default";
-    exampleEl.value = "";
     memoEl.value = "";
     tagsEl.value = "";
     if (synonymsEl) synonymsEl.value = "";
@@ -311,7 +272,6 @@ function setExampleStatus(text, type="") {
     wordEl.value = item.word || "";
     meaningEl.value = item.meaning || "";
     statusEl.value = item.status || "default";
-    exampleEl.value = item.example || "";
     memoEl.value = item.memo || "";
     tagsEl.value = item.tags || "";
     if (synonymsEl) synonymsEl.value = item.synonyms || "";
@@ -357,32 +317,6 @@ function setExampleStatus(text, type="") {
     clearForm(false);
   });
 
-async function runExampleGen() {
-  const w = (wordEl.value || "").trim();
-  if (!w) { setExampleStatus("英単語を入力してください。", "err"); return; }
-  setExampleStatus("例文生成中…", "");
-  try {
-    const r = await generateExampleViaSpace(w);
-    if (r.ja) {
-      exampleEl.value = `EN: ${r.en}\nJA: ${r.ja}`;
-    } else {
-      // If server didn't return JA, translate client-side as fallback
-      const ja = await translateToJaViaSpace(r.en);
-      exampleEl.value = `EN: ${r.en}\nJA: ${ja}`;
-    }
-    setExampleStatus("例文を追加しました（編集できます）。", "ok");
-  } catch (e) {
-    const msg = String(e && (e.message || e) ? (e.message || e) : e);
-    setExampleStatus(msg, "err");
-  }
-}
-
-exampleGenBtn?.addEventListener("click", runExampleGen);
-exampleAltBtn?.addEventListener("click", runExampleGen);
-exampleClearBtn?.addEventListener("click", () => {
-  exampleEl.value = "";
-  setExampleStatus("例文をクリアしました。", "");
-});
   translateBtn.addEventListener("click", async () => {
     const w = wordEl.value.trim();
     if (!w) return setMsg("英単語を入力してください。", "err");
@@ -450,7 +384,6 @@ exampleClearBtn?.addEventListener("click", () => {
           word: w,
           meaning: m,
           status: statusEl.value || "default",
-          example: exampleEl.value.trim(),
           memo: memoEl.value.trim(),
           tags: tagsEl.value.trim(),
           synonyms: synonymsEl ? synonymsEl.value.trim() : (prev.synonyms || ""),
@@ -469,7 +402,6 @@ exampleClearBtn?.addEventListener("click", () => {
         word: w,
         meaning: m,
         status: statusEl.value || "default",
-        example: exampleEl.value.trim(),
         memo: memoEl.value.trim(),
         tags: tagsEl.value.trim(),
         synonyms: synonymsEl ? synonymsEl.value.trim() : "",
@@ -503,7 +435,6 @@ exampleClearBtn?.addEventListener("click", () => {
         word: t,
         meaning: m,
         status: statusEl.value || "default",
-        example: "",
         memo: `同義語（${w}）`,
         tags: tagsEl.value.trim(),
         synonyms: "",
@@ -640,13 +571,6 @@ function renderWordList() {
     item.appendChild(top);
     item.appendChild(meaning);
     if (synEl) item.appendChild(synEl);
-
-    if (w.example) {
-      const ex = document.createElement("div");
-      ex.className = "word-meta";
-      ex.textContent = `例: ${w.example}`;
-      item.appendChild(ex);
-    }
     if (w.memo) {
       const mm = document.createElement("div");
       mm.className = "word-meta";
@@ -940,7 +864,6 @@ function normalizeImportedItem(x) {
     word,
     meaning,
     status: (x.status === "forgot" || x.status === "default" || x.status === "learned") ? x.status : "default",
-    example: String(x.example || "").trim(),
     memo: String(x.memo || "").trim(),
     tags: String(x.tags || "").trim(),
     synonyms: String(x.synonyms || "").trim(),
