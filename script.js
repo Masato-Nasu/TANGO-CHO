@@ -3,7 +3,6 @@ const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
 const FILTER_KEY = "tangoChoFilter";
 const SEARCH_KEY = "tangoChoSearch";
-const TAGFILTER_KEY = "tangoChoTagFilter";
 
 let editId = null;
 
@@ -31,7 +30,34 @@ function buildTagSuggestions(words) {
     for (const t of parseTags(w.tags)) set.add(t);
   }
   const list = Array.from(set).sort((a, b) => a.localeCompare(b));
-  dl.innerHTML = list.map((t) => `<option value="${t.replace(/"/g, "&quot;")}"></option>`).join("");
+  const opts = [];
+  for (const t of list) {
+    const esc = t.replace(/"/g, "&quot;");
+    opts.push(`<option value="${esc}"></option>`);
+    opts.push(`<option value="#${esc}"></option>`);
+  }
+  dl.innerHTML = opts.join("");
+}
+
+function extractQueryAndTags(raw) {
+  let s = (raw || "").trim();
+  const tags = [];
+
+  // tag:xxx / tags:xxx,yyy / タグ:xxx
+  s = s.replace(/(?:^|\s)(?:tag|tags|タグ)\s*[:：]\s*([^\s]+)/gi, (m, g1) => {
+    tags.push(...parseTags(g1));
+    return " ";
+  });
+
+  // #tag tokens (e.g. #travel)
+  s = s.replace(/#([^\s#,、]+)/g, (m, g1) => {
+    tags.push(g1);
+    return " ";
+  });
+
+  const query = s.replace(/\s+/g, " ").trim();
+  const cleanTags = tags.map((t) => String(t || "").trim()).filter(Boolean);
+  return { query, tags: cleanTags };
 }
 
 function containsQuery(wordObj, qLower) {
@@ -519,11 +545,12 @@ function renderWordList() {
   
 if (filter !== "all") words = words.filter((w) => (w.status || "default") === filter);
 
-// search / tag filter
-const q = (document.getElementById("searchBox")?.value || (localStorage.getItem(SEARCH_KEY) || "")).trim();
+// search / tag filter (unified)
+const raw = (document.getElementById("searchBox")?.value || (localStorage.getItem(SEARCH_KEY) || "")).trim();
+const parsed = extractQueryAndTags(raw);
+const q = parsed.query;
 const qLower = q.toLowerCase();
-const tagQ = (document.getElementById("tagFilter")?.value || (localStorage.getItem(TAGFILTER_KEY) || "")).trim();
-const requiredTagsLower = parseTags(tagQ).map((t) => t.toLowerCase());
+const requiredTagsLower = parsed.tags.map((t) => t.toLowerCase());
 
 buildTagSuggestions(all);
 
@@ -654,6 +681,20 @@ function setupFilter() {
   sel.value = (localStorage.getItem(FILTER_KEY) || "all").trim();
   sel.addEventListener("change", () => {
     localStorage.setItem(FILTER_KEY, sel.value);
+    renderWordList();
+  });
+}
+
+function setupSearch() {
+  const box = document.getElementById("searchBox");
+  if (!box) return;
+  box.value = (localStorage.getItem(SEARCH_KEY) || "").trim();
+  box.addEventListener("input", () => {
+    localStorage.setItem(SEARCH_KEY, box.value);
+    renderWordList();
+  });
+  box.addEventListener("change", () => {
+    localStorage.setItem(SEARCH_KEY, box.value);
     renderWordList();
   });
 }
@@ -991,6 +1032,7 @@ document.addEventListener("DOMContentLoaded", () => {
   setupSettings();
   setupAddForm();
   setupFilter();
+  setupSearch();
   setupExport();
   setupImport();
   setupQuiz();

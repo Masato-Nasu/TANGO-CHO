@@ -124,17 +124,14 @@
 <div class="search-row">
   <div>
     <label class="field-label" for="searchBox">検索（英語 / 日本語 / メモ / タグ）</label>
-    <input id="searchBox" class="input" type="text" placeholder="例: curious / 好奇心 / travel" autocomplete="off" />
-  </div>
-  <div>
-    <label class="field-label" for="tagFilter">タグで絞り込み（任意）</label>
-    <input id="tagFilter" class="input" type="text" list="tagSuggestions" placeholder="例: travel, school" autocomplete="off" />
+    <input id="searchBox" class="input" type="text" list="tagSuggestions"
+      placeholder="例: curious / 好奇心 / #travel / tags:travel,school" autocomplete="off" />
+    <div class="note">タグで絞り込みたい時は <b>#tag</b> か <b>tags:</b> を使えます（複数OK） 例: <b>#travel #school</b></div>
     <datalist id="tagSuggestions"></datalist>
   </div>
 </div>
 
-
-        <div id="listMsg" class="msg"></div>
+<div id="listMsg" class="msg"></div>
 
         <div id="wordList" class="word-list"></div>
       </div>
