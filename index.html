@@ -33,18 +33,18 @@
       <h2>追加（検索＋手入力）</h2>
 
       <details class="card" id="settingsCard">
-        <summary class="summary">⚙️ 接続設定（HF Spaces）</summary>
+        <summary class="summary">⚙️ 接続設定（HF Spaces） <span id="connStatus" class="conn-status"></span></summary>
 
         <label class="field-label" for="hfBase">HF Spaces API Base（例：https://xxxxx.hf.space）</label>
         <div class="field-row">
           <input id="hfBase" type="text" placeholder="https://mazzgogo-tango-cho.hf.space" />
-          <button id="saveHfBaseBtn" class="secondary-btn">保存</button>
+          <button id="saveHfBaseBtn" class="secondary-btn" type="button">保存</button>
         </div>
 
         <label class="field-label" for="appToken">APP_TOKEN（Spacesで設定した場合のみ）</label>
         <div class="field-row">
           <input id="appToken" type="text" placeholder="未設定なら空でOK" />
-          <button id="saveAppTokenBtn" class="secondary-btn">保存</button>
+          <button id="saveAppTokenBtn" class="secondary-btn" type="button">保存</button>
         </div>
 
         <p class="note">※ DeepLキーはSpacesのSecrets（DEEPL_KEY）に入れてください。PWAには不要です。</p>
@@ -96,11 +96,11 @@
         <textarea id="memo" rows="2" placeholder="ニュアンス・使い分けなど"></textarea>
 
 
-        <div id="editBanner" class="edit-banner" style="display:none">
-          <div class="edit-title">編集モード</div>
-          <div class="edit-sub" id="editSub"></div>
-          <button id="cancelEditBtn" class="ghost-btn" type="button">編集をやめる</button>
-        </div>
+      <div id="editBanner" class="edit-banner" style="display:none">
+        <div class="edit-title">編集モード</div>
+        <div class="edit-sub" id="editSub"></div>
+        <button id="cancelEditBtn" class="ghost-btn" type="button">編集をやめる</button>
+      </div>
 
         <button id="saveBtn" class="secondary-btn full-width">単語帳に保存</button>
 

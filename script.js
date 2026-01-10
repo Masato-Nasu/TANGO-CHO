@@ -3,6 +3,8 @@ const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
 const FILTER_KEY = "tangoChoFilter";
 
+let editId = null;
+
 const STATUS_LABEL = {
   forgot: "覚えてない",
   default: "デフォルト",
@@ -60,10 +62,50 @@ function setListMsg(text, kind) {
 
 
 function getHfBase() {
-  return (localStorage.getItem(HF_BASE_KEY) || "").trim();
+  // 1) primary key
+  let v = (localStorage.getItem(HF_BASE_KEY) || "").trim();
+
+  // 2) legacy keys migration (older versions)
+  if (!v) {
+    const legacyKeys = ["tangoChoApiBase", "tangoChoApiBaseUrl", "tangoChoSpaceBase", "tangoChoServerBase"];
+    for (const k of legacyKeys) {
+      const t = (localStorage.getItem(k) || "").trim();
+      if (t) {
+        v = t;
+        localStorage.setItem(HF_BASE_KEY, v);
+        break;
+      }
+    }
+  }
+
+  // 3) fallback: current input value (if user typed but didn't press save)
+  if (!v) {
+    const el = document.getElementById("hfBase");
+    if (el && el.value && el.value.trim()) v = el.value.trim();
+  }
+  return v;
 }
+
 function getAppToken() {
-  return (localStorage.getItem(HF_TOKEN_KEY) || "").trim();
+  let v = (localStorage.getItem(HF_TOKEN_KEY) || "").trim();
+
+  if (!v) {
+    const legacyKeys = ["tangoChoToken", "tangoChoAppTokenLegacy", "tangoChoApiToken"];
+    for (const k of legacyKeys) {
+      const t = (localStorage.getItem(k) || "").trim();
+      if (t) {
+        v = t;
+        localStorage.setItem(HF_TOKEN_KEY, v);
+        break;
+      }
+    }
+  }
+
+  if (!v) {
+    const el = document.getElementById("appToken");
+    if (el && el.value && el.value.trim()) v = el.value.trim();
+  }
+  return v;
 }
 
 async function translateToJaViaSpace(word) {
@@ -140,22 +182,55 @@ function setupTabs() {
   });
 }
 
+function switchToAddTab() {
+  const btn = document.querySelector('.tab-button[data-section="addSection"]');
+  if (btn) btn.click();
+}
+
+
 function setupSettings() {
   const hfBase = document.getElementById("hfBase");
   const saveHfBaseBtn = document.getElementById("saveHfBaseBtn");
   const appToken = document.getElementById("appToken");
   const saveAppTokenBtn = document.getElementById("saveAppTokenBtn");
+  const connStatus = document.getElementById("connStatus");
 
   hfBase.value = getHfBase();
   appToken.value = getAppToken();
 
-  saveHfBaseBtn.addEventListener("click", () => {
+  function updateConnBadge() {
+    const v = (hfBase.value || '').trim();
+    if (!connStatus) return;
+    connStatus.textContent = v ? '✅ 接続先設定済み' : '⚠️ 未設定';
+  }
+  updateConnBadge();
+
+  saveHfBaseBtn?.addEventListener("click", () => {
     localStorage.setItem(HF_BASE_KEY, hfBase.value.trim());
+    updateConnBadge();
     setMsg("HF Spaces API Base を保存しました。", "ok");
   });
-  saveAppTokenBtn.addEventListener("click", () => {
+  saveAppTokenBtn?.addEventListener("click", () => {
     localStorage.setItem(HF_TOKEN_KEY, appToken.value.trim());
     setMsg("APP_TOKEN を保存しました。", "ok");
+  });
+
+
+  // Auto-save (user may forget pressing "保存")
+  hfBase.addEventListener("blur", () => {
+    localStorage.setItem(HF_BASE_KEY, hfBase.value.trim());
+    updateConnBadge();
+  });
+  hfBase.addEventListener("change", () => {
+    localStorage.setItem(HF_BASE_KEY, hfBase.value.trim());
+    updateConnBadge();
+  });
+
+  appToken.addEventListener("blur", () => {
+    localStorage.setItem(HF_TOKEN_KEY, appToken.value.trim());
+  });
+  appToken.addEventListener("change", () => {
+    localStorage.setItem(HF_TOKEN_KEY, appToken.value.trim());
   });
 }
 
@@ -173,6 +248,9 @@ function setupAddForm() {
   const clearBtn = document.getElementById("clearBtn");
   const ttsBtn = document.getElementById("ttsBtn");
   const statePill = document.getElementById("translateState");
+  const editBanner = document.getElementById("editBanner");
+  const editSub = document.getElementById("editSub");
+  const cancelEditBtn = document.getElementById("cancelEditBtn");
 
   function setState(text) {
     if (!statePill) return;
@@ -191,42 +269,28 @@ function setupAddForm() {
     if (!afterSave) setMsg("", "");
   }
 
-  const editBanner = document.getElementById("editBanner");
-  const editSub = document.getElementById("editSub");
-  const cancelEditBtn = document.getElementById("cancelEditBtn");
+  function enterEditMode(item) {
+    editId = item.id;
+    wordEl.value = item.word || "";
+    meaningEl.value = item.meaning || "";
+    statusEl.value = item.status || "default";
+    exampleEl.value = item.example || "";
+    memoEl.value = item.memo || "";
+    tagsEl.value = item.tags || "";
+    if (synonymsEl) synonymsEl.value = item.synonyms || "";
 
-  function enterEditMode(wordItem) {
-    editId = wordItem.id;
-    // Fill form
-    wordEl.value = wordItem.word || "";
-    meaningEl.value = wordItem.meaning || "";
-    statusEl.value = wordItem.status || "default";
-    exampleEl.value = wordItem.example || "";
-    memoEl.value = wordItem.memo || "";
-    tagsEl.value = wordItem.tags || "";
-    if (synonymsEl) synonymsEl.value = wordItem.synonyms || "";
-    setState("編集");
-    // Banner
     if (editBanner) editBanner.style.display = "flex";
-    if (editSub) editSub.textContent = `${(wordItem.word || "").trim()} を編集中`;
-    // Button label
+    if (editSub) editSub.textContent = `${(item.word || "").trim()} を編集中`;
+
     saveBtn.textContent = "更新";
+    setState("編集");
     setMsg("編集モードに入りました。内容を修正して「更新」を押してください。", "ok");
-    // Switch tab to Add
-    switchTab("add");
+
+    switchToAddTab();
     wordEl.focus();
   }
 
-  window.startEdit = (id) => {
-    const all = loadWords();
-    // keep global words in sync for other operations
-    words = Array.isArray(all) ? all : [];
-    const item = words.find(x => x.id === id);
-    if (!item) return;
-    enterEditMode(item);
-  };
-
-  function exitEditMode(showMsg=false) {
+  function exitEditMode(showMsg = false) {
     editId = null;
     if (editBanner) editBanner.style.display = "none";
     saveBtn.textContent = "単語帳に保存";
@@ -234,9 +298,15 @@ function setupAddForm() {
     if (showMsg) setMsg("編集を終了しました。", "ok");
   }
 
-  if (cancelEditBtn) {
-    cancelEditBtn.addEventListener("click", () => exitEditMode(true));
-  }
+  // expose for list tab
+  window.startEdit = (id) => {
+    const all = loadWords();
+    const item = all.find((x) => x.id === id);
+    if (!item) return;
+    enterEditMode(item);
+  };
+
+  cancelEditBtn?.addEventListener("click", () => exitEditMode(true));
 
 
 
@@ -246,6 +316,7 @@ function setupAddForm() {
   });
 
   clearBtn.addEventListener("click", () => {
+    if (editId) return exitEditMode(true);
     clearForm(false);
   });
 
@@ -298,16 +369,19 @@ function setupAddForm() {
   saveBtn.addEventListener("click", () => {
     const w = wordEl.value.trim();
     const m = meaningEl.value.trim();
-    if (!w) return setMsg("英単語を入力してください。", "err");
-    if (!m) return setMsg("日本語訳を入力してください。", "err");
+    if (!w) return setMsg("英単語が空です。", "err");
+    if (!m) return setMsg("日本語訳が空です（翻訳 or 手入力してください）。", "err");
 
-    const now = new Date().toISOString();
+    const words = loadWords();
+    const now = nowIso();
 
     // ===== Edit mode =====
+    let baseId = `${now}-${Math.random().toString(36).slice(2, 8)}`;
     if (editId) {
-      const idx = words.findIndex(x => x.id === editId);
-      if (idx !== -1) {
+      const idx = words.findIndex((x) => x.id === editId);
+      if (idx >= 0) {
         const prev = words[idx];
+        baseId = prev.id;
         words[idx] = {
           ...prev,
           word: w,
@@ -319,43 +393,37 @@ function setupAddForm() {
           synonyms: synonymsEl ? synonymsEl.value.trim() : (prev.synonyms || ""),
           updatedAt: now,
         };
-        saveWords(words);
-        renderWordList();
-        exitEditMode(false);
-        setMsg("更新しました（入力をクリアしました）。", "ok");
-        return;
+      } else {
+        // If the item disappeared, fall back to adding as new.
+        editId = null;
       }
-      // if target missing, fall through to "add new"
-      editId = null;
     }
 
-    // ===== Add new =====
-    const createdAt = now;
+    // ===== Add new if not editing =====
+    if (!editId) {
+      words.push({
+        id: baseId,
+        word: w,
+        meaning: m,
+        status: statusEl.value || "default",
+        example: exampleEl.value.trim(),
+        memo: memoEl.value.trim(),
+        tags: tagsEl.value.trim(),
+        synonyms: synonymsEl ? synonymsEl.value.trim() : "",
+        source: "manual",
+        createdAt: now,
+      });
+    }
 
-    const baseId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-    words.push({
-      id: baseId,
-      word: w,
-      meaning: m,
-      status: statusEl.value || "default",
-      example: exampleEl.value.trim(),
-      memo: memoEl.value.trim(),
-      tags: tagsEl.value.trim(),
-      synonyms: synonymsEl ? synonymsEl.value.trim() : "",
-      source: "manual",
-      createdAt,
-    });
-
-    // Auto-add synonym cards (comma-separated)
+    // ===== Auto-add synonym cards (comma-separated) =====
     const synRaw = (synonymsEl ? synonymsEl.value : "").trim();
     const synTokens = synRaw
-      ? synRaw.split(/[,、\n\r]+/).map(s => s.trim()).filter(Boolean)
+      ? synRaw.split(/[,、\n\r]+/).map((s) => s.trim()).filter(Boolean)
       : [];
 
     const seen = new Set();
     const baseLower = w.toLowerCase();
-    const existingKey = new Set(words.map(x => `${String(x.word||"").toLowerCase()}|${String(x.meaning||"")}`));
+    const existingKey = new Set(words.map((x) => `${String(x.word || "").toLowerCase()}|${String(x.meaning || "")}`));
     let synAdded = 0;
 
     for (const t of synTokens) {
@@ -377,20 +445,24 @@ function setupAddForm() {
         tags: tagsEl.value.trim(),
         synonyms: "",
         source: "synonym",
-        createdAt,
+        createdAt: nowIso(),
       });
       existingKey.add(key);
       synAdded += 1;
     }
 
     saveWords(words);
-    clearForm(true);
+
+    if (editId) {
+      exitEditMode(false);
+      setMsg(`更新しました（入力をクリアしました）。${synAdded ? ` 類似語カード +${synAdded}` : ""}`.trim(), "ok");
+    } else {
+      clearForm(true);
+      setMsg(`保存しました（入力をクリアしました）。${synAdded ? ` 類似語カード +${synAdded}` : ""}`.trim(), "ok");
+    }
+
     renderWordList();
-    setMsg(`保存しました（入力をクリアしました）。${synAdded ? ` 類似語カード +${synAdded}` : ""}`.trim(), "ok");
     wordEl.focus();
-  });
-
-
   });
 }
 
@@ -499,6 +571,7 @@ function renderWordList() {
     });
 
     actions.appendChild(edit);
+
     actions.appendChild(del);
 
     item.appendChild(top);
