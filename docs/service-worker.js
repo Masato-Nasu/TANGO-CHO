@@ -1,10 +1,13 @@
-const CACHE = "tango-cho-cache-v2.4";
+const CACHE = "tango-cho-cache-v2.5";
 const ASSETS = [
   "./",
   "./index.html",
   "./style.css",
   "./script.js",
-  "./manifest.json",];
+  "./manifest.json",
+  "./icons/apple-touch-icon-v25.png",
+  "./icons/icon-192-v25.png",
+  "./icons/icon-512-v25.png",];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));
