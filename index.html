@@ -40,28 +40,12 @@
           <input id="hfBase" type="text" placeholder="https://mazzgogo-tango-cho.hf.space" />
           <button id="saveHfBaseBtn" class="secondary-btn" type="button">保存</button>
         </div>
-        <div id="hfBaseStatus" class="status-line"></div>
 
         <label class="field-label" for="appToken">APP_TOKEN（Spacesで設定した場合のみ）</label>
         <div class="field-row">
           <input id="appToken" type="text" placeholder="未設定なら空でOK" />
           <button id="saveAppTokenBtn" class="secondary-btn" type="button">保存</button>
         </div>
-        <div id="appTokenStatus" class="status-line"></div>
-
-        <div class="btn-row" style="margin-top:10px">
-          <button id="testConnBtn" class="secondary-btn" type="button">接続テスト（/health）</button>
-        </div>
-        <div id="testConnStatus" class="status-line"></div>
-        <div class="btn-row" style="margin-top:10px">
-          <button id="storageTestBtn" class="secondary-btn" type="button">保存テスト（localStorage）</button>
-        </div>
-        <div class="btn-row" style="margin-top:10px">
-          <button id="resetCacheBtn" class="secondary-btn" type="button">キャッシュ削除＆再読み込み</button>
-        </div>
-        <div id="storageTestStatus" class="status-line"></div>
-        <div id="currentSettings" class="status-line"></div>
-        <div style="height:8px"></div>
 
         <p class="note">※ DeepLキーはSpacesのSecrets（DEEPL_KEY）に入れてください。PWAには不要です。</p>
       </details>
@@ -79,9 +63,7 @@
           <button id="translateBtn" class="primary-btn">翻訳（DeepL）</button>
           <button id="clearBtn" class="ghost-btn">クリア</button>
           <div class="pill" id="translateState">未翻訳</div>
-        
-        <div id="translateDebug" class="status-line"></div>
-</div>
+        </div>
 
         <label class="field-label" for="meaning">日本語訳（編集可）</label>
         <input id="meaning" type="text" placeholder="翻訳ボタンで自動入力 / 手入力もOK" />
@@ -108,10 +90,6 @@
         </div>
 
         <label class="field-label" for="example">例文（任意）</label>
-        <div class="btn-row" style="margin-top:8px">
-          <button id="exampleGenBtn" class="secondary-btn" type="button">例文を自動生成</button>
-        </div>
-        <div style="height:10px"></div>
         <textarea id="example" rows="2" placeholder="例: I was curious about it."></textarea>
 
         <label class="field-label" for="memo">メモ（任意）</label>
@@ -193,7 +171,6 @@
   <footer class="app-footer">
     <button id="ttsTestBtn" class="ghost-btn small">🔊 テスト</button>
     <span class="footer-text">発音: Web Speech API / 翻訳: HF Spaces → DeepL</span>
-    <span class="footer-text" data-version>v3.7.0</span>
   </footer>
 
   <script src="script.js"></script>
@@ -204,187 +181,5 @@
       });
     }
   </script>
-<script>
-(function(){
-  const HF_BASE_KEY = "tangoChoHfBase";
-  const HF_TOKEN_KEY = "tangoChoAppToken";
-
-  function setLine(id, text, type){
-    const el = document.getElementById(id);
-    if(!el) return;
-    el.textContent = text || "";
-    el.classList.remove("ok","err");
-    if(type) el.classList.add(type);
-  }
-
-  function normalizeBase(raw){
-    let v = String(raw || "").trim();
-    // Convert huggingface.co/spaces/OWNER/SPACE -> https://owner-space.hf.space
-    const m = v.match(/^https?:\/\/huggingface\.co\/spaces\/([^\/]+)\/([^\/?#]+)\/*/i);
-    if(m){
-      const owner = m[1].toLowerCase();
-      const space = m[2].toLowerCase();
-      const host = (owner + "-" + space).replace(/[^a-z0-9\-]/g,"-").replace(/\-+/g,"-");
-      v = "https://" + host + ".hf.space";
-    }
-    if(v && !/^https?:\/\//i.test(v)) v = "https://" + v;
-    try{
-      const u = new URL(v);
-      v = u.origin; // strip /health etc
-    }catch(e){}
-    v = v.replace(/\/+$/,"");
-    return v;
-  }
-
-  function showDiag(msg, ok){
-    const b = document.getElementById("diagBanner");
-    if(!b) return;
-    b.textContent = msg;
-    b.classList.remove("ok","err");
-    b.classList.add(ok ? "ok" : "err");
-  }
-
-  // Mark JS executed immediately
-  showDiag("DIAG: JS動作中（v3.7.0）", true);
-
-  // Refs
-  const hfBase = document.getElementById("hfBase");
-  const appToken = document.getElementById("appToken");
-  const saveHf = document.getElementById("saveHfBaseBtn");
-  const saveTok = document.getElementById("saveAppTokenBtn");
-  const testBtn = document.getElementById("testConnBtn");
-  const storageBtn = document.getElementById("storageTestBtn");
-  const resetBtn = document.getElementById("resetCacheBtn");
-
-  // Load existing values (do not rely on external script)
-  try{
-    if(hfBase){
-      const v = normalizeBase(localStorage.getItem(HF_BASE_KEY) || hfBase.value || hfBase.getAttribute("placeholder") || "");
-      hfBase.value = v;
-      setLine("hfBaseStatus", v ? ("保存済み: " + v) : "未保存: HF Base 未設定", v ? "ok" : "err");
-    }
-    if(appToken){
-      const t = (localStorage.getItem(HF_TOKEN_KEY) || "").trim();
-      appToken.value = t;
-      setLine("appTokenStatus", t ? ("保存済み: " + t) : "未設定（空）", "");
-    }
-    setLine("currentSettings", "現在値\nHF_BASE: " + (localStorage.getItem(HF_BASE_KEY)||"(未設定)") + "\nAPP_TOKEN: " + (localStorage.getItem(HF_TOKEN_KEY)||"(空)"), "");
-  }catch(e){
-    setLine("testConnStatus", "初期化エラー: " + String(e && e.message ? e.message : e), "err");
-  }
-
-  function saveBase(){
-    try{
-      const v = normalizeBase(hfBase ? hfBase.value : "");
-      if(hfBase) hfBase.value = v;
-      if(!v){
-        setLine("hfBaseStatus","未保存: HF Base が空です","err");
-        alert("HF Base が空です");
-        return;
-      }
-      localStorage.setItem(HF_BASE_KEY, v);
-      setLine("hfBaseStatus","保存OK: " + v,"ok");
-      setLine("currentSettings", "現在値\nHF_BASE: " + (localStorage.getItem(HF_BASE_KEY)||"(未設定)") + "\nAPP_TOKEN: " + (localStorage.getItem(HF_TOKEN_KEY)||"(空)"), "");
-      alert("保存OK: " + v);
-    }catch(e){
-      setLine("hfBaseStatus","保存失敗: " + String(e && e.message ? e.message : e),"err");
-      alert("保存失敗: " + String(e && e.message ? e.message : e));
-    }
-  }
-
-  function saveToken(){
-    try{
-      const t = (appToken ? appToken.value : "").trim();
-      localStorage.setItem(HF_TOKEN_KEY, t);
-      setLine("appTokenStatus", t ? ("保存OK: " + t) : "保存OK: 未設定（空）", "ok");
-      setLine("currentSettings", "現在値\nHF_BASE: " + (localStorage.getItem(HF_BASE_KEY)||"(未設定)") + "\nAPP_TOKEN: " + (localStorage.getItem(HF_TOKEN_KEY)||"(空)"), "");
-      alert(t ? ("APP_TOKEN保存OK: " + t) : "APP_TOKENは空で保存されました");
-    }catch(e){
-      setLine("appTokenStatus","保存失敗: " + String(e && e.message ? e.message : e),"err");
-      alert("保存失敗: " + String(e && e.message ? e.message : e));
-    }
-  }
-
-  async function testHealth(){
-    const base = normalizeBase(hfBase ? hfBase.value : "");
-    if(hfBase) hfBase.value = base;
-    if(!base){
-      setLine("testConnStatus","未設定: HF Base が空です","err");
-      alert("HF Base が空です");
-      return;
-    }
-    const url = base + "/health";
-    setLine("testConnStatus","テスト中: " + url,"");
-    if(testBtn){ testBtn.disabled = true; }
-    try{
-      const controller = new AbortController();
-      const timer = setTimeout(()=>controller.abort(), 12000);
-      const token = (localStorage.getItem(HF_TOKEN_KEY)||"").trim();
-      const res = await fetch(url, {
-        method: "GET",
-        headers: token ? {"X-App-Token": token} : {},
-        signal: controller.signal
-      });
-      clearTimeout(timer);
-      const txt = await res.text();
-      if(!res.ok){
-        throw new Error("status " + res.status + " - " + txt.slice(0,160));
-      }
-      setLine("testConnStatus","接続OK: " + txt,"ok");
-      alert("接続OK: /health");
-    }catch(e){
-      const msg = (e && e.name === "AbortError") ? "タイムアウト(12秒)" : String(e && e.message ? e.message : e);
-      setLine("testConnStatus","接続NG: " + msg,"err");
-      alert("接続NG: " + msg);
-    }finally{
-      if(testBtn){ testBtn.disabled = false; }
-    }
-  }
-
-  function storageTest(){
-    try{
-      const k = "tangoChoStorageTest";
-      const v = "ok-" + Date.now();
-      localStorage.setItem(k, v);
-      const r = localStorage.getItem(k);
-      setLine("storageTestStatus","storage write/read OK: " + r,"ok");
-      alert("保存テストOK");
-    }catch(e){
-      setLine("storageTestStatus","storage FAILED: " + String(e && e.message ? e.message : e),"err");
-      alert("保存テストNG: " + String(e && e.message ? e.message : e));
-    }
-  }
-
-  async function resetCache(){
-    try{
-      setLine("testConnStatus","キャッシュ削除中…","");
-      if(navigator.serviceWorker){
-        const regs = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(regs.map(r=>r.unregister()));
-      }
-      if(window.caches){
-        const keys = await caches.keys();
-        await Promise.all(keys.map(k=>caches.delete(k)));
-      }
-      alert("キャッシュを削除しました。再読み込みします。");
-      location.reload();
-    }catch(e){
-      const msg = String(e && e.message ? e.message : e);
-      setLine("testConnStatus","キャッシュ削除失敗: " + msg,"err");
-      alert("キャッシュ削除失敗: " + msg);
-    }
-  }
-
-  // Wire handlers (even if external script fails)
-  if(saveHf) saveHf.addEventListener("click", saveBase);
-  if(saveTok) saveTok.addEventListener("click", saveToken);
-  if(testBtn) testBtn.addEventListener("click", testHealth);
-  if(storageBtn) storageBtn.addEventListener("click", storageTest);
-  if(resetBtn) resetBtn.addEventListener("click", resetCache);
-
-  // Also expose for console/debug
-  window.__tc = {saveBase, saveToken, testHealth, storageTest, resetCache, normalizeBase};
-})();
-</script>
 </body>
 </html>

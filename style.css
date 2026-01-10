@@ -110,22 +110,3 @@ details summary::-webkit-details-marker{display:none}
 .edit-banner{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px 14px;border:1px solid var(--border);background:#0f1412;border-radius:16px;margin:10px 0 12px;}
 .edit-title{font-weight:800;font-size:1.05rem;color:var(--text)}
 .edit-sub{flex:1;color:var(--sub);font-size:0.98rem;line-height:1.2}
-
-/* example button spacing */
-#exampleGenBtn{ margin-bottom: 6px; }
-
-.status-line{
-  margin-top:8px;
-  padding:10px 12px;
-  border-radius:14px;
-  border:1px solid var(--border);
-  background: rgba(255,255,255,0.03);
-  font-size:14px;
-  line-height:1.4;
-  word-break: break-word;
-}
-.status-line.ok{ border-color: rgba(0,200,150,0.6); }
-.status-line.err{ border-color: rgba(255,100,100,0.6); }
-
-#currentSettings{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; opacity: 0.95; }
-#storageTestStatus{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; opacity: 0.95; }

@@ -1,12 +1,4 @@
 const STORAGE_KEY = "tangoChoWords";
-function safeStorageGet(key) {
-  try { return (localStorage.getItem(key) || ""); }
-  catch (e) { return ""; }
-}
-function safeStorageSet(key, value) {
-  try { localStorage.setItem(key, value); return true; }
-  catch (e) { return false; }
-}
 const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
 const FILTER_KEY = "tangoChoFilter";
@@ -35,14 +27,7 @@ function loadWords() {
 }
 
 function saveWords(words) {
-  try {
-    if (!safeStorageSet(STORAGE_KEY, JSON.stringify(words))) throw new Error("ストレージ保存に失敗しました");
-    localStorage.setItem("tangoChoLastSavedAt", new Date().toISOString());
-    return true;
-  } catch (e) {
-    console.error("saveWords failed", e);
-    return false;
-  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
 }
 
 function speak(text) {
@@ -66,29 +51,6 @@ function setMsg(text, kind) {
   if (kind === "err") el.classList.add("err");
 }
 
-function setStatusLine(id, text, type = "") {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.textContent = text || "";
-  el.classList.remove("ok","err");
-  if (type) el.classList.add(type);
-}
-
-window.addEventListener("error", (e) => {
-  try {
-    const msg = e?.message ? String(e.message) : "Unknown error";
-    setStatusLine("testConnStatus", `JSエラー: ${msg}`, "err");
-  } catch (_) {}
-});
-
-window.addEventListener("unhandledrejection", (e) => {
-  try {
-    const msg = e?.reason?.message ? String(e.reason.message) : String(e.reason || "Unhandled rejection");
-    setStatusLine("testConnStatus", `Promiseエラー: ${msg}`, "err");
-  } catch (_) {}
-});
-
-
 function setListMsg(text, kind) {
   const el = document.getElementById("listMsg");
   if (!el) return;
@@ -99,47 +61,18 @@ function setListMsg(text, kind) {
 }
 
 
-
-function normalizeHfBase(vRaw) {
-  let v = String(vRaw || "").trim();
-
-  // If user pasted the Hugging Face "spaces" page URL, convert to hf.space
-  // e.g. https://huggingface.co/spaces/mazzGOGO/TANGO-CHO -> https://mazzgogo-tango-cho.hf.space
-  const m = v.match(/^https?:\/\/huggingface\.co\/spaces\/([^\/]+)\/([^\/?#]+)\/*/i);
-  if (m) {
-    const owner = m[1].toLowerCase();
-    const space = m[2].toLowerCase();
-    const host = `${owner}-${space}`.replace(/[^a-z0-9\-]/g, "-").replace(/\-+/g, "-");
-    v = `https://${host}.hf.space`;
-  }
-
-  // Ensure scheme so URL() can parse
-  if (v && !/^https?:\/\//i.test(v)) v = "https://" + v;
-
-  // Strip any path like /health, /translate, etc. Keep only origin.
-  try {
-    const u = new URL(v);
-    v = u.origin;
-  } catch (_) {}
-
-  // Remove trailing slashes
-  v = v.replace(/\/+$/, "");
-
-  return v;
-}
-
 function getHfBase() {
   // 1) primary key
-  let v = (safeStorageGet(HF_BASE_KEY) || "").trim();
+  let v = (localStorage.getItem(HF_BASE_KEY) || "").trim();
 
   // 2) legacy keys migration (older versions)
   if (!v) {
     const legacyKeys = ["tangoChoApiBase", "tangoChoApiBaseUrl", "tangoChoSpaceBase", "tangoChoServerBase"];
     for (const k of legacyKeys) {
-      const t = (safeStorageGet(k) || "").trim();
+      const t = (localStorage.getItem(k) || "").trim();
       if (t) {
         v = t;
-        safeStorageSet(HF_BASE_KEY, v);
+        localStorage.setItem(HF_BASE_KEY, v);
         break;
       }
     }
@@ -150,27 +83,19 @@ function getHfBase() {
     const el = document.getElementById("hfBase");
     if (el && el.value && el.value.trim()) v = el.value.trim();
   }
-  // 4) fallback: placeholder (recommended default)
-  if (!v) {
-    const el = document.getElementById("hfBase");
-    const ph = (el && el.getAttribute("placeholder")) ? el.getAttribute("placeholder").trim() : "";
-    if (ph.startsWith("http")) v = ph;
-  }
-  // 5) hard default (this project)
-  if (!v) v = "https://mazzgogo-tango-cho.hf.space";
-  return normalizeHfBase(v);
+  return v;
 }
 
 function getAppToken() {
-  let v = (safeStorageGet(HF_TOKEN_KEY) || "").trim();
+  let v = (localStorage.getItem(HF_TOKEN_KEY) || "").trim();
 
   if (!v) {
     const legacyKeys = ["tangoChoToken", "tangoChoAppTokenLegacy", "tangoChoApiToken"];
     for (const k of legacyKeys) {
-      const t = (safeStorageGet(k) || "").trim();
+      const t = (localStorage.getItem(k) || "").trim();
       if (t) {
         v = t;
-        safeStorageSet(HF_TOKEN_KEY, v);
+        localStorage.setItem(HF_TOKEN_KEY, v);
         break;
       }
     }
@@ -184,9 +109,8 @@ function getAppToken() {
 }
 
 async function translateToJaViaSpace(word) {
-  let base = normalizeHfBase(getHfBase());
-  if (!base) base = "https://mazzgogo-tango-cho.hf.space";
-  base = normalizeHfBase(base);
+  const base = getHfBase();
+  if (!base) throw new Error("HF Spaces API Base が未設定です（⚙️接続設定）。");
   const token = getAppToken();
 
   const res = await fetch(`${base.replace(/\/$/, "")}/translate`, {
@@ -205,34 +129,6 @@ async function translateToJaViaSpace(word) {
   const data = await res.json();
   return data.translated || "";
 }
-
-async function translateTextViaSpace(text, targetLang = "JA") {
-  const base = normalizeHfBase(getHfBase());
-  if (!base) throw new Error("HF Spaces API Base が未設定です（⚙️接続設定）。");
-  const token = getAppToken();
-
-  const res = await fetch(`${base.replace(/\/$/, "")}/translate`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { "X-App-Token": token } : {}),
-    },
-    body: JSON.stringify({ text, target_lang: targetLang }),
-  });
-
-  if (!res.ok) {
-    let detail = "";
-    try {
-      const j = await res.json();
-      detail = j?.detail ? ` (${j.detail})` : "";
-    } catch (_) {}
-    throw new Error(`翻訳に失敗: ${res.status}${detail}`);
-  }
-
-  const data = await res.json();
-  return String(data?.translated || "").trim();
-}
-
 
 async function fetchSynonymsViaSpace(word, max = 8) {
   const base = getHfBase();
@@ -298,38 +194,9 @@ function setupSettings() {
   const appToken = document.getElementById("appToken");
   const saveAppTokenBtn = document.getElementById("saveAppTokenBtn");
   const connStatus = document.getElementById("connStatus");
-  const testConnBtn = document.getElementById("testConnBtn");
-  const hfBaseStatus = document.getElementById("hfBaseStatus");
-  const appTokenStatus = document.getElementById("appTokenStatus");
-  const testConnStatus = document.getElementById("testConnStatus");
-  const storageTestBtn = document.getElementById("storageTestBtn");
-  const storageTestStatus = document.getElementById("storageTestStatus");
-  const currentSettings = document.getElementById("currentSettings");
-  const resetCacheBtn = document.getElementById("resetCacheBtn");
 
   hfBase.value = getHfBase();
   appToken.value = getAppToken();
-  hfBase.value = normalizeHfBase(hfBase.value);
-  setStatusLine("currentSettings", `現在値\nHF_BASE: ${hfBase.value || "(未設定)"}\nAPP_TOKEN: ${appToken.value || "(空)"}\nLastSaved: ${localStorage.getItem("tangoChoLastSavedAt") || "(なし)"}`, "");
-  setStatusLine("hfBaseStatus", hfBase.value ? `保存済み：${hfBase.value}` : "未保存：HF Base 未設定", hfBase.value ? "ok" : "err");
-  setStatusLine("appTokenStatus", appToken.value ? `保存済み：${appToken.value}` : "未設定（空）", "");
-  setStatusLine("testConnStatus", "", "");
-
-  function safeSetItem(key, value) {
-    try {
-      localStorage.setItem(key, value);
-      return true;
-    } catch (e) {
-      setMsg("保存できません：ブラウザのストレージが無効/制限されています。PWAを削除→再インストールで直ることがあります。", "err");
-      return false;
-    }
-  }
-
-  let _debounceTimer = null;
-  function debounce(fn, ms=300) {
-    clearTimeout(_debounceTimer);
-    _debounceTimer = setTimeout(fn, ms);
-  }
 
   function updateConnBadge() {
     const v = (hfBase.value || '').trim();
@@ -339,117 +206,39 @@ function setupSettings() {
   updateConnBadge();
 
   saveHfBaseBtn?.addEventListener("click", () => {
-    const v = normalizeHfBase(hfBase.value || "");
-    hfBase.value = v;
-    if (!v) return setMsg("HF Spaces API Base を入力してください。", "err");
-    if (safeSetItem(HF_BASE_KEY, v)) {
-      updateConnBadge();
-      setMsg("HF Spaces API Base を保存しました。", "ok");
-    }
+    localStorage.setItem(HF_BASE_KEY, hfBase.value.trim());
+    updateConnBadge();
+    setMsg("HF Spaces API Base を保存しました。", "ok");
   });
   saveAppTokenBtn?.addEventListener("click", () => {
-    const v = (appToken.value || "").trim();
-    if (safeSetItem(HF_TOKEN_KEY, v)) {
-      setMsg("APP_TOKEN を保存しました。", "ok");
-    }
+    localStorage.setItem(HF_TOKEN_KEY, appToken.value.trim());
+    setMsg("APP_TOKEN を保存しました。", "ok");
   });
 
 
-    });
-
-
-  // Auto-save (入力するだけで保存される)
-  hfBase.addEventListener("input", () => {
-    setStatusLine("hfBaseStatus", "入力検知：保存準備中…", "");
-    debounce(() => {
-      const v = normalizeHfBase(hfBase.value || "");
-      // do not overwrite while typing unless it looks like a full URL
-      if (/^https?:\/\//i.test(v)) hfBase.value = v;
-      safeSetItem(HF_BASE_KEY, v);
-      updateConnBadge();
-      setStatusLine("hfBaseStatus", v ? `自動保存：${v}` : "未保存：HF Base 未設定", v ? "ok" : "err");
-      setStatusLine("currentSettings", `現在値
-HF_BASE: ${getHfBase() || "(未設定)"}
-APP_TOKEN: ${getAppToken() || "(空)"}
-LastSaved: ${localStorage.getItem("tangoChoLastSavedAt") || "(なし)"}`, "");
-    }, 250);
+  // Auto-save (user may forget pressing "保存")
+  hfBase.addEventListener("blur", () => {
+    localStorage.setItem(HF_BASE_KEY, hfBase.value.trim());
+    updateConnBadge();
   });
-appToken.addEventListener("input", () => {
-    debounce(() => {
-      const v = (appToken.value || "").trim();
-      safeSetItem(HF_TOKEN_KEY, v);
-      setStatusLine("appTokenStatus", v ? `自動保存：${v}` : "未設定（空）", v ? "ok" : "");
-      setStatusLine("currentSettings", `現在値
-HF_BASE: ${getHfBase() || "(未設定)"}
-APP_TOKEN: ${getAppToken() || "(空)"}
-LastSaved: ${localStorage.getItem("tangoChoLastSavedAt") || "(なし)"}`, "");
-    }, 250);
-  });
-// Connection test
-  testConnBtn?.addEventListener("click", async () => {
-    const base = getHfBase();
-    if (!base) return setMsg("HF Spaces API Base が未設定です。", "err");
-    try {
-      const token = getAppToken();
-      const res = await fetch(`${base.replace(/\/$/, "")}/health`, {
-        method: "GET",
-        headers: { ...(token ? { "X-App-Token": token } : {}) },
-      });
-      if (!res.ok) throw new Error(`status ${res.status}`);
-      const data = await res.json();
-      if (data && data.ok) setMsg("接続OK：/health が応答しました。", "ok");
-      else setMsg("接続はできましたが応答が想定外です。", "err");
-    } catch (e) {
-      setMsg(`接続NG：${String(e.message || e)}`, "err");
-    }
+  hfBase.addEventListener("change", () => {
+    localStorage.setItem(HF_BASE_KEY, hfBase.value.trim());
+    updateConnBadge();
   });
 
-
-  // localStorage test (write/read)
-  resetCacheBtn?.addEventListener("click", async () => {
-    try {
-      setStatusLine("testConnStatus", "キャッシュ削除中…", "");
-      if (navigator.serviceWorker) {
-        const regs = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(regs.map((r) => r.unregister()));
-      }
-      if (window.caches) {
-        const keys = await caches.keys();
-        await Promise.all(keys.map((k) => caches.delete(k)));
-      }
-      alert("キャッシュを削除しました。再読み込みします。");
-      location.reload();
-    } catch (e) {
-      const msg = String(e && e.message ? e.message : e);
-      setStatusLine("testConnStatus", `キャッシュ削除失敗: ${msg}`, "err");
-      alert("キャッシュ削除に失敗しました: " + msg);
-    }
+  appToken.addEventListener("blur", () => {
+    localStorage.setItem(HF_TOKEN_KEY, appToken.value.trim());
   });
-
-  storageTestBtn?.addEventListener("click", () => {
-    try {
-      const k = "tangoChoStorageTest";
-      const v = `ok-${Date.now()}`;
-      localStorage.setItem(k, v);
-      const r = localStorage.getItem(k);
-      setStatusLine("storageTestStatus", `storage write/read OK: ${r}`, "ok");
-      setMsg("保存テストOK（localStorage）。", "ok");
-    } catch (e) {
-      setStatusLine("storageTestStatus", `storage FAILED: ${String(e && e.message ? e.message : e)}`, "err");
-      setMsg("保存テストNG（localStorage）。", "err");
-    }
+  appToken.addEventListener("change", () => {
+    localStorage.setItem(HF_TOKEN_KEY, appToken.value.trim());
   });
-
 }
-
-
 
 function setupAddForm() {
   const wordEl = document.getElementById("word");
   const meaningEl = document.getElementById("meaning");
   const statusEl = document.getElementById("status");
   const exampleEl = document.getElementById("example");
-  const exampleGenBtn = document.getElementById("exampleGenBtn");
   const memoEl = document.getElementById("memo");
   const tagsEl = document.getElementById("tags");
   const synonymsEl = document.getElementById("synonyms");
@@ -479,123 +268,6 @@ function setupAddForm() {
     setState("未翻訳");
     if (!afterSave) setMsg("", "");
   }
-
-  function looksLikeVerb(w) {
-    const wl = w.toLowerCase();
-    return wl === "be" || wl === "have" || wl === "do" ||
-      wl.endsWith("ate") || wl.endsWith("ify") || wl.endsWith("ise") || wl.endsWith("ize") ||
-      wl.endsWith("ing") || wl.endsWith("ed");
-  }
-
-  function looksLikeAdverb(w) {
-    return w.toLowerCase().endsWith("ly");
-  }
-
-  function looksLikeNoun(w) {
-    const wl = w.toLowerCase();
-    return wl.endsWith("tion") || wl.endsWith("sion") || wl.endsWith("ment") || wl.endsWith("ness") ||
-           wl.endsWith("ity") || wl.endsWith("ship") || wl.endsWith("ism") || wl.endsWith("er") || wl.endsWith("or");
-  }
-
-  function buildShortExample(word) {
-    const w = word.trim();
-    if (!w) return "";
-    if (/\s/.test(w)) {
-      return `I keep hearing the phrase "${w}".`;
-    }
-    if (looksLikeAdverb(w)) {
-      return `She spoke ${w} during the meeting.`;
-    }
-    if (looksLikeVerb(w)) {
-      return `I ${w.toLowerCase()} this every day.`;
-    }
-    if (looksLikeNoun(w)) {
-      return `This is a helpful ${w}.`;
-    }
-    return `I am ${w} about how it works.`;
-  }
-
-    async function generateExample() {
-    const w = wordEl.value.trim();
-    if (!w) {
-      setMsg("例文生成の前に英単語を入力してください。", "err");
-      return;
-    }
-    const en = buildShortExample(w);
-    if (!en) return;
-
-    // Show English immediately (even if API is not configured / network fails)
-    exampleEl.value = `EN: ${en}`;
-    setMsg("例文（EN）を作成しました。JAを翻訳中…", "ok");
-
-    // If HF Base is not set, stop here (EN only)
-    const base = getHfBase();
-    if (!base) {
-      setMsg("接続設定が未設定のため、例文はENのみです（⚙️接続設定でHF Baseを設定してください）。", "err");
-      return;
-    }
-
-    // Translate EN -> JA with a timeout
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 12000);
-
-      const token = getAppToken();
-      const res = await fetch(`${base.replace(/\/$/, "")}/translate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "X-App-Token": token } : {}),
-        },
-        body: JSON.stringify({ text: en, target_lang: "JA" }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timer);
-
-      if (!res.ok) {
-        let detail = "";
-        try {
-          const j = await res.json();
-          detail = j?.detail ? ` (${j.detail})` : "";
-        } catch (_) {}
-        throw new Error(`翻訳に失敗: ${res.status}${detail}`);
-      }
-
-      const data = await res.json();
-      const ja = String(data?.translated || "").trim();
-      if (ja) {
-        exampleEl.value = `EN: ${en}\nJA: ${ja}`;
-        setMsg("例文（EN+JA）を作成しました。", "ok");
-      } else {
-        setMsg("翻訳結果が空でした（ENのみ表示）。", "err");
-      }
-    } catch (e) {
-      // Keep EN, just show error
-      const msg = (e && e.name === "AbortError")
-        ? "翻訳がタイムアウトしました（ENのみ表示）。"
-        : String(e && e.message ? e.message : "例文生成に失敗しました（ENのみ表示）。");
-      setMsg(msg, "err");
-    }
-  }
-    const en = buildShortExample(w);
-    if (!en) return;
-
-    try {
-      setMsg("例文を生成中…", "ok");
-      const ja = await translateTextViaSpace(en, "JA");
-      exampleEl.value = `EN: ${en}\nJA: ${ja}`;
-      setMsg("例文を自動生成しました。", "ok");
-    } catch (e) {
-      exampleEl.value = `EN: ${en}`;
-      setMsg(String(e && e.message ? e.message : "例文生成に失敗しました。"), "err");
-    }
-  }
-
-  if (exampleGenBtn) {
-    exampleGenBtn.addEventListener("click", generateExample);
-  }
-
 
   function enterEditMode(item) {
     editId = item.id;
@@ -652,24 +324,15 @@ function setupAddForm() {
     const w = wordEl.value.trim();
     if (!w) return setMsg("英単語を入力してください。", "err");
 
-    setStatusLine("translateDebug", "", "");
     setMsg("翻訳中...", "");
     setState("翻訳中");
     try {
       const ja = await translateToJaViaSpace(w);
-      if (!ja) {
-        setStatusLine("translateDebug", "翻訳結果が空でした（Spacesの応答に translated がありません）", "err");
-        throw new Error("翻訳結果が空です（Spacesの応答が想定外の可能性）。");
-      }
       meaningEl.value = ja;
       setMsg("翻訳しました（編集できます）。", "ok");
-      setStatusLine("translateDebug", `OK: ${w} -> ${ja}`, "ok");
       setState("翻訳済み");
     } catch (e) {
-      const msg = String(e && (e.message || e) ? (e.message || e) : e);
-      setMsg(msg, "err");
-      setStatusLine("translateDebug", `NG: ${msg}`, "err");
-      try { alert("翻訳NG: " + msg); } catch(_) {}
+      setMsg(String(e.message || e), "err");
       setState("失敗");
     }
   });
@@ -788,11 +451,7 @@ function setupAddForm() {
       synAdded += 1;
     }
 
-    const ok = saveWords(words);
-    if (!ok) {
-      setMsg("保存に失敗しました。端末のストレージが無効/不足の可能性があります。PWAを削除→再インストールで直ることがあります。", "err");
-      return;
-    }
+    saveWords(words);
 
     if (editId) {
       exitEditMode(false);
@@ -1291,11 +950,3 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("ttsTestBtn")?.addEventListener("click", () => speak("Hello, this is a test."));
 });
-
-
-// Show version loaded message once
-try {
-  setTimeout(() => {
-    try { setMsg("v3.6.6 loaded", "ok"); } catch(_) {}
-  }, 200);
-} catch(_) {}
