@@ -78,11 +78,6 @@
 
 ---
 
-## 📝 License
-TBD（必要ならMITなどに変更してください）
-
----
-
 ## 🙏 Thanks
 - DeepL API
 - Hugging Face Spaces
