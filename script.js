@@ -191,6 +191,54 @@ function setupAddForm() {
     if (!afterSave) setMsg("", "");
   }
 
+  const editBanner = document.getElementById("editBanner");
+  const editSub = document.getElementById("editSub");
+  const cancelEditBtn = document.getElementById("cancelEditBtn");
+
+  function enterEditMode(wordItem) {
+    editId = wordItem.id;
+    // Fill form
+    wordEl.value = wordItem.word || "";
+    meaningEl.value = wordItem.meaning || "";
+    statusEl.value = wordItem.status || "default";
+    exampleEl.value = wordItem.example || "";
+    memoEl.value = wordItem.memo || "";
+    tagsEl.value = wordItem.tags || "";
+    if (synonymsEl) synonymsEl.value = wordItem.synonyms || "";
+    setState("編集");
+    // Banner
+    if (editBanner) editBanner.style.display = "flex";
+    if (editSub) editSub.textContent = `${(wordItem.word || "").trim()} を編集中`;
+    // Button label
+    saveBtn.textContent = "更新";
+    setMsg("編集モードに入りました。内容を修正して「更新」を押してください。", "ok");
+    // Switch tab to Add
+    switchTab("add");
+    wordEl.focus();
+  }
+
+  window.startEdit = (id) => {
+    const all = loadWords();
+    // keep global words in sync for other operations
+    words = Array.isArray(all) ? all : [];
+    const item = words.find(x => x.id === id);
+    if (!item) return;
+    enterEditMode(item);
+  };
+
+  function exitEditMode(showMsg=false) {
+    editId = null;
+    if (editBanner) editBanner.style.display = "none";
+    saveBtn.textContent = "単語帳に保存";
+    clearForm(false);
+    if (showMsg) setMsg("編集を終了しました。", "ok");
+  }
+
+  if (cancelEditBtn) {
+    cancelEditBtn.addEventListener("click", () => exitEditMode(true));
+  }
+
+
 
   ttsBtn.addEventListener("click", () => {
     const w = wordEl.value.trim();
@@ -250,13 +298,43 @@ function setupAddForm() {
   saveBtn.addEventListener("click", () => {
     const w = wordEl.value.trim();
     const m = meaningEl.value.trim();
-    if (!w) return setMsg("英単語が空です。", "err");
-    if (!m) return setMsg("日本語訳が空です（翻訳 or 手入力してください）。", "err");
+    if (!w) return setMsg("英単語を入力してください。", "err");
+    if (!m) return setMsg("日本語訳を入力してください。", "err");
 
-    const words = loadWords();
-    const createdAt = nowIso();
+    const now = new Date().toISOString();
+
+    // ===== Edit mode =====
+    if (editId) {
+      const idx = words.findIndex(x => x.id === editId);
+      if (idx === -1) {
+        // fallback: treat as new
+        editId = null;
+      } else {
+        const prev = words[idx];
+        words[idx] = {
+          ...prev,
+          word: w,
+          meaning: m,
+          status: statusEl.value || "default",
+          example: exampleEl.value.trim(),
+          memo: memoEl.value.trim(),
+          tags: tagsEl.value.trim(),
+          synonyms: synonymsEl ? synonymsEl.value.trim() : (prev.synonyms || ""),
+          updatedAt: now,
+        };
+        saveWords(words);
+        renderWordList();
+        exitEditMode(false);
+        setMsg("更新しました（入力をクリアしました）。", "ok");
+        return;
+      }
+    }
+
+    // ===== Add new =====
+    const createdAt = now;
+
     words.push({
-      id: `${createdAt}-${Math.random().toString(36).slice(2, 8)}`,
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       word: w,
       meaning: m,
       status: statusEl.value || "default",
@@ -264,9 +342,51 @@ function setupAddForm() {
       memo: memoEl.value.trim(),
       tags: tagsEl.value.trim(),
       synonyms: synonymsEl ? synonymsEl.value.trim() : "",
-      source: "add",
+      source: "manual",
       createdAt,
     });
+
+    // Auto-add synonym cards (comma-separated)
+    const synRaw = (synonymsEl ? synonymsEl.value : "").trim();
+    const synTokens = synRaw
+      ? synRaw.split(/[,、\n\r]+/).map(s => s.trim()).filter(Boolean)
+      : [];
+    const seen = new Set();
+    const baseLower = w.toLowerCase();
+    const existingKey = new Set(words.map(x => `${String(x.word||"").toLowerCase()}|${String(x.meaning||"")}`));
+    let synAdded = 0;
+
+    for (const t of synTokens) {
+      const tl = t.toLowerCase();
+      if (!t || tl === baseLower) continue;
+      if (seen.has(tl)) continue;
+      seen.add(tl);
+
+      const key = `${tl}|${m}`;
+      if (existingKey.has(key)) continue;
+
+      words.push({
+        id: `${createdAt}-syn-${Math.random().toString(36).slice(2, 8)}`,
+        word: t,
+        meaning: m,
+        status: statusEl.value || "default",
+        example: "",
+        memo: `同義語（${w}）`,
+        tags: tagsEl.value.trim(),
+        synonyms: "",
+        source: "synonym",
+        createdAt,
+      });
+      existingKey.add(key);
+      synAdded += 1;
+    }
+
+    saveWords(words);
+    clearForm(true);
+    renderWordList();
+    setMsg(`保存しました（入力をクリアしました）。${synAdded ? ` 類似語カード +${synAdded}` : ""}`.trim(), "ok");
+    wordEl.focus();
+  });
 
     // Auto-add synonym cards (comma-separated)
     const synRaw = (synonymsEl ? synonymsEl.value : "").trim();
@@ -398,6 +518,13 @@ function renderWordList() {
     const actions = document.createElement("div");
     actions.className = "word-actions";
 
+    const edit = document.createElement("button");
+    edit.className = "ghost-btn small";
+    edit.textContent = "編集";
+    edit.addEventListener("click", () => {
+      if (typeof window.startEdit === "function") window.startEdit(w.id);
+    });
+
     const del = document.createElement("button");
     del.className = "delete-btn";
     del.textContent = "削除";
@@ -408,6 +535,7 @@ function renderWordList() {
       renderWordList();
     });
 
+    actions.appendChild(edit);
     actions.appendChild(del);
 
     item.appendChild(top);

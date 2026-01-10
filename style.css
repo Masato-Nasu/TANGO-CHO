@@ -104,3 +104,18 @@ details summary::-webkit-details-marker{display:none}
   align-items:stretch;
 }
 .row > input[type="text"]{flex:1}
+
+/* Edit mode banner */
+.edit-banner{
+  display:flex;
+  gap:12px;
+  align-items:center;
+  justify-content:space-between;
+  padding:12px 14px;
+  border:1px solid var(--border);
+  background:#0f1412;
+  border-radius:16px;
+  margin:10px 0 12px;
+}
+.edit-title{font-weight:800;font-size:1.05rem;color:var(--text)}
+.edit-sub{flex:1;color:var(--sub);font-size:0.98rem;line-height:1.2}
