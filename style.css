@@ -126,3 +126,6 @@ details summary::-webkit-details-marker{display:none}
 }
 .status-line.ok{ border-color: rgba(0,200,150,0.6); }
 .status-line.err{ border-color: rgba(255,100,100,0.6); }
+
+#currentSettings{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; opacity: 0.95; }
+#storageTestStatus{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; opacity: 0.95; }

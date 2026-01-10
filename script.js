@@ -91,6 +91,29 @@ function setListMsg(text, kind) {
 }
 
 
+
+function normalizeHfBase(vRaw) {
+  let v = String(vRaw || "").trim();
+
+  // If user pasted the Hugging Face "spaces" page URL, convert to hf.space
+  // e.g. https://huggingface.co/spaces/mazzGOGO/TANGO-CHO -> https://mazzgogo-tango-cho.hf.space
+  const m = v.match(/^https?:\/\/huggingface\.co\/spaces\/([^\/]+)\/([^\/?#]+)\/*/i);
+  if (m) {
+    const owner = m[1].toLowerCase();
+    const space = m[2].toLowerCase();
+    const host = `${owner}-${space}`.replace(/[^a-z0-9\-]/g, "-").replace(/\-+/g, "-");
+    v = `https://${host}.hf.space`;
+  }
+
+  // Ensure scheme
+  if (v && !/^https?:\/\//i.test(v)) v = "https://" + v;
+
+  // Remove trailing slash
+  v = v.replace(/\/+$/, "");
+
+  return v;
+}
+
 function getHfBase() {
   // 1) primary key
   let v = (localStorage.getItem(HF_BASE_KEY) || "").trim();
@@ -264,9 +287,14 @@ function setupSettings() {
   const hfBaseStatus = document.getElementById("hfBaseStatus");
   const appTokenStatus = document.getElementById("appTokenStatus");
   const testConnStatus = document.getElementById("testConnStatus");
+  const storageTestBtn = document.getElementById("storageTestBtn");
+  const storageTestStatus = document.getElementById("storageTestStatus");
+  const currentSettings = document.getElementById("currentSettings");
 
   hfBase.value = getHfBase();
   appToken.value = getAppToken();
+  hfBase.value = normalizeHfBase(hfBase.value);
+  setStatusLine("currentSettings", `現在値\nHF_BASE: ${hfBase.value || "(未設定)"}\nAPP_TOKEN: ${appToken.value || "(空)"}\nLastSaved: ${localStorage.getItem("tangoChoLastSavedAt") || "(なし)"}`, "");
   setStatusLine("hfBaseStatus", hfBase.value ? `保存済み：${hfBase.value}` : "未保存：HF Base 未設定", hfBase.value ? "ok" : "err");
   setStatusLine("appTokenStatus", appToken.value ? `保存済み：${appToken.value}` : "未設定（空）", "");
   setStatusLine("testConnStatus", "", "");
@@ -295,7 +323,8 @@ function setupSettings() {
   updateConnBadge();
 
   saveHfBaseBtn?.addEventListener("click", () => {
-    const v = (hfBase.value || "").trim();
+    const v = normalizeHfBase(hfBase.value || "");
+    hfBase.value = v;
     if (!v) return setMsg("HF Spaces API Base を入力してください。", "err");
     if (safeSetItem(HF_BASE_KEY, v)) {
       updateConnBadge();
@@ -315,21 +344,32 @@ function setupSettings() {
 
   // Auto-save (入力するだけで保存される)
   hfBase.addEventListener("input", () => {
+    setStatusLine("hfBaseStatus", "入力検知：保存準備中…", "");
     debounce(() => {
-      const v = (hfBase.value || "").trim();
+      const v = normalizeHfBase(hfBase.value || "");
+      // do not overwrite while typing unless it looks like a full URL
+      if (/^https?:\/\//i.test(v)) hfBase.value = v;
       safeSetItem(HF_BASE_KEY, v);
       updateConnBadge();
+      setStatusLine("hfBaseStatus", v ? `自動保存：${v}` : "未保存：HF Base 未設定", v ? "ok" : "err");
+      setStatusLine("currentSettings", `現在値
+HF_BASE: ${getHfBase() || "(未設定)"}
+APP_TOKEN: ${getAppToken() || "(空)"}
+LastSaved: ${localStorage.getItem("tangoChoLastSavedAt") || "(なし)"}`, "");
     }, 250);
   });
-
-  appToken.addEventListener("input", () => {
+appToken.addEventListener("input", () => {
     debounce(() => {
       const v = (appToken.value || "").trim();
       safeSetItem(HF_TOKEN_KEY, v);
+      setStatusLine("appTokenStatus", v ? `自動保存：${v}` : "未設定（空）", v ? "ok" : "");
+      setStatusLine("currentSettings", `現在値
+HF_BASE: ${getHfBase() || "(未設定)"}
+APP_TOKEN: ${getAppToken() || "(空)"}
+LastSaved: ${localStorage.getItem("tangoChoLastSavedAt") || "(なし)"}`, "");
     }, 250);
   });
-
-  // Connection test
+// Connection test
   testConnBtn?.addEventListener("click", async () => {
     const base = getHfBase();
     if (!base) return setMsg("HF Spaces API Base が未設定です。", "err");
@@ -348,7 +388,24 @@ function setupSettings() {
     }
   });
 
+
+  // localStorage test (write/read)
+  storageTestBtn?.addEventListener("click", () => {
+    try {
+      const k = "tangoChoStorageTest";
+      const v = `ok-${Date.now()}`;
+      localStorage.setItem(k, v);
+      const r = localStorage.getItem(k);
+      setStatusLine("storageTestStatus", `storage write/read OK: ${r}`, "ok");
+      setMsg("保存テストOK（localStorage）。", "ok");
+    } catch (e) {
+      setStatusLine("storageTestStatus", `storage FAILED: ${String(e && e.message ? e.message : e)}`, "err");
+      setMsg("保存テストNG（localStorage）。", "err");
+    }
+  });
+
 }
+
 
 
 function setupAddForm() {
@@ -1189,3 +1246,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("ttsTestBtn")?.addEventListener("click", () => speak("Hello, this is a test."));
 });
+
+
+// Show version loaded message once
+try {
+  setTimeout(() => {
+    try { setMsg("v3.6.6 loaded", "ok"); } catch(_) {}
+  }, 200);
+} catch(_) {}
