@@ -33,7 +33,7 @@
         <input type="text" id="meaning" class="input" placeholder="りんご" />
         
         <div class="field-label">例文</div>
-        <textarea id="example" class="input" rows="2" placeholder="自然な例文（自動入力されます）"></textarea>
+        <textarea id="example" class="input" rows="2" placeholder="AI例文"></textarea>
 
         <div class="field-label">タグ</div>
         <input type="text" id="tags" class="input" placeholder="重要 学校" list="tagSuggestions" />
@@ -63,7 +63,7 @@
     </section>
 
     <section id="listSection" class="tab-content">
-      <div class="card" style="padding:10px;">
+      <div class="card">
         <input type="text" id="searchBar" class="input" placeholder="検索..." />
         <div id="wordList" class="word-list"></div>
       </div>
@@ -72,8 +72,10 @@
     <section id="quizSection" class="tab-content">
       <div class="card">
         <div id="quizArea" class="quiz-area"></div>
-        <button id="startQuizBtn" class="primary-btn">出題</button>
-        <button id="nextQuizBtn" class="ghost-btn" disabled>次へ</button>
+        <div class="quiz-foot">
+          <button id="startQuizBtn" class="primary-btn">出題</button>
+          <button id="nextQuizBtn" class="ghost-btn" disabled>次へ</button>
+        </div>
       </div>
     </section>
   </main>

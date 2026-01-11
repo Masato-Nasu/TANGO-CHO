@@ -10,7 +10,6 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("hfBaseUrl").value = localStorage.getItem(HF_BASE_KEY) || "";
   renderWordList();
   
-  // タブ切り替え
   document.querySelectorAll('.tab-button').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.tab-button, .tab-content').forEach(el => el.classList.remove('active'));
@@ -22,9 +21,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-function saveWords(arr) { localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); }
-
-// --- 自動入力 ---
+// --- API連携 ---
 async function fetchAutoFill() {
   const word = document.getElementById("word").value.trim();
   const url = localStorage.getItem(HF_BASE_KEY);
@@ -32,7 +29,7 @@ async function fetchAutoFill() {
   if (!word || !url) return alert("URLを設定してください");
 
   const btn = document.getElementById("autoFillBtn");
-  btn.disabled = true; btn.textContent = "取得中...";
+  btn.disabled = true; btn.textContent = "中...";
 
   try {
     const tRes = await fetch(`${url}/translate`, {
@@ -54,7 +51,7 @@ async function fetchAutoFill() {
   finally { btn.disabled = false; btn.textContent = "自動入力"; }
 }
 
-// --- 保存・削除 ---
+// --- 基本操作 ---
 function addWord() {
   const word = document.getElementById("word").value.trim();
   const meaning = document.getElementById("meaning").value.trim();
@@ -72,20 +69,16 @@ function addWord() {
     words.push({ id: Date.now(), word, meaning, example, tags, status: 'default' });
   }
 
-  saveWords(words);
-  clearInput();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
+  ["word", "meaning", "example", "tags"].forEach(id => document.getElementById(id).value = "");
+  renderWordList();
   alert("保存完了");
 }
 
-function clearInput() {
-  ["word", "meaning", "example", "tags"].forEach(id => document.getElementById(id).value = "");
-}
-
-// --- リスト表示 ---
 function renderWordList() {
   const listEl = document.getElementById("wordList");
   listEl.innerHTML = words.map((w, i) => `
-    <div class="card" style="border-left:4px solid ${getStatusColor(w.status)}">
+    <div class="card" style="border-left:4px solid ${w.status==='learned'?'#00c896':(w.status==='forgot'?'#ff4f4f':'#333')}">
       <div style="display:flex; justify-content:space-between;">
         <strong>${w.word}</strong>
         <div>
@@ -94,19 +87,15 @@ function renderWordList() {
         </div>
       </div>
       <div>${w.meaning}</div>
-      ${w.example ? `<div style="font-size:0.85rem; color:#888; margin-top:4px; padding-left:5px; border-left:2px solid #ccc;">${w.example}</div>` : ''}
+      ${w.example ? `<div style="font-size:0.85rem; color:#888; margin-top:4px; padding-left:5px; border-left:2px solid #00c896;">💡 ${w.example}</div>` : ''}
     </div>
   `).reverse().join('');
-}
-
-function getStatusColor(s) {
-  return s === 'learned' ? '#00c896' : (s === 'forgot' ? '#ff4f4f' : '#333');
 }
 
 function deleteWord(id) {
   if(!confirm("削除しますか？")) return;
   words = words.filter(w => w.id !== id);
-  saveWords(words);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
   renderWordList();
 }
 
@@ -125,7 +114,7 @@ function editWord(id) {
 
 function cancelEdit() {
   editId = null;
-  clearInput();
+  ["word", "meaning", "example", "tags"].forEach(id => document.getElementById(id).value = "");
   document.getElementById("addBtn").textContent = "保存";
   document.getElementById("cancelEditBtn").style.display = "none";
 }
@@ -136,42 +125,50 @@ function saveSettings() {
   alert("保存しました");
 }
 
-// --- クイズ機能 (オリジナル復旧) ---
-let quizWords = [];
+// --- クイズ機能 ---
 let currentQuizIndex = 0;
+let quizPool = [];
 
 document.getElementById("startQuizBtn").addEventListener("click", () => {
-  quizWords = words.filter(w => w.status !== 'learned').sort(() => 0.5 - Math.random()).slice(0, 10);
-  if (quizWords.length < 4) return alert("単語が4つ以上必要です");
+  quizPool = words.filter(w => w.status !== 'learned').sort(() => 0.5 - Math.random()).slice(0, 10);
+  if (quizPool.length < 4) return alert("単語が4つ以上必要です");
   currentQuizIndex = 0;
-  showNextQuiz();
+  showQuiz();
 });
 
-function showNextQuiz() {
+function showQuiz() {
   const area = document.getElementById("quizArea");
-  const q = quizWords[currentQuizIndex];
-  if (!q) { area.innerHTML = "終了！"; return; }
+  const q = quizPool[currentQuizIndex];
+  if (!q) { area.innerHTML = "クイズ終了！"; return; }
 
   const choices = [q, ...words.filter(x => x.id !== q.id).sort(() => 0.5 - Math.random()).slice(0, 3)].sort(() => 0.5 - Math.random());
-
+  
   area.innerHTML = `
-    <div style="font-size:1.5rem; text-align:center; margin-bottom:10px;">${q.word}</div>
-    ${choices.map(c => `<button class="primary-btn" onclick="checkAnswer(${c.id === q.id})" style="margin-bottom:5px;">${c.meaning}</button>`).join('')}
+    <div style="font-size:1.5rem; text-align:center; margin-bottom:15px;">${q.word}</div>
+    ${choices.map(c => `<button class="primary-btn" onclick="checkAnswer(${c.id === q.id}, ${q.id})" style="margin-bottom:8px;">${c.meaning}</button>`).join('')}
   `;
 }
 
-function checkAnswer(isCorrect) {
-  alert(isCorrect ? "正解！" : "残念...");
+function checkAnswer(isCorrect, id) {
+  const w = words.find(x => x.id === id);
+  if (isCorrect) {
+    w.status = 'learned';
+    alert("正解！");
+  } else {
+    w.status = 'forgot';
+    alert("不正解...");
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
   currentQuizIndex++;
-  showNextQuiz();
+  showQuiz();
 }
 
-// --- インポート/エクスポート ---
+// --- エクスポート/インポート ---
 function exportWords() {
   const blob = new Blob([JSON.stringify(words)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `tango_backup.json`;
+  a.download = "tango_backup.json";
   a.click();
 }
 
@@ -179,9 +176,9 @@ function importWords(e) {
   const reader = new FileReader();
   reader.onload = (ev) => {
     words = JSON.parse(ev.target.result);
-    saveWords(words);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
     renderWordList();
-    alert("インポート完了");
+    alert("完了");
   };
   reader.readAsText(e.target.files[0]);
 }
