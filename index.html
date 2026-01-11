@@ -12,7 +12,7 @@
 <body>
   <header class="app-header">
     <h1>TANGO-CHO</h1>
-    <p class="app-subtitle">娘のための学習アプリ</p>
+    <p class="app-subtitle">中学生向け学習アプリ</p>
   </header>
 
   <nav class="tab-bar">
@@ -25,31 +25,56 @@
     <section id="addSection" class="tab-content active">
       <div class="card">
         <div class="field-label">英単語</div>
-        <div class="row"><input type="text" id="word" class="input"><button id="autoFillBtn" class="small-btn accent" onclick="fetchAutoFill()">自動入力</button></div>
+        <div class="row">
+          <input type="text" id="word" class="input" placeholder="apple" />
+          <button id="autoFillBtn" class="small-btn accent" onclick="fetchAutoFill()">自動入力</button>
+        </div>
         <div class="field-label">意味</div>
-        <input type="text" id="meaning" class="input">
+        <input type="text" id="meaning" class="input" placeholder="りんご" />
+        
         <div class="field-label">例文</div>
-        <textarea id="example" class="input" rows="2" placeholder="AI例文"></textarea>
+        <textarea id="example" class="input" rows="2" placeholder="自然な例文（自動入力されます）"></textarea>
+
         <div class="field-label">タグ</div>
-        <input type="text" id="tags" class="input" list="tagSuggestions">
-        <button id="addBtn" class="primary-btn" onclick="addWord()">保存</button>
+        <input type="text" id="tags" class="input" placeholder="重要 学校" list="tagSuggestions" />
+        <datalist id="tagSuggestions"></datalist>
+
+        <div style="margin-top:10px; display:flex; gap:8px;">
+          <button id="addBtn" class="primary-btn" onclick="addWord()" style="flex:2;">保存</button>
+          <button id="cancelEditBtn" class="ghost-btn" onclick="cancelEdit()" style="display:none; flex:1;">取消</button>
+        </div>
         <p id="addMsg" class="note"></p>
       </div>
+
       <div class="card">
-        <details><summary>API設定</summary>
-          <input type="text" id="hfBaseUrl" class="input" placeholder="URL">
-          <input type="password" id="hfToken" class="input" placeholder="Token">
-          <button onclick="saveSettings()" class="small-btn">保存</button>
+        <details>
+          <summary>API・データ管理</summary>
+          <div style="margin-top:10px;">
+            <input type="text" id="hfBaseUrl" class="input" placeholder="HF Base URL" />
+            <input type="password" id="hfToken" class="input" placeholder="X-App-Token" />
+            <button onclick="saveSettings()" class="small-btn">保存</button>
+          </div>
+          <div style="margin-top:10px; display:flex; gap:5px;">
+            <button onclick="exportWords()" class="small-btn">Export</button>
+            <label class="small-btn"><input type="file" id="importFile" style="display:none" onchange="importWords(event)">Import</label>
+          </div>
         </details>
       </div>
     </section>
 
     <section id="listSection" class="tab-content">
-      <div class="card"><input type="text" id="searchBar" class="input" placeholder="検索"><div id="wordList" class="word-list"></div></div>
+      <div class="card" style="padding:10px;">
+        <input type="text" id="searchBar" class="input" placeholder="検索..." />
+        <div id="wordList" class="word-list"></div>
+      </div>
     </section>
 
     <section id="quizSection" class="tab-content">
-      <div class="card"><div id="quizArea" class="quiz-area"></div><button id="startQuizBtn" class="primary-btn">出題</button></div>
+      <div class="card">
+        <div id="quizArea" class="quiz-area"></div>
+        <button id="startQuizBtn" class="primary-btn">出題</button>
+        <button id="nextQuizBtn" class="ghost-btn" disabled>次へ</button>
+      </div>
     </section>
   </main>
   <script src="script.js"></script>
