@@ -1,14 +1,14 @@
-const CACHE = "tango-cho-cache-v3.6.1-root";
+const CACHE = "tango-cho-cache-v3.6.2-root";
 const ASSETS = [
   "./",
   "./index.html",
-  "./index.html?v=3.6.1",
-  "./style.css?v=3.6.1",
-  "./script.js?v=3.6.1",
+  "./index.html?v=3.6.2",
+  "./style.css?v=3.6.2",
+  "./script.js?v=3.6.2",
   "./manifest.json",
-  "./icons/apple-touch-icon-v25.png",
-  "./icons/icon-192-v25.png",
-  "./icons/icon-512-v25.png",];
+  "./icon-192.png",
+  "./icon-512.png",
+];
 
 self.addEventListener("install", (e) => {
   self.skipWaiting();

@@ -1,102 +1,127 @@
-TANGO-CHO（単語帳 × DeepL × 類義語 × 4択クイズ PWA）
+# Gray-Scott Visualizer (Minimal Fade-In)
 
-英語を読んでいて分からない単語が出たら、コピペ → 翻訳 → 保存。
-集めた単語を 「覚えてない / デフォルト / 覚えた」 の3カテゴリで管理し、あとから 4択クイズで復習できるPWAです。
+音楽に合わせて生成される **Gray-Scott 反応拡散パターン** をリアルタイムに可視化する Web アプリです。  
+📱 **PWA対応 (iPhone / Android / PC 全対応確認済み)** — スマホやPCにインストールしてアプリのように使えます！
 
-さらに、類義語（同義語） も取得して一緒に覚えられます（必要なら類義語カードを自動追加）。
+---
 
-制作：Masato Nasu
+## 特長
+- 🎶 **音楽入力対応** — ローカルの音楽ファイルを読み込み、音の特徴量に反応  
+- 🌊 **リアルタイム生成** — Gray-Scott 反応拡散モデルでパターンが進化  
+- 🖼️ **インタラクティブ** — クリックでフィード／キル値にフラッシュ効果  
+- 📱 **PWA対応** — GitHub Pagesから直接インストール可能  
+- 🌙 **Wake Lock対応** — 画面が暗転せず連続再生できる（Android/Chrome）。  
+   → 実質 **バックグラウンド再生に近い体験** が可能！  
+- 🎧 **Media Session対応** — 通知バー・ロック画面・イヤホンボタンから操作可能。電話着信時もOS側で自動制御され安心
 
-🔗 Links
+---
 
-GitHub Pages（PWA）
-https://masato-nasu.github.io/TANGO-CHO/
+## インストール方法（PWA）
+1. デモページを開く  
+   👉 [https://masato-nasu.github.io/Gray-Scott-Visualizer/](https://masato-nasu.github.io/Gray-Scott-Visualizer/)  
+2. **PC (Chrome/Edge)**：URLバー右端の「インストール」アイコンをクリック  
+3. **Android (Chrome)**：メニュー「…」→「インストール」または「ホーム画面に追加」  
+4. **iOS (Safari)**：共有ボタン →「ホーム画面に追加」  
 
-Hugging Face Spaces（API / DeepL中継）
-https://huggingface.co/spaces/mazzGOGO/TANGO-CHO
+---
 
-API Base（例）：https://mazzgogo-tango-cho.hf.space
+## 制約について（重要）
+- PWAの仕様上、**完全なバックグラウンド再生は不可**  
+- ただし Wake Lock により **画面ON状態なら暗転せず音楽継続可能**  
+- 端末ロックや他アプリを開いた場合は再生停止します  
 
-📸 Screenshots
-	
-| | |
-|---|---|
-| ![Screenshot 1](./screenshot1.png) | ![Screenshot 2](./screenshot2.png) |
-| ![Screenshot 3](./screenshot3.png) | |
-	
-✨ Features
-追加（翻訳＋手入力＋類義語）
+---
 
-英単語を入力
+## スクリーンショット
+![Gray-Scott Visualizer Screenshot](./screenshot.png)
 
-翻訳（HF Spaces → DeepL） で日本語訳を自動取得
+---
 
-日本語訳は 編集可能（手入力でもOK）
+## デモページ
+https://masato-nasu.github.io/Gray-Scott-Visualizer/
 
-類義語 / 同義語 を取得（ボタン）
+---
 
-類義語を入力すると、保存時に 類義語カードを自動で別カード追加（重複は自動スキップ）
+## 使い方
+1. 「SELECT MUSIC FOLDER / FILES」から音楽ファイルをまとめて読み込み  
+   - **PC**：フォルダを選択（サブフォルダ内も再帰的に読み込み）  
+   - **Android**：フォルダ相当のディレクトリ選択が可能  
+   - **iPhone/iPad**：ファイルアプリから複数曲を選択（フォルダ的に扱える体験）  
+2. **PLAY** で再生開始  
+3. **PAUSE / NEXT / PREVIOUS** で操作可能  
+4. キャンバスをクリックするとパターンが一時的に変調  
 
-メモ・タグも保存可能
+---
 
-🔊 発音（Web Speech API）
+## 開発環境
+- HTML / CSS / JavaScript  
+- [Meyda](https://meyda.js.org/) (音声特徴量抽出ライブラリ)  
 
-単語帳（検索は1つに統合）
+---
 
-登録単語の一覧表示
+## ライセンス
+MIT License
 
-カテゴリをワンタップで変更（覚えてない / デフォルト / 覚えた）
+# Gray-Scott Visualizer (Minimal Fade-In)
 
-統合検索（英語 / 日本語訳 / メモ / タグ / 類義語 をまとめて検索）
+A **real-time Gray-Scott reaction-diffusion visualizer** that responds to music.  
+📱 **PWA Support (Tested on iPhone / Android / PC)** — Works like an app on your device!
 
-タグ検索（統合検索で指定）
+---
 
-#travel のように #タグ で絞り込み
+## Features
+- 🎶 **Music Input** — Load local audio files and react to audio features  
+- 🌊 **Real-Time Generation** — Dynamic Gray-Scott reaction-diffusion patterns  
+- 🖼️ **Interactive** — Click the canvas to trigger flash effects  
+- 📱 **PWA Support** — Installable directly from GitHub Pages  
+- 🌙 **Wake Lock** — Prevents screen dimming; keeps music and visuals running (Android/Chrome).  
+   → Provides an **almost background playback experience**  
+- 🎧 **Media Session** — Control playback via notifications, lock screen, or headset buttons. Integrates smoothly with phone calls
 
-#travel #school のように複数指定で AND 絞り込み
+---
 
-編集：単語帳のカードを後から修正して「更新」
+## Installation (PWA)
+1. Open the demo page  
+   👉 [https://masato-nasu.github.io/Gray-Scott-Visualizer/](https://masato-nasu.github.io/Gray-Scott-Visualizer/)  
+2. **PC (Chrome/Edge)**: Click the “Install” icon in the URL bar  
+3. **Android (Chrome)**: Menu “⋮” → “Install” or “Add to Home screen”  
+4. **iOS (Safari)**: Share → “Add to Home Screen”  
 
-Import / Export（JSON）：バックアップ＆復元
+---
 
-クイズ（4択）
+## Limitations
+- As a PWA, **full background playback is not supported**  
+- With Wake Lock enabled, playback continues as long as the screen stays ON  
+- Playback stops when the device is locked or another app is brought to the foreground  
 
-英→日 / 日→英 を切り替え
+---
 
-出題カテゴリ（全て / 覚えてない / デフォルト / 覚えた）
+## Screenshot
+![Gray-Scott Visualizer Screenshot](./screenshot.png)
 
-クイズ中にカテゴリ変更（覚えてないへ / 覚えたへ）を即反映
+---
 
-※ 4択の選択肢を作るため、出題カテゴリ内に 最低4単語が必要です。
-足りない場合は「出題カテゴリ＝全て」にすると始めやすいです。
+## Demo Page
+https://masato-nasu.github.io/Gray-Scott-Visualizer/
 
-📲 PWAとしてインストール
-iPhone（iOS）
+---
 
-Safariで https://masato-nasu.github.io/TANGO-CHO/
- を開く
+## Usage
+1. Select music using **SELECT MUSIC FOLDER / FILES**  
+   - **PC**: Choose a folder (recursive load of subfolders)  
+   - **Android**: Select a directory  
+   - **iPhone/iPad**: Choose multiple files from the Files app (similar to folder selection)  
+2. Press **PLAY** to start playback  
+3. Use **PAUSE / NEXT / PREVIOUS** for controls  
+4. Click the canvas to apply temporary flash effects  
 
-共有 → ホーム画面に追加
+---
 
-Chromeやアプリ内ブラウザだと「PWAとして追加」にならず、
-“ブックマークっぽい動作”になりやすいです。
+## Tech Stack
+- HTML / CSS / JavaScript  
+- [Meyda](https://meyda.js.org/) (Audio feature extraction library)  
 
-Android / PC（Chrome/Edge）
+---
 
-URLを開く → メニューに 「アプリをインストール」 が出たらOK
-
-📁 データについて
-
-単語帳は 端末内（localStorage） に保存されます
-
-端末を変えるとデータは引き継げません（同期なし）
-
-ただし JSON Export / Import でバックアップ＆復元が可能です
-
-🙏 Thanks
-
-DeepL API
-
-Hugging Face Spaces
-
-GitHub Pages / PWA
+## License
+MIT License

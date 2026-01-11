@@ -5,24 +5,21 @@
   --r:16px;
   --btnH:52px;
   /* keep layout "phone-width" even on PC */
-  --appMax:520px;
+  --appMax:420px;
+  --padX:12px;
 }
 *{box-sizing:border-box}
-html,body{margin:0;padding:0;background:radial-gradient(circle at top,#252525,#050505);color:var(--text);
-  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:22px;
-  overflow-x:hidden}
-body{min-height:100vh;display:flex;flex-direction:column}
-.app-header{padding:16px 16px 8px;text-align:center}
+html,body{margin:0;padding:0;width:100%;max-width:100%;background:radial-gradient(circle at top,#252525,#050505);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:22px;overflow-x:hidden;overscroll-behavior-x:none}
+body{min-height:100vh;display:flex;flex-direction:column;touch-action:pan-y}
+.app-header{padding:16px var(--padX) 8px;text-align:center}
 .app-header h1{margin:0;font-size:2.0rem;letter-spacing:.04em}
 .app-subtitle{margin:6px 0 0;font-size:1.0rem;color:var(--sub)}
-.tab-bar{position:sticky;top:0;z-index:10;
-  background:linear-gradient(to bottom,#111,rgba(17,17,17,.95));backdrop-filter:blur(10px)}
-.tab-inner{display:flex;flex-direction:column;gap:10px;padding:10px 12px 8px;
-  max-width:var(--appMax);width:100%;margin:0 auto}
+.tab-bar{position:sticky;top:0;z-index:10;background:linear-gradient(to bottom,#111,rgba(17,17,17,.95));backdrop-filter:blur(10px);padding:10px var(--padX) 8px}
+.tab-inner{display:flex;flex-direction:column;gap:10px;padding:0;max-width:var(--appMax);width:100%;margin:0 auto}
 .tab-button{width:100%;padding:14px 18px;font-size:1.0rem;border-radius:var(--r);
   border:1px solid var(--border);background:rgba(0,0,0,.4);color:var(--sub);cursor:pointer;min-height:var(--btnH)}
 .tab-button.active{background:var(--accentSoft);border-color:var(--accent);color:var(--accent);font-weight:600}
-.main{flex:1;padding:8px 12px 16px;max-width:var(--appMax);width:100%;margin:0 auto}
+.main{flex:1;padding:8px var(--padX) 16px;max-width:var(--appMax);width:100%;margin:0 auto}
 .section{display:none}
 .section.active{display:block}
 .section h2{margin:8px 0 4px;font-size:1.2rem}
@@ -117,7 +114,7 @@ details summary::-webkit-details-marker{display:none}
 }
 .small-btn.accent{border-color:var(--accent);color:var(--accent)}
 .small-btn.danger{border-color:var(--danger);color:var(--danger)}
-.app-footer{padding:6px 12px 10px;display:flex;align-items:center;gap:8px;font-size:.75rem;color:var(--sub);
+.app-footer{padding:6px var(--padX) 10px;display:flex;align-items:center;gap:8px;font-size:.75rem;color:var(--sub);
   border-top:1px solid #141414;background:#050505}
 .footer-text{flex:1}
 @media (max-width:400px){html,body{font-size:22px}}

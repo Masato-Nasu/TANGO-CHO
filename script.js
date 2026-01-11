@@ -28,29 +28,98 @@ function updateQuizSoundToggle() {
 
 function playQuizSound(isCorrect) {
   if (!isQuizSoundOn()) return;
+
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return;
-  try {
-    if (!__audioCtx) __audioCtx = new AC();
-    const ctx = __audioCtx;
+
+  function tone(ctx, freq, start, dur, type = "sine", peak = 0.18) {
     const o = ctx.createOscillator();
     const g = ctx.createGain();
-    o.type = "sine";
-    o.frequency.value = isCorrect ? 880 : 220;
+    o.type = type;
+    o.frequency.setValueAtTime(freq, start);
 
-    const t0 = ctx.currentTime;
-    g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(0.16, t0 + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.11);
+    // click-free envelope
+    g.gain.setValueAtTime(0.0001, start);
+    g.gain.exponentialRampToValueAtTime(peak, start + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
 
     o.connect(g);
     g.connect(ctx.destination);
-    o.start(t0);
-    o.stop(t0 + 0.12);
+    o.start(start);
+    o.stop(start + dur + 0.03);
+  }
+
+  try {
+    if (!__audioCtx) __audioCtx = new AC();
+    const ctx = __audioCtx;
+
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
+
+    const t0 = ctx.currentTime + 0.01;
+
+    if (isCorrect) {
+      // "ピンポン"
+      tone(ctx, 1046.5, t0, 0.08, "sine", 0.16);
+      tone(ctx, 1318.5, t0 + 0.10, 0.10, "sine", 0.16);
+    } else {
+      // "ブブー" (low buzz)
+      const start = t0;
+      const dur = 0.22;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = "square";
+      o.frequency.setValueAtTime(180, start);
+      o.frequency.exponentialRampToValueAtTime(110, start + dur);
+
+      g.gain.setValueAtTime(0.0001, start);
+      g.gain.exponentialRampToValueAtTime(0.22, start + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, start + dur + 0.02);
+
+      o.connect(g);
+      g.connect(ctx.destination);
+      o.start(start);
+      o.stop(start + dur + 0.05);
+    }
   } catch (_) {
     // ignore
   }
 }
+
+// Prevent horizontal panning (keeps the app from drifting left/right on touch devices)
+(function lockHorizontalPan(){
+  let sx = 0, sy = 0, lock = false;
+  const EDGE = 24;
+
+  document.addEventListener("touchstart", (e) => {
+    if (!e.touches || e.touches.length !== 1) { lock = false; return; }
+    const t = e.touches[0];
+    sx = t.clientX; sy = t.clientY;
+    const w = window.innerWidth || 0;
+    // allow OS edge-swipe gestures
+    lock = !(sx < EDGE || sx > w - EDGE);
+  }, { passive: true });
+
+  document.addEventListener("touchmove", (e) => {
+    if (!lock) return;
+    if (!e.touches || e.touches.length !== 1) return;
+
+    const target = e.target;
+    const tag = target && target.tagName ? target.tagName.toLowerCase() : "";
+    if (tag === "input" || tag === "textarea" || (target && target.isContentEditable)) return;
+
+    const t = e.touches[0];
+    const dx = t.clientX - sx;
+    const dy = t.clientY - sy;
+
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 6) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+})();
+
+
 
 const STATUS_LABEL = {
   forgot: "覚えてない",

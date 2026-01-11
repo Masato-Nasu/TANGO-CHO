@@ -9,18 +9,17 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="TANGO-CHO" />
-  <link rel="apple-touch-icon" href="./icons/apple-touch-icon-v25.png" />
-  <link rel="icon" sizes="192x192" href="./icons/icon-192-v25.png" />
-  <link rel="icon" sizes="512x512" href="./icons/icon-512-v25.png" />
+  <link rel="apple-touch-icon" href="./icon-192.png" />
+  <link rel="icon" sizes="192x192" href="./icon-192.png" />
+  <link rel="icon" sizes="512x512" href="./icon-512.png" />
 
   <meta name="theme-color" content="#00c896" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="style.css?v=3.6.1" />
+  <link rel="stylesheet" href="style.css?v=3.6.2" />
 </head>
 <body>
   <header class="app-header">
     <h1>TANGO-CHO</h1>
-    <p class="app-subtitle">調べる＋手入力を1画面に統合 / 単語帳 / 4択クイズ</p>
   </header>
 
   <nav class="tab-bar">
@@ -33,7 +32,7 @@
 
   <main class="main">
     <section id="addSection" class="section active">
-      <h2>追加（検索＋手入力）</h2>
+      <h2>追加</h2>
 
       <details class="card" id="settingsCard">
         <summary class="summary">⚙️ 接続設定（HF Spaces） <span id="connStatus" class="conn-status"></span></summary>
@@ -177,7 +176,7 @@
     <span class="footer-text">発音: Web Speech API / 翻訳: HF Spaces → DeepL</span>
   </footer>
 
-  <script src="script.js?v=3.6.1"></script>
+  <script src="script.js?v=3.6.2"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
