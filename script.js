@@ -42,6 +42,41 @@ function speak(text) {
   window.speechSynthesis.speak(u);
 }
 
+// --- Quiz feedback sounds (no external files) ---
+let _audioCtx = null;
+function getAudioCtx(){
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return null;
+  if (!_audioCtx) _audioCtx = new Ctx();
+  return _audioCtx;
+}
+function playTone(freq, durMs, type="sine", gain=0.18){
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  const t0 = ctx.currentTime;
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = type;
+  o.frequency.value = freq;
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(gain, t0 + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + durMs/1000);
+  o.connect(g);
+  g.connect(ctx.destination);
+  o.start(t0);
+  o.stop(t0 + durMs/1000 + 0.02);
+}
+function playCorrectSound(){
+  // "ピンポン" (two bright tones)
+  playTone(880, 90, "sine", 0.22);
+  setTimeout(() => playTone(1175, 110, "sine", 0.20), 120);
+}
+function playWrongSound(){
+  // "ブブー" (two low buzz tones)
+  playTone(180, 160, "sawtooth", 0.16);
+  setTimeout(() => playTone(140, 220, "sawtooth", 0.16), 170);
+}
+
 function setMsg(text, kind) {
   const el = document.getElementById("msg");
   if (!el) return;
@@ -733,6 +768,7 @@ function renderQuiz() {
     <p class="quiz-mini">${modeLabel}</p>
     <p class="quiz-q">${promptLabel}<br><span style="font-size:1.25rem;">${escapeHtml(q.prompt)}</span></p>
     <div class="quiz-choices" id="choices"></div>
+    <div class="quiz-result" id="quizResult" style="display:none"></div>
     <div class="quiz-foot" id="quizFoot"></div>
   `;
 
@@ -743,6 +779,7 @@ function renderQuiz() {
   q.choices.forEach((c) => {
     const b = document.createElement("button");
     b.className = "choice-btn";
+    b.dataset.mark = "";
     b.textContent = c;
     b.disabled = quizState.answered;
     b.addEventListener("click", () => onAnswer(c));
@@ -768,14 +805,35 @@ function onAnswer(selected) {
   const isCorrect = selected === q.correct;
   if (isCorrect) quizState.correct += 1;
 
+  // Clear previous marks/result
+  const resEl0 = document.getElementById("quizResult");
+  if (resEl0) { resEl0.style.display = "none"; resEl0.className = "quiz-result"; resEl0.textContent = ""; }
+
+
   // mark buttons
   const btns = Array.from(document.querySelectorAll(".choice-btn"));
   btns.forEach((b) => {
     const txt = b.textContent;
-    if (txt === q.correct) b.classList.add("correct");
-    if (txt === selected && !isCorrect) b.classList.add("wrong");
+    b.dataset.mark = "";
+    if (txt === q.correct) { b.classList.add("correct"); b.dataset.mark = "○"; }
+    if (txt === selected && !isCorrect) { b.classList.add("wrong"); b.dataset.mark = "✕"; }
     b.disabled = true;
   });
+
+  // Big result banner + sound/vibration
+  const resEl = document.getElementById("quizResult");
+  if (resEl) {
+    resEl.style.display = "flex";
+    resEl.className = isCorrect ? "quiz-result ok" : "quiz-result ng";
+    if (isCorrect) {
+      resEl.innerHTML = `<span class="mark">○</span><span>正解！</span>`;
+    } else {
+      resEl.innerHTML = `<span class="mark">✕</span><span>不正解</span><span class="sub">正解: ${escapeHtml(q.correct)}</span>`;
+    }
+  }
+  try { isCorrect ? playCorrectSound() : playWrongSound(); } catch(_){}
+  try { if (navigator.vibrate) navigator.vibrate(isCorrect ? 30 : [60, 40, 120]); } catch(_){}
+
 
   // footer actions
   const footEl = document.getElementById("quizFoot");
