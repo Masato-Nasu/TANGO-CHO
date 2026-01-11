@@ -7,12 +7,11 @@
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;background:radial-gradient(circle at top,#252525,#050505);color:var(--text);
   font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:22px}
-body{min-height:100vh;display:flex;flex-direction:column}
-.app-header{padding:16px 16px 8px;text-align:center}
+body{min-height:100vh;display:flex;flex-direction:column;overflow-x:hidden}
+.app-header{padding:16px 16px 8px;text-align:center;max-width:760px;width:100%;margin:0 auto}
 .app-header h1{margin:0;font-size:2.0rem;letter-spacing:.04em}
 .app-subtitle{margin:6px 0 0;font-size:1.0rem;color:var(--sub)}
-.tab-bar{display:flex;flex-direction:column;gap:10px;padding:10px 12px 8px;position:sticky;top:0;z-index:10;
-  background:linear-gradient(to bottom,#111,rgba(17,17,17,.95));backdrop-filter:blur(10px)}
+.tab-bar{padding:10px 12px 8px;position:sticky;top:0;z-index:10;background:linear-gradient(to bottom, rgba(5,5,5,0.92), rgba(5,5,5,0.75));backdrop-filter:blur(10px);max-width:760px;width:100%;margin:0 auto}
 .tab-button{width:100%;padding:14px 14px;font-size:1.05rem;border-radius:18px;border:1px solid var(--border);
   background:rgba(0,0,0,.4);color:var(--sub);cursor:pointer}
 .tab-button.active{background:var(--accentSoft);border-color:var(--accent);color:var(--accent);font-weight:600}
