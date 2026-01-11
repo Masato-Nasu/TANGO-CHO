@@ -88,7 +88,11 @@
           <input id="synonyms" type="text" placeholder="例: inquisitive, interested, wondering" />
           <button id="synFetchBtn" class="secondary-btn" type="button">類義語取得</button>
         </div>
-<label class="field-label" for="memo">メモ（任意）</label>
+
+        <label class="field-label" for="example">例文（任意）</label>
+        <textarea id="example" rows="2" placeholder="例: I was curious about it."></textarea>
+
+        <label class="field-label" for="memo">メモ（任意）</label>
         <textarea id="memo" rows="2" placeholder="ニュアンス・使い分けなど"></textarea>
 
 
@@ -121,17 +125,8 @@
             <button id="exportBtn" class="ghost-btn">JSON</button>
           </div>
         </div>
-<div class="search-row">
-  <div>
-    <label class="field-label" for="searchBox">検索（英語 / 日本語 / メモ / タグ）</label>
-    <input id="searchBox" class="input" type="text" list="tagSuggestions"
-      placeholder="例: curious / 好奇心 / #travel / tags:travel,school" autocomplete="off" />
-    <div class="note">タグで絞り込みたい時は <b>#tag</b> か <b>tags:</b> を使えます（複数OK） 例: <b>#travel #school</b></div>
-    <datalist id="tagSuggestions"></datalist>
-  </div>
-</div>
 
-<div id="listMsg" class="msg"></div>
+        <div id="listMsg" class="msg"></div>
 
         <div id="wordList" class="word-list"></div>
       </div>

@@ -2,9 +2,6 @@ const STORAGE_KEY = "tangoChoWords";
 const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
 const FILTER_KEY = "tangoChoFilter";
-const SEARCH_KEY = "tangoChoSearch";
-const WAKE_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
-const LAST_WAKE_PING_KEY = "tangoChoLastWakePingAt";
 
 let editId = null;
 
@@ -13,77 +10,6 @@ const STATUS_LABEL = {
   default: "デフォルト",
   learned: "覚えた",
 };
-
-
-function parseTags(tagStr) {
-  const s = (tagStr || "").trim();
-  if (!s) return [];
-  return s
-    .split(/[\s,、]+/g)
-    .map((t) => t.trim())
-    .filter(Boolean);
-}
-
-function buildTagSuggestions(words) {
-  const dl = document.getElementById("tagSuggestions");
-  if (!dl) return;
-  const set = new Set();
-  for (const w of words || []) {
-    for (const t of parseTags(w.tags)) set.add(t);
-  }
-  const list = Array.from(set).sort((a, b) => a.localeCompare(b));
-  const opts = [];
-  for (const t of list) {
-    const esc = t.replace(/"/g, "&quot;");
-    opts.push(`<option value="${esc}"></option>`);
-    opts.push(`<option value="#${esc}"></option>`);
-  }
-  dl.innerHTML = opts.join("");
-}
-
-function extractQueryAndTags(raw) {
-  let s = (raw || "").trim();
-  const tags = [];
-
-  // tag:xxx / tags:xxx,yyy / タグ:xxx
-  s = s.replace(/(?:^|\s)(?:tag|tags|タグ)\s*[:：]\s*([^\s]+)/gi, (m, g1) => {
-    tags.push(...parseTags(g1));
-    return " ";
-  });
-
-  // #tag tokens (e.g. #travel)
-  s = s.replace(/#([^\s#,、]+)/g, (m, g1) => {
-    tags.push(g1);
-    return " ";
-  });
-
-  const query = s.replace(/\s+/g, " ").trim();
-  const cleanTags = tags.map((t) => String(t || "").trim()).filter(Boolean);
-  return { query, tags: cleanTags };
-}
-
-function containsQuery(wordObj, qLower) {
-  if (!qLower) return true;
-  const fields = [
-    wordObj.word || "",
-    wordObj.meaning || "",
-    wordObj.memo || "",
-    wordObj.tags || "",
-    wordObj.synonyms || "",
-  ];
-  const hay = fields.join(" ").toLowerCase();
-  return hay.includes(qLower);
-}
-
-function containsAllTags(wordObj, requiredTagsLower) {
-  if (!requiredTagsLower || requiredTagsLower.length === 0) return true;
-  const tags = parseTags(wordObj.tags).map((t) => t.toLowerCase());
-  if (tags.length === 0) return false;
-  for (const need of requiredTagsLower) {
-    if (!tags.includes(need)) return false;
-  }
-  return true;
-}
 
 function nowIso() {
   return new Date().toISOString();
@@ -235,67 +161,6 @@ async function fetchSynonymsViaSpace(word, max = 8) {
   return Array.isArray(arr) ? arr : [];
 }
 
-/** HF Spaces を「起こす」ための /health ping（ベストエフォート）
- * 重要: PWAはバックグラウンドで常時動けないため、
- * - アプリ起動時 / 復帰時に、前回から6時間以上空いていれば ping
- * - アプリを開いている間は、6時間ごとに ping
- * という挙動になります（iOSは特にバックグラウンド実行が制限されます）。
- */
-async function pingHealthViaSpace(reason = "auto") {
-  const base = getHfBase();
-  if (!base) return false;
-
-  const token = getAppToken();
-  const url = `${base.replace(/\/$/, "")}/health`;
-
-  try {
-    const res = await fetch(url, {
-      method: "GET",
-      headers: {
-        ...(token ? { "X-App-Token": token } : {}),
-      },
-      cache: "no-store",
-    });
-
-    if (!res.ok) {
-      // silent fail (don't block UX)
-      return false;
-    }
-
-    // consume body (some environments require reading to complete)
-    await res.json().catch(() => res.text().catch(() => ""));
-    localStorage.setItem(LAST_WAKE_PING_KEY, String(Date.now()));
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
-
-function setupWakePing() {
-  // immediate check
-  const now = Date.now();
-  const last = parseInt(localStorage.getItem(LAST_WAKE_PING_KEY) || "0", 10) || 0;
-
-  if (now - last > WAKE_INTERVAL_MS) {
-    pingHealthViaSpace("startup");
-  }
-
-  // while the app is open
-  setInterval(() => {
-    pingHealthViaSpace("interval");
-  }, WAKE_INTERVAL_MS);
-
-  // on resume / tab becomes visible
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState !== "visible") return;
-    const n = Date.now();
-    const l = parseInt(localStorage.getItem(LAST_WAKE_PING_KEY) || "0", 10) || 0;
-    if (n - l > WAKE_INTERVAL_MS) {
-      pingHealthViaSpace("resume");
-    }
-  });
-}
-
 async function getSynonymsSmart(word, max = 8) {
   return await fetchSynonymsViaSpace(word, max);
 }
@@ -373,6 +238,7 @@ function setupAddForm() {
   const wordEl = document.getElementById("word");
   const meaningEl = document.getElementById("meaning");
   const statusEl = document.getElementById("status");
+  const exampleEl = document.getElementById("example");
   const memoEl = document.getElementById("memo");
   const tagsEl = document.getElementById("tags");
   const synonymsEl = document.getElementById("synonyms");
@@ -395,6 +261,7 @@ function setupAddForm() {
     wordEl.value = "";
     meaningEl.value = "";
     statusEl.value = "default";
+    exampleEl.value = "";
     memoEl.value = "";
     tagsEl.value = "";
     if (synonymsEl) synonymsEl.value = "";
@@ -407,6 +274,7 @@ function setupAddForm() {
     wordEl.value = item.word || "";
     meaningEl.value = item.meaning || "";
     statusEl.value = item.status || "default";
+    exampleEl.value = item.example || "";
     memoEl.value = item.memo || "";
     tagsEl.value = item.tags || "";
     if (synonymsEl) synonymsEl.value = item.synonyms || "";
@@ -498,7 +366,7 @@ function setupAddForm() {
   }
 
 
-  saveBtn.addEventListener("click", () => {
+    saveBtn.addEventListener("click", async () => {
     const w = wordEl.value.trim();
     const m = meaningEl.value.trim();
     if (!w) return setMsg("英単語が空です。", "err");
@@ -519,6 +387,7 @@ function setupAddForm() {
           word: w,
           meaning: m,
           status: statusEl.value || "default",
+          example: exampleEl.value.trim(),
           memo: memoEl.value.trim(),
           tags: tagsEl.value.trim(),
           synonyms: synonymsEl ? synonymsEl.value.trim() : (prev.synonyms || ""),
@@ -537,6 +406,7 @@ function setupAddForm() {
         word: w,
         meaning: m,
         status: statusEl.value || "default",
+        example: exampleEl.value.trim(),
         memo: memoEl.value.trim(),
         tags: tagsEl.value.trim(),
         synonyms: synonymsEl ? synonymsEl.value.trim() : "",
@@ -546,6 +416,8 @@ function setupAddForm() {
     }
 
     // ===== Auto-add synonym cards (comma-separated) =====
+    // 重要：類似語カードは「元単語の日本語訳(m)」を流用せず、
+    //       各類似語ごとに DeepL で再翻訳して正しい訳を入れます。
     const synRaw = (synonymsEl ? synonymsEl.value : "").trim();
     const synTokens = synRaw
       ? synRaw.split(/[,、\n\r]+/).map((s) => s.trim()).filter(Boolean)
@@ -553,8 +425,12 @@ function setupAddForm() {
 
     const seen = new Set();
     const baseLower = w.toLowerCase();
-    const existingKey = new Set(words.map((x) => `${String(x.word || "").toLowerCase()}|${String(x.meaning || "")}`));
+    const existingWordLower = new Set(
+      words.map((x) => String(x.word || "").trim().toLowerCase()).filter(Boolean)
+    );
+
     let synAdded = 0;
+    let synFailed = 0;
 
     for (const t of synTokens) {
       const tl = t.toLowerCase();
@@ -562,32 +438,48 @@ function setupAddForm() {
       if (seen.has(tl)) continue;
       seen.add(tl);
 
-      const key = `${tl}|${m}`;
-      if (existingKey.has(key)) continue;
+      // すでに同じ英単語が単語帳にある場合は追加しない（重複防止）
+      if (existingWordLower.has(tl)) continue;
+
+      // 各類似語の日本語訳を再取得（DeepL）
+      let synMeaning = "";
+      try {
+        synMeaning = await translateToJaViaSpace(t);
+      } catch (e) {
+        synFailed += 1;
+        continue;
+      }
 
       words.push({
         id: `${baseId}-syn-${Math.random().toString(36).slice(2, 8)}`,
         word: t,
-        meaning: m,
+        meaning: synMeaning,
         status: statusEl.value || "default",
-        memo: `同義語（${w}）`,
+        example: "",
+        memo: "",
         tags: tagsEl.value.trim(),
         synonyms: "",
         source: "synonym",
         createdAt: nowIso(),
       });
-      existingKey.add(key);
+
+      existingWordLower.add(tl);
       synAdded += 1;
     }
 
     saveWords(words);
 
+    const extra =
+      (synAdded || synFailed)
+        ? `（${synAdded ? `類似語カード +${synAdded}` : ""}${(synAdded && synFailed) ? " / " : ""}${synFailed ? `類似語訳失敗 ${synFailed}` : ""}）`
+        : "";
+
     if (editId) {
       exitEditMode(false);
-      setMsg(`更新しました（入力をクリアしました）。${synAdded ? ` 類似語カード +${synAdded}` : ""}`.trim(), "ok");
+      setMsg(`更新しました（入力をクリアしました）。${extra}`.trim(), "ok");
     } else {
       clearForm(true);
-      setMsg(`保存しました（入力をクリアしました）。${synAdded ? ` 類似語カード +${synAdded}` : ""}`.trim(), "ok");
+      setMsg(`保存しました（入力をクリアしました）。${extra}`.trim(), "ok");
     }
 
     renderWordList();
@@ -605,26 +497,7 @@ function renderWordList() {
   if (!listEl) return;
 
   let words = [...all].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
-  
-if (filter !== "all") words = words.filter((w) => (w.status || "default") === filter);
-
-// search / tag filter (unified)
-const raw = (document.getElementById("searchBox")?.value || (localStorage.getItem(SEARCH_KEY) || "")).trim();
-const parsed = extractQueryAndTags(raw);
-const q = parsed.query;
-const qLower = q.toLowerCase();
-const requiredTagsLower = parsed.tags.map((t) => t.toLowerCase());
-
-buildTagSuggestions(all);
-
-words = words.filter((w) => containsQuery(w, qLower) && containsAllTags(w, requiredTagsLower));
-
-const hasAnyFilter = !!q || (requiredTagsLower.length > 0) || (filter !== "all");
-if (hasAnyFilter) {
-  setListMsg(`表示: ${words.length} / 全体: ${all.length}`, "ok");
-} else {
-  setListMsg("", "");
-}
+  if (filter !== "all") words = words.filter((w) => (w.status || "default") === filter);
 
   listEl.innerHTML = "";
 
@@ -725,6 +598,13 @@ if (hasAnyFilter) {
     item.appendChild(top);
     item.appendChild(meaning);
     if (synEl) item.appendChild(synEl);
+
+    if (w.example) {
+      const ex = document.createElement("div");
+      ex.className = "word-meta";
+      ex.textContent = `例: ${w.example}`;
+      item.appendChild(ex);
+    }
     if (w.memo) {
       const mm = document.createElement("div");
       mm.className = "word-meta";
@@ -744,20 +624,6 @@ function setupFilter() {
   sel.value = (localStorage.getItem(FILTER_KEY) || "all").trim();
   sel.addEventListener("change", () => {
     localStorage.setItem(FILTER_KEY, sel.value);
-    renderWordList();
-  });
-}
-
-function setupSearch() {
-  const box = document.getElementById("searchBox");
-  if (!box) return;
-  box.value = (localStorage.getItem(SEARCH_KEY) || "").trim();
-  box.addEventListener("input", () => {
-    localStorage.setItem(SEARCH_KEY, box.value);
-    renderWordList();
-  });
-  box.addEventListener("change", () => {
-    localStorage.setItem(SEARCH_KEY, box.value);
     renderWordList();
   });
 }
@@ -1032,6 +898,7 @@ function normalizeImportedItem(x) {
     word,
     meaning,
     status: (x.status === "forgot" || x.status === "default" || x.status === "learned") ? x.status : "default",
+    example: String(x.example || "").trim(),
     memo: String(x.memo || "").trim(),
     tags: String(x.tags || "").trim(),
     synonyms: String(x.synonyms || "").trim(),
@@ -1093,10 +960,8 @@ function setupImport() {
 document.addEventListener("DOMContentLoaded", () => {
   setupTabs();
   setupSettings();
-  setupWakePing();
   setupAddForm();
   setupFilter();
-  setupSearch();
   setupExport();
   setupImport();
   setupQuiz();
