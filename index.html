@@ -25,53 +25,20 @@
     <section id="addSection" class="tab-content active">
       <div class="card">
         <div class="field-label">英単語</div>
-        <div class="row">
-          <input type="text" id="word" class="input" placeholder="apple" />
-          <button id="autoFillBtn" class="small-btn accent" onclick="fetchAutoFill()">自動入力</button>
-        </div>
-
+        <div class="row"><input type="text" id="word" class="input"><button id="autoFillBtn" class="small-btn accent" onclick="fetchAutoFill()">自動入力</button></div>
         <div class="field-label">意味</div>
-        <input type="text" id="meaning" class="input" placeholder="りんご" />
-
+        <input type="text" id="meaning" class="input">
+        
         <div class="field-label">例文</div>
-        <textarea id="example" class="input" rows="2" placeholder="AIが作る自然な例文"></textarea>
+        <textarea id="example" class="input" rows="2" placeholder="自然な例文"></textarea>
 
-        <div class="field-label">タグ (スペース区切り)</div>
-        <input type="text" id="tags" class="input" placeholder="重要 学校" />
-
-        <button id="addBtn" class="primary-btn" onclick="addWord()">単語帳に追加</button>
-        <p id="addMsg" class="note" style="margin-top:10px;"></p>
+        <div class="field-label">タグ</div>
+        <input type="text" id="tags" class="input" list="tagSuggestions">
+        <button id="addBtn" class="primary-btn" onclick="addWord()">保存</button>
+        <p id="addMsg" class="note"></p>
       </div>
-
-      <div class="card">
-        <details>
-          <summary>API設定</summary>
-          <div style="margin-top:10px;">
-            <input type="text" id="hfBaseUrl" class="input" placeholder="https://xxx.hf.space" />
-            <input type="password" id="hfToken" class="input" placeholder="X-App-Token" />
-            <button onclick="saveSettings()" class="small-btn">設定を保存</button>
-          </div>
-        </details>
-      </div>
-    </section>
-
-    <section id="listSection" class="tab-content">
-      <div class="card">
-        <input type="text" id="searchBar" class="input" placeholder="検索 (#タグ または キーワード)" />
-        <div id="wordList" class="word-list"></div>
-      </div>
-    </section>
-
-    <section id="quizSection" class="tab-content">
-      <div class="card">
-        <div id="quizArea">
-          <p class="note">「出題」ボタンを押してね！</p>
-        </div>
-        <button id="startQuizBtn" class="primary-btn" style="margin-top:10px;">出題</button>
-      </div>
-    </section>
-  </main>
-
+      </section>
+    </main>
   <script src="script.js"></script>
 </body>
 </html>
