@@ -1,102 +1,123 @@
 const STORAGE_KEY = "tangoChoWords";
 const HF_BASE_KEY = "tangoChoHfBase";
+const HF_TOKEN_KEY = "tangoChoAppToken";
 
 let words = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
 
-// 初期表示
-document.getElementById('hfBaseUrl').value = localStorage.getItem(HF_BASE_KEY) || "";
-renderWordList();
+// タブ切り替え
+document.querySelectorAll('.tab-button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-button, .tab-content').forEach(el => el.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.section).classList.add('active');
+    if(btn.dataset.section === 'listSection') renderWordList();
+  });
+});
 
-// リストの表示
-function renderWordList() {
-    const listEl = document.getElementById('wordList');
-    listEl.innerHTML = words.map((w, i) => `
-        <div class="card" style="border-left: 4px solid var(--accent);">
-            <div style="display:flex; justify-content:space-between; align-items:start;">
-                <div>
-                    <strong style="font-size:1.2rem; color:var(--accent);">${w.word}</strong>
-                    <span style="margin-left:10px; color:#ccc;">${w.meaning}</span>
-                </div>
-                <button onclick="deleteWord(${i})" style="background:none; border:none; color:#ff4f4f; cursor:pointer;">削除</button>
-            </div>
-            ${w.example ? `<div style="margin-top:8px; font-size:0.9rem; color:#bbb; font-style:italic; background:#222; padding:8px; border-radius:8px;">💡 ${w.example}</div>` : ''}
-            <div style="margin-top:8px;">
-                ${(w.tags || "").split(',').filter(t => t).map(t => `<span class="pill" style="font-size:0.7rem; margin-right:4px;">#${t.trim()}</span>`).join('')}
-            </div>
-        </div>
-    `).reverse().join('');
-}
-
-// 自動入力 (API連携)
+// 自動入力 (app.pyと通信)
 async function fetchAutoFill() {
-    const word = document.getElementById('word').value.trim();
-    const hfBase = localStorage.getItem(HF_BASE_KEY);
-    
-    if (!word) return alert("単語を入力してね");
-    if (!hfBase) return alert("設定でAPIのURLを保存してね");
+  const word = document.getElementById("word").value.trim();
+  const hfBase = localStorage.getItem(HF_BASE_KEY);
+  const token = localStorage.getItem(HF_TOKEN_KEY);
+  if (!word || !hfBase) return alert("単語と設定を確認してね");
 
-    const btn = document.getElementById('autoFillBtn');
-    btn.textContent = "作成中...";
-    btn.disabled = true;
+  const btn = document.getElementById("autoFillBtn");
+  btn.textContent = "取得中...";
+  btn.disabled = true;
 
-    try {
-        // 1. 翻訳
-        const tRes = await fetch(`${hfBase}/translate`, {
-            method: 'POST',
-            body: JSON.stringify({ text: word })
-        });
-        const tData = await tRes.json();
-        const meaning = tData.translated;
-        document.getElementById('meaning').value = meaning;
+  try {
+    // 1. 翻訳
+    const tRes = await fetch(`${hfBase}/translate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Token': token },
+      body: JSON.stringify({ text: word })
+    });
+    const tData = await tRes.json();
+    document.getElementById("meaning").value = tData.translated || "";
 
-        // 2. 例文
-        const eRes = await fetch(`${hfBase}/examples`, {
-            method: 'POST',
-            body: JSON.stringify({ word: word, meaning: meaning })
-        });
-        const eData = await eRes.json();
-        if (eData.examples && eData.examples[0]) {
-            document.getElementById('example').value = eData.examples[0];
-        }
-    } catch (e) {
-        alert("APIに接続できなかったよ。URLを確認してね。");
-    } finally {
-        btn.textContent = "自動入力";
-        btn.disabled = false;
-    }
+    // 2. 例文
+    const eRes = await fetch(`${hfBase}/examples`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Token': token },
+      body: JSON.stringify({ word: word, meaning: tData.translated })
+    });
+    const eData = await eRes.json();
+    document.getElementById("example").value = eData.examples[0] || "";
+
+  } catch (e) {
+    alert("エラーが発生しました。URLやトークンを確認してください。");
+  } finally {
+    btn.textContent = "自動入力";
+    btn.disabled = false;
+  }
 }
 
 // 単語追加
 function addWord() {
-    const word = document.getElementById('word').value.trim();
-    const meaning = document.getElementById('meaning').value.trim();
-    const example = document.getElementById('example').value.trim();
-    const tags = document.getElementById('tags').value.trim();
+  const word = document.getElementById("word").value.trim();
+  const meaning = document.getElementById("meaning").value.trim();
+  const example = document.getElementById("example").value.trim();
+  const tags = document.getElementById("tags").value.trim();
 
-    if (!word || !meaning) return alert("単語と意味は必須だよ！");
+  if (!word || !meaning) return;
 
-    words.push({ word, meaning, example, tags, id: Date.now() });
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
-    
-    // クリア
-    document.getElementById('word').value = "";
-    document.getElementById('meaning').value = "";
-    document.getElementById('example').value = "";
-    document.getElementById('tags').value = "";
-    
-    renderWordList();
+  words.push({
+    id: Date.now(),
+    word,
+    meaning,
+    example,
+    tags,
+    status: 'default',
+    createdAt: new Date().toISOString()
+  });
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
+  document.getElementById("word").value = "";
+  document.getElementById("meaning").value = "";
+  document.getElementById("example").value = "";
+  document.getElementById("tags").value = "";
+  alert("追加したよ！");
 }
 
-function deleteWord(index) {
-    if(!confirm("本当に消していい？")) return;
-    const actualIndex = words.length - 1 - index;
-    words.splice(actualIndex, 1);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
-    renderWordList();
+// リスト表示
+function renderWordList() {
+  const listEl = document.getElementById("wordList");
+  const query = document.getElementById("searchBar").value.toLowerCase();
+  
+  const filtered = words.filter(w => 
+    w.word.toLowerCase().includes(query) || 
+    w.meaning.toLowerCase().includes(query) ||
+    w.tags.toLowerCase().includes(query)
+  );
+
+  listEl.innerHTML = filtered.map((w, i) => `
+    <div class="card">
+      <div style="display:flex; justify-content:space-between;">
+        <strong>${w.word}</strong>
+        <button onclick="deleteWord(${w.id})" class="small-btn danger">削除</button>
+      </div>
+      <div>${w.meaning}</div>
+      ${w.example ? `<div style="font-size:0.85rem; color:#888; margin-top:5px; border-left:2px solid #00c896; padding-left:8px;">${w.example}</div>` : ''}
+      <div style="margin-top:5px;">
+        ${w.tags.split(' ').filter(t => t).map(t => `<span class="pill">#${t}</span>`).join('')}
+      </div>
+    </div>
+  `).reverse().join('');
+}
+
+function deleteWord(id) {
+  if(!confirm("消してもいい？")) return;
+  words = words.filter(w => w.id !== id);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
+  renderWordList();
 }
 
 function saveSettings() {
-    const url = document.getElementById('hfBaseUrl').value.trim().replace(/\/$/, "");
-    localStorage.setItem(HF_BASE_KEY, url);
-    alert("保存しました！");
+  localStorage.setItem(HF_BASE_KEY, document.getElementById("hfBaseUrl").value.trim());
+  localStorage.setItem(HF_TOKEN_KEY, document.getElementById("hfToken").value.trim());
+  alert("設定を保存しました");
 }
+
+// 初期ロード
+document.getElementById("hfBaseUrl").value = localStorage.getItem(HF_BASE_KEY) || "";
+document.getElementById("searchBar").addEventListener('input', renderWordList);

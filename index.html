@@ -2,46 +2,74 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>TANGO-CHO for Daughter</title>
+  <title>TANGO-CHO</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <header class="app-header">
     <h1>TANGO-CHO</h1>
-    <p class="app-subtitle">娘のための魔法の単語帳</p>
+    <p class="app-subtitle">娘のための学習アプリ</p>
   </header>
 
+  <nav class="tab-bar">
+    <button class="tab-button active" data-section="addSection">追加</button>
+    <button class="tab-button" data-section="listSection">単語帳</button>
+    <button class="tab-button" data-section="quizSection">クイズ</button>
+  </nav>
+
   <main class="container">
-    <section class="card">
-      <div class="row">
-        <input type="text" id="word" class="input" placeholder="英単語を入力" />
-        <button id="autoFillBtn" class="small-btn accent" onclick="fetchAutoFill()">自動入力</button>
+    <section id="addSection" class="tab-content active">
+      <div class="card">
+        <div class="field-label">英単語</div>
+        <div class="row">
+          <input type="text" id="word" class="input" placeholder="apple" />
+          <button id="autoFillBtn" class="small-btn accent" onclick="fetchAutoFill()">自動入力</button>
+        </div>
+
+        <div class="field-label">意味</div>
+        <input type="text" id="meaning" class="input" placeholder="りんご" />
+
+        <div class="field-label">例文</div>
+        <textarea id="example" class="input" rows="2" placeholder="AIが作る自然な例文"></textarea>
+
+        <div class="field-label">タグ (スペース区切り)</div>
+        <input type="text" id="tags" class="input" placeholder="重要 学校" />
+
+        <button id="addBtn" class="primary-btn" onclick="addWord()">単語帳に追加</button>
+        <p id="addMsg" class="note" style="margin-top:10px;"></p>
       </div>
-      
-      <input type="text" id="meaning" class="input" placeholder="意味（自動入力されます）" />
-      
-      <textarea id="example" class="input" rows="2" placeholder="自然な例文（自動入力されます）"></textarea>
-      
-      <div class="row" style="margin-top:10px;">
-        <input type="text" id="tags" class="input" placeholder="タグ（例: 学校, 重要）" style="flex:1; margin-bottom:0;" />
-        <button onclick="addWord()" class="primary-btn" style="flex:1;">単語帳に追加</button>
+
+      <div class="card">
+        <details>
+          <summary>API設定</summary>
+          <div style="margin-top:10px;">
+            <input type="text" id="hfBaseUrl" class="input" placeholder="https://xxx.hf.space" />
+            <input type="password" id="hfToken" class="input" placeholder="X-App-Token" />
+            <button onclick="saveSettings()" class="small-btn">設定を保存</button>
+          </div>
+        </details>
       </div>
     </section>
 
-    <details class="card" style="font-size: 0.8rem; color: #888;">
-      <summary>設定 (API URL)</summary>
-      <div style="margin-top:10px;">
-        <input type="text" id="hfBaseUrl" class="input" placeholder="https://xxx.hf.space" />
-        <button onclick="saveSettings()" class="small-btn">保存</button>
+    <section id="listSection" class="tab-content">
+      <div class="card">
+        <input type="text" id="searchBar" class="input" placeholder="検索 (#タグ または キーワード)" />
+        <div id="wordList" class="word-list"></div>
       </div>
-    </details>
+    </section>
 
-    <hr style="border:0; border-top:1px solid #333; margin:20px 0;" />
-
-    <div id="wordList" class="word-list"></div>
+    <section id="quizSection" class="tab-content">
+      <div class="card">
+        <div id="quizArea">
+          <p class="note">「出題」ボタンを押してね！</p>
+        </div>
+        <button id="startQuizBtn" class="primary-btn" style="margin-top:10px;">出題</button>
+      </div>
+    </section>
   </main>
 
   <script src="script.js"></script>
