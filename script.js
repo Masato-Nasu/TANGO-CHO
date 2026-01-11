@@ -11,6 +11,46 @@ const STATUS_LABEL = {
   learned: "覚えた",
 };
 
+// --- Quiz SFX (no external audio files) ---
+let __audioCtx = null;
+function __getAudioCtx(){
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return null;
+  if (!__audioCtx) __audioCtx = new Ctx();
+  if (__audioCtx.state === "suspended") {
+    __audioCtx.resume().catch(() => {});
+  }
+  return __audioCtx;
+}
+function __beep(freq, dur, type="sine", vol=0.14){
+  const ctx = __getAudioCtx();
+  if (!ctx) return;
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = type;
+  o.frequency.value = freq;
+  g.gain.value = vol;
+  o.connect(g);
+  g.connect(ctx.destination);
+  const t = ctx.currentTime;
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.start(t);
+  o.stop(t + dur);
+}
+function sfxCorrect(){
+  __beep(880, 0.08, "sine", 0.12);
+  setTimeout(() => __beep(1320, 0.10, "sine", 0.12), 120);
+}
+function sfxWrong(){
+  __beep(160, 0.22, "sawtooth", 0.18);
+}
+function vib(pattern){
+  try { if (navigator.vibrate) navigator.vibrate(pattern); } catch(e) {}
+}
+
+
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -751,12 +791,16 @@ function renderQuiz() {
   area.innerHTML = `
     <p class="quiz-mini">${modeLabel}</p>
     <p class="quiz-q">${promptLabel}<br><span style="font-size:1.25rem;">${escapeHtml(q.prompt)}</span></p>
+    <div id="quizResult" class="quiz-result" aria-live="polite"></div>
     <div class="quiz-choices" id="choices"></div>
     <div class="quiz-foot" id="quizFoot"></div>
   `;
 
   const choicesEl = document.getElementById("choices");
   const footEl = document.getElementById("quizFoot");
+  const resultEl = document.getElementById("quizResult");
+  if (resultEl) { resultEl.className = "quiz-result"; resultEl.textContent = ""; }
+
   choicesEl.innerHTML = "";
 
   q.choices.forEach((c) => {
@@ -786,6 +830,19 @@ function onAnswer(selected) {
   const q = quizState.current;
   const isCorrect = selected === q.correct;
   if (isCorrect) quizState.correct += 1;
+
+  // SFX + big mark
+  const resultEl = document.getElementById("quizResult");
+  if (isCorrect) { sfxCorrect(); vib(40); }
+  else { sfxWrong(); vib([60,40,120]); }
+  if (resultEl) {
+    resultEl.classList.add(isCorrect ? "correct" : "wrong");
+    if (isCorrect) {
+      resultEl.innerHTML = `<span class="mark">○</span><span>正解</span>`;
+    } else {
+      resultEl.innerHTML = `<span class="mark">✕</span><span>不正解</span><span class="quiz-mini">正解: ${escapeHtml(q.correct)}</span>`;
+    }
+  }
 
   // mark buttons
   const btns = Array.from(document.querySelectorAll(".choice-btn"));
