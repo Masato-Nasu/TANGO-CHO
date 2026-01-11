@@ -1,40 +1,49 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>娘専用・単語帳</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="manifest" href="manifest.json">
+  <meta charset="UTF-8" />
+  <title>TANGO-CHO for Daughter</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-    <header class="app-header">
-        <h1>TANGO-CHO</h1>
-    </header>
+  <header class="app-header">
+    <h1>TANGO-CHO</h1>
+    <p class="app-subtitle">娘のための魔法の単語帳</p>
+  </header>
 
-    <main class="container">
-        <section class="card add-section">
-            <div class="field-row">
-                <input type="text" id="word" placeholder="英単語を入力" class="input">
-                <button id="autoFillBtn" onclick="fetchAutoFill()" class="secondary-btn">自動入力</button>
-            </div>
-            
-            <input type="text" id="meaning" placeholder="意味（自動入力されます）" class="input">
-            
-            <textarea id="example" placeholder="AIが作る自然な例文（自動入力されます）" class="input" rows="2"></textarea>
-            
-            <button onclick="addWord()" class="primary-btn">単語帳に追加</button>
-        </section>
+  <main class="container">
+    <section class="card">
+      <div class="row">
+        <input type="text" id="word" class="input" placeholder="英単語を入力" />
+        <button id="autoFillBtn" class="small-btn accent" onclick="fetchAutoFill()">自動入力</button>
+      </div>
+      
+      <input type="text" id="meaning" class="input" placeholder="意味（自動入力されます）" />
+      
+      <textarea id="example" class="input" rows="2" placeholder="自然な例文（自動入力されます）"></textarea>
+      
+      <div class="row" style="margin-top:10px;">
+        <input type="text" id="tags" class="input" placeholder="タグ（例: 学校, 重要）" style="flex:1; margin-bottom:0;" />
+        <button onclick="addWord()" class="primary-btn" style="flex:1;">単語帳に追加</button>
+      </div>
+    </section>
 
-        <details class="settings-card">
-            <summary>設定（API URL）</summary>
-            <input type="text" id="hfBaseUrl" placeholder="https://your-space.hf.space" class="input">
-            <button onclick="saveSettings()" class="small-btn">設定を保存</button>
-        </details>
+    <details class="card" style="font-size: 0.8rem; color: #888;">
+      <summary>設定 (API URL)</summary>
+      <div style="margin-top:10px;">
+        <input type="text" id="hfBaseUrl" class="input" placeholder="https://xxx.hf.space" />
+        <button onclick="saveSettings()" class="small-btn">保存</button>
+      </div>
+    </details>
 
-        <div id="wordList" class="word-list"></div>
-    </main>
+    <hr style="border:0; border-top:1px solid #333; margin:20px 0;" />
 
-    <script src="script.js"></script>
+    <div id="wordList" class="word-list"></div>
+  </main>
+
+  <script src="script.js"></script>
 </body>
 </html>
