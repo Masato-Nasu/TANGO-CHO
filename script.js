@@ -3,47 +3,6 @@ const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
 const FILTER_KEY = "tangoChoFilter";
 
-const SHARE_PAYLOAD_KEY = "tangoChoSharePayload";
-
-function extractFirstWord(text) {
-  const t = (text || "").trim();
-  // Prefer a single "word-like" token (letters / apostrophe / hyphen).
-  const m = t.match(/[A-Za-z][A-Za-z'’\-]*/);
-  return m ? m[0] : t;
-}
-
-function consumeSharePayload() {
-  let raw = null;
-  try { raw = localStorage.getItem(SHARE_PAYLOAD_KEY); } catch (e) {}
-  if (!raw) return;
-
-  try { localStorage.removeItem(SHARE_PAYLOAD_KEY); } catch (e) {}
-
-  let payload = null;
-  try { payload = JSON.parse(raw); } catch (e) {
-    payload = { text: String(raw || "") };
-  }
-  const txt = (payload && payload.text ? String(payload.text) : "").trim();
-  if (!txt) return;
-
-  const w = extractFirstWord(txt);
-  const wordEl = document.getElementById("word");
-  if (!wordEl) return;
-
-  // Move to Add tab and prefill only if the field is empty.
-  switchToAddTab();
-  if (!wordEl.value.trim()) {
-    wordEl.value = w;
-    const statePill = document.getElementById("translateState");
-    if (statePill) statePill.textContent = "未翻訳";
-    setMsg("共有したテキストを取り込みました。", "ok");
-    try { wordEl.focus(); } catch (e) {}
-  } else {
-    setMsg("共有したテキストを取り込みました（英単語欄が入力済みのため未反映）。", "ok");
-  }
-}
-
-
 let editId = null;
 
 const STATUS_LABEL = {
@@ -407,7 +366,7 @@ function setupAddForm() {
   }
 
 
-    saveBtn.addEventListener("click", async () => {
+  saveBtn.addEventListener("click", () => {
     const w = wordEl.value.trim();
     const m = meaningEl.value.trim();
     if (!w) return setMsg("英単語が空です。", "err");
@@ -457,8 +416,6 @@ function setupAddForm() {
     }
 
     // ===== Auto-add synonym cards (comma-separated) =====
-    // 重要：類似語カードは「元単語の日本語訳(m)」を流用せず、
-    //       各類似語ごとに DeepL で再翻訳して正しい訳を入れます。
     const synRaw = (synonymsEl ? synonymsEl.value : "").trim();
     const synTokens = synRaw
       ? synRaw.split(/[,、\n\r]+/).map((s) => s.trim()).filter(Boolean)
@@ -466,12 +423,8 @@ function setupAddForm() {
 
     const seen = new Set();
     const baseLower = w.toLowerCase();
-    const existingWordLower = new Set(
-      words.map((x) => String(x.word || "").trim().toLowerCase()).filter(Boolean)
-    );
-
+    const existingKey = new Set(words.map((x) => `${String(x.word || "").toLowerCase()}|${String(x.meaning || "")}`));
     let synAdded = 0;
-    let synFailed = 0;
 
     for (const t of synTokens) {
       const tl = t.toLowerCase();
@@ -479,48 +432,33 @@ function setupAddForm() {
       if (seen.has(tl)) continue;
       seen.add(tl);
 
-      // すでに同じ英単語が単語帳にある場合は追加しない（重複防止）
-      if (existingWordLower.has(tl)) continue;
-
-      // 各類似語の日本語訳を再取得（DeepL）
-      let synMeaning = "";
-      try {
-        synMeaning = await translateToJaViaSpace(t);
-      } catch (e) {
-        synFailed += 1;
-        continue;
-      }
+      const key = `${tl}|${m}`;
+      if (existingKey.has(key)) continue;
 
       words.push({
         id: `${baseId}-syn-${Math.random().toString(36).slice(2, 8)}`,
         word: t,
-        meaning: synMeaning,
+        meaning: m,
         status: statusEl.value || "default",
         example: "",
-        memo: "",
+        memo: `同義語（${w}）`,
         tags: tagsEl.value.trim(),
         synonyms: "",
         source: "synonym",
         createdAt: nowIso(),
       });
-
-      existingWordLower.add(tl);
+      existingKey.add(key);
       synAdded += 1;
     }
 
     saveWords(words);
 
-    const extra =
-      (synAdded || synFailed)
-        ? `（${synAdded ? `類似語カード +${synAdded}` : ""}${(synAdded && synFailed) ? " / " : ""}${synFailed ? `類似語訳失敗 ${synFailed}` : ""}）`
-        : "";
-
     if (editId) {
       exitEditMode(false);
-      setMsg(`更新しました（入力をクリアしました）。${extra}`.trim(), "ok");
+      setMsg(`更新しました（入力をクリアしました）。${synAdded ? ` 類似語カード +${synAdded}` : ""}`.trim(), "ok");
     } else {
       clearForm(true);
-      setMsg(`保存しました（入力をクリアしました）。${extra}`.trim(), "ok");
+      setMsg(`保存しました（入力をクリアしました）。${synAdded ? ` 類似語カード +${synAdded}` : ""}`.trim(), "ok");
     }
 
     renderWordList();
@@ -1002,7 +940,6 @@ document.addEventListener("DOMContentLoaded", () => {
   setupTabs();
   setupSettings();
   setupAddForm();
-  consumeSharePayload();
   setupFilter();
   setupExport();
   setupImport();

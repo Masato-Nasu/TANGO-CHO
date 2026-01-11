@@ -1,4 +1,4 @@
-const CACHE = "tango-cho-cache-v3.6.1-ui";
+const CACHE = "tango-cho-cache-v3.6.2-root";
 const ASSETS = [
   "./",
   "./index.html",
@@ -6,23 +6,18 @@ const ASSETS = [
   "./script.js",
   "./manifest.json",
   "./share-target.html",
-  "./icons/apple-touch-icon-v25.png",
-  "./icons/icon-192-v25.png",
-  "./icons/icon-512-v25.png",
+  "./icons/apple-touch-icon-v26.png",
+  "./icons/icon-192-v26.png",
+  "./icons/icon-512-v26.png"
 ];
 
 self.addEventListener("install", (e) => {
-  self.skipWaiting();
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));
 });
 
 self.addEventListener("activate", (e) => {
   e.waitUntil(
-    (async () => {
-      const keys = await caches.keys();
-      await Promise.all(keys.map((k) => (k !== CACHE ? caches.delete(k) : null)));
-      await self.clients.claim();
-    })()
+    caches.keys().then((keys) => Promise.all(keys.map((k) => (k !== CACHE ? caches.delete(k) : null))))
   );
 });
 
@@ -30,37 +25,39 @@ self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
 
   const url = new URL(e.request.url);
-  if (url.origin !== self.location.origin) return;
+  const sameOrigin = url.origin === self.location.origin;
 
-  e.respondWith(
-    (async () => {
-      const direct = await caches.match(e.request);
-      if (direct) return direct;
-
-      // クエリ付きでも同一パスのキャッシュを返す（更新用 cache-bust に強くする）
-      if (url.search) {
-        const strippedReq = new Request(url.origin + url.pathname, {
-          method: "GET",
-          headers: e.request.headers,
-          mode: e.request.mode,
-          credentials: e.request.credentials,
-          redirect: e.request.redirect,
-        });
-        const stripped = await caches.match(strippedReq);
-        if (stripped) return stripped;
-      }
-
-      // ナビゲーション時は index を返す（オフライン起動用）
-      if (e.request.mode === "navigate") {
-        const cachedIndex = await caches.match("./index.html");
-        if (cachedIndex) return cachedIndex;
-      }
+  // For navigations (including start_url with query), ignore the query string and fall back to cached index.html.
+  if (sameOrigin && (e.request.mode === "navigate" || (e.request.headers.get("accept") || "").includes("text/html"))) {
+    e.respondWith((async () => {
+      const cache = await caches.open(CACHE);
 
       try {
-        return await fetch(e.request);
-      } catch (err) {
-        return direct;
+        // Try network first so updates show up when online.
+        const fresh = await fetch(e.request);
+        if (fresh && fresh.ok) {
+          // Cache the version without query as well, for stable offline startup.
+          cache.put("./index.html", fresh.clone()).catch(() => {});
+        }
+        return fresh;
+      } catch (_) {
+        const cached = await cache.match("./index.html", { ignoreSearch: true });
+        return cached || Response.error();
       }
-    })()
+    })());
+    return;
+  }
+
+  // Static assets: cache-first.
+  e.respondWith(
+    caches.match(e.request, { ignoreSearch: false }).then((cached) =>
+      cached ||
+      fetch(e.request).then((res) => {
+        if (sameOrigin && res && res.ok) {
+          caches.open(CACHE).then((c) => c.put(e.request, res.clone())).catch(() => {});
+        }
+        return res;
+      })
+    )
   );
 });
