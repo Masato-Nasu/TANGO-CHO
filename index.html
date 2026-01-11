@@ -19,7 +19,8 @@
 <body>
   <header class="app-header">
     <h1>TANGO-CHO</h1>
-</header>
+    <p class="app-subtitle">調べる＋手入力を1画面に統合 / 単語帳 / 4択クイズ</p>
+  </header>
 
   <nav class="tab-bar">
     <button class="tab-button active" data-section="addSection">追加</button>
@@ -29,7 +30,9 @@
 
   <main class="main">
     <section id="addSection" class="section active">
-<details class="card" id="settingsCard">
+      <h2>追加（検索＋手入力）</h2>
+
+      <details class="card" id="settingsCard">
         <summary class="summary">⚙️ 接続設定（HF Spaces） <span id="connStatus" class="conn-status"></span></summary>
 
         <label class="field-label" for="hfBase">HF Spaces API Base（例：https://xxxxx.hf.space）</label>
