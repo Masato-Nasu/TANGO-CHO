@@ -100,3 +100,11 @@ DeepL API
 Hugging Face Spaces
 
 GitHub Pages / PWA
+
+
+## 🍎 iPhoneでJSONバックアップする方法
+
+- 単語帳画面の **JSON** を押す
+- 共有シートが出たら **「ファイルに保存」** を選ぶ（iCloud Drive など）
+- もし共有が出ない場合は、JSONが新しいタブで開きます → 共有 → **ファイルに保存**
+

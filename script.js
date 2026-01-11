@@ -2,6 +2,7 @@ const STORAGE_KEY = "tangoChoWords";
 const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
 const FILTER_KEY = "tangoChoFilter";
+const APP_VERSION = "3.6.8";
 
 let editId = null;
 
@@ -10,44 +11,67 @@ const STATUS_LABEL = {
   default: "デフォルト",
   learned: "覚えた",
 };
-
-// --- Quiz SFX (no external audio files) ---
+// --- Quiz SFX (WebAudio) ---
+// iOS Safari/PWA needs user gesture to unlock audio. We create/resume AudioContext inside clicks.
 let __audioCtx = null;
-function __getAudioCtx(){
+
+function getAudioCtx() {
   const Ctx = window.AudioContext || window.webkitAudioContext;
   if (!Ctx) return null;
   if (!__audioCtx) __audioCtx = new Ctx();
-  if (__audioCtx.state === "suspended") {
-    __audioCtx.resume().catch(() => {});
-  }
   return __audioCtx;
 }
-function __beep(freq, dur, type="sine", vol=0.14){
-  const ctx = __getAudioCtx();
+
+async function ensureAudioUnlocked() {
+  const ctx = getAudioCtx();
+  if (!ctx) return false;
+  try {
+    if (ctx.state === "suspended") await ctx.resume();
+    return ctx.state === "running";
+  } catch {
+    return false;
+  }
+}
+
+function playTone(freq, durationMs, type = "sine", gainValue = 0.08) {
+  const ctx = getAudioCtx();
   if (!ctx) return;
-  const o = ctx.createOscillator();
-  const g = ctx.createGain();
-  o.type = type;
-  o.frequency.value = freq;
-  g.gain.value = vol;
-  o.connect(g);
-  g.connect(ctx.destination);
-  const t = ctx.currentTime;
-  g.gain.setValueAtTime(vol, t);
-  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-  o.start(t);
-  o.stop(t + dur);
+  const now = ctx.currentTime;
+
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, now);
+
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(gainValue, now + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + durationMs / 1000);
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+
+  osc.start(now);
+  osc.stop(now + durationMs / 1000 + 0.02);
 }
-function sfxCorrect(){
-  __beep(880, 0.08, "sine", 0.12);
-  setTimeout(() => __beep(1320, 0.10, "sine", 0.12), 120);
+
+async function playQuizSfx(kind) {
+  const ok = await ensureAudioUnlocked();
+  if (!ok) return; // blocked → silent fallback
+
+  if (kind === "correct") {
+    // ピンポン
+    playTone(880, 90, "sine", 0.09);
+    setTimeout(() => playTone(1320, 120, "sine", 0.08), 110);
+  } else if (kind === "wrong") {
+    // ブブー
+    playTone(180, 220, "square", 0.07);
+    setTimeout(() => playTone(140, 260, "square", 0.06), 120);
+  }
 }
-function sfxWrong(){
-  __beep(160, 0.22, "sawtooth", 0.18);
-}
-function vib(pattern){
-  try { if (navigator.vibrate) navigator.vibrate(pattern); } catch(e) {}
-}
+
+// Try to unlock as early as possible (first tap anywhere)
+document.addEventListener("pointerdown", () => { ensureAudioUnlocked(); }, { once: true });
+document.addEventListener("touchstart", () => { ensureAudioUnlocked(); }, { once: true, passive: true });
 
 
 
@@ -70,18 +94,50 @@ function saveWords(words) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
 }
 
-function speak(text) {
+function isJapaneseText(text) {
+  return /[\u3040-\u30FF\u3400-\u9FFF]/.test(String(text || ""));
+}
+
+let __voices = [];
+function refreshVoices() {
+  try {
+    __voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+  } catch {
+    __voices = [];
+  }
+}
+if ("speechSynthesis" in window) {
+  refreshVoices();
+  window.speechSynthesis.onvoiceschanged = refreshVoices;
+}
+
+function pickVoice(lang) {
+  const l = String(lang || "").toLowerCase();
+  if (!__voices || __voices.length === 0) return null;
+  let v = __voices.find((vv) => (vv.lang || "").toLowerCase().startsWith(l));
+  if (v) return v;
+  const base = l.split("-")[0];
+  v = __voices.find((vv) => (vv.lang || "").toLowerCase().startsWith(base));
+  return v || null;
+}
+
+function speak(text, langHint) {
   if (!("speechSynthesis" in window)) {
     alert("この端末では音声読み上げが利用できません。");
     return;
   }
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = "en-US";
+  const lang = langHint || (isJapaneseText(text) ? "ja-JP" : "en-US");
+  const u = new SpeechSynthesisUtterance(String(text || ""));
+  u.lang = lang;
   u.rate = 0.95;
+
+  refreshVoices();
+  const v = pickVoice(lang);
+  if (v) u.voice = v;
+
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(u);
 }
-
 function setMsg(text, kind) {
   const el = document.getElementById("msg");
   if (!el) return;
@@ -406,7 +462,7 @@ function setupAddForm() {
   }
 
 
-  saveBtn.addEventListener("click", async () => {
+  saveBtn.addEventListener("click", () => {
     const w = wordEl.value.trim();
     const m = meaningEl.value.trim();
     if (!w) return setMsg("英単語が空です。", "err");
@@ -463,9 +519,8 @@ function setupAddForm() {
 
     const seen = new Set();
     const baseLower = w.toLowerCase();
-    const existingWordLower = new Set(words.map((x) => String(x.word || "").toLowerCase()));
+    const existingKey = new Set(words.map((x) => `${String(x.word || "").toLowerCase()}|${String(x.meaning || "")}`));
     let synAdded = 0;
-    const synFailed = [];
 
     for (const t of synTokens) {
       const tl = t.toLowerCase();
@@ -473,26 +528,13 @@ function setupAddForm() {
       if (seen.has(tl)) continue;
       seen.add(tl);
 
-      // already exists -> skip (do not overwrite)
-      if (existingWordLower.has(tl)) continue;
-
-      // re-translate each synonym before carding (avoid "meaning" reuse)
-      let meaningSyn = "";
-      try {
-        meaningSyn = await translateToJaViaSpace(t);
-      } catch (e) {
-        synFailed.push(t);
-        continue;
-      }
-      if (!meaningSyn) {
-        synFailed.push(t);
-        continue;
-      }
+      const key = `${tl}|${m}`;
+      if (existingKey.has(key)) continue;
 
       words.push({
         id: `${baseId}-syn-${Math.random().toString(36).slice(2, 8)}`,
         word: t,
-        meaning: meaningSyn,
+        meaning: m,
         status: statusEl.value || "default",
         example: "",
         memo: `同義語（${w}）`,
@@ -501,23 +543,18 @@ function setupAddForm() {
         source: "synonym",
         createdAt: nowIso(),
       });
-      existingWordLower.add(tl);
+      existingKey.add(key);
       synAdded += 1;
     }
-
-    const synFailNote = synFailed.length
-      ? `（類似語の再翻訳失敗: ${synFailed.slice(0, 3).join(", ")}${synFailed.length > 3 ? " 他" + (synFailed.length - 3) : ""}）`
-      : "";
-
 
     saveWords(words);
 
     if (editId) {
       exitEditMode(false);
-      setMsg(`更新しました（入力をクリアしました）。${synAdded ? ` 類似語カード +${synAdded}` : ""}${synFailNote}`.trim(), "ok");
+      setMsg(`更新しました（入力をクリアしました）。${synAdded ? ` 類似語カード +${synAdded}` : ""}`.trim(), "ok");
     } else {
       clearForm(true);
-      setMsg(`保存しました（入力をクリアしました）。${synAdded ? ` 類似語カード +${synAdded}` : ""}${synFailNote}`.trim(), "ok");
+      setMsg(`保存しました（入力をクリアしました）。${synAdded ? ` 類似語カード +${synAdded}` : ""}`.trim(), "ok");
     }
 
     renderWordList();
@@ -666,35 +703,61 @@ function setupFilter() {
   });
 }
 
+
 function setupExport() {
   const btn = document.getElementById("exportBtn");
   if (!btn) return;
-  btn.addEventListener("click", () => {
+
+  btn.addEventListener("click", async () => {
     const words = loadWords();
-    const blob = new Blob([JSON.stringify(words, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
     const now = new Date();
-    const ts = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
+    const ts = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+    const filename = `tango-cho-backup-${ts}.json`;
+
+    const payload = {
+      app: "TANGO-CHO",
+      version: APP_VERSION,
+      exportedAt: now.toISOString(),
+      words
+    };
+    const jsonText = JSON.stringify(payload, null, 2);
+    const blob = new Blob([jsonText], { type: "application/json" });
+
+    // Best for iPhone: Web Share →「ファイルに保存」
+    try {
+      const file = new File([blob], filename, { type: "application/json" });
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ title: "TANGO-CHO JSONバックアップ", files: [file] });
+        setListMsg("JSONを共有しました。iPhoneなら「ファイルに保存」で保存できます。", "ok");
+        return;
+      }
+    } catch {
+      // ignore → fallback
+    }
+
+    const url = URL.createObjectURL(blob);
+    const ua = navigator.userAgent || "";
+    const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+
+    if (isIOS) {
+      // iOSはdownload属性が効きにくい → 新規タブで開く → 共有から保存
+      window.open(url, "_blank");
+      setListMsg("JSONを新しいタブで開きました。共有 →「ファイルに保存」で保存してください。", "ok");
+      setTimeout(() => URL.revokeObjectURL(url), 8000);
+      return;
+    }
+
+    const a = document.createElement("a");
     a.href = url;
-    a.download = `tango-cho-backup-${ts}.json`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
-    URL.revokeObjectURL(url);
+    setListMsg("JSONを保存しました。", "ok");
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
   });
 }
 
-// --------------------
-// Quiz (4-choice)
-// --------------------
-let quizState = {
-  active: false,
-  current: null,
-  answered: false,
-  correct: 0,
-  total: 0,
-};
 
 function choiceShuffle(arr) {
   const a = [...arr];
@@ -791,16 +854,12 @@ function renderQuiz() {
   area.innerHTML = `
     <p class="quiz-mini">${modeLabel}</p>
     <p class="quiz-q">${promptLabel}<br><span style="font-size:1.25rem;">${escapeHtml(q.prompt)}</span></p>
-    <div id="quizResult" class="quiz-result" aria-live="polite"></div>
     <div class="quiz-choices" id="choices"></div>
     <div class="quiz-foot" id="quizFoot"></div>
   `;
 
   const choicesEl = document.getElementById("choices");
   const footEl = document.getElementById("quizFoot");
-  const resultEl = document.getElementById("quizResult");
-  if (resultEl) { resultEl.className = "quiz-result"; resultEl.textContent = ""; }
-
   choicesEl.innerHTML = "";
 
   q.choices.forEach((c) => {
@@ -829,20 +888,8 @@ function onAnswer(selected) {
 
   const q = quizState.current;
   const isCorrect = selected === q.correct;
+  playQuizSfx(isCorrect ? "correct" : "wrong");
   if (isCorrect) quizState.correct += 1;
-
-  // SFX + big mark
-  const resultEl = document.getElementById("quizResult");
-  if (isCorrect) { sfxCorrect(); vib(40); }
-  else { sfxWrong(); vib([60,40,120]); }
-  if (resultEl) {
-    resultEl.classList.add(isCorrect ? "correct" : "wrong");
-    if (isCorrect) {
-      resultEl.innerHTML = `<span class="mark">○</span><span>正解</span>`;
-    } else {
-      resultEl.innerHTML = `<span class="mark">✕</span><span>不正解</span><span class="quiz-mini">正解: ${escapeHtml(q.correct)}</span>`;
-    }
-  }
 
   // mark buttons
   const btns = Array.from(document.querySelectorAll(".choice-btn"));
@@ -859,7 +906,7 @@ function onAnswer(selected) {
     const msg = document.createElement("div");
     msg.className = "quiz-mini";
     msg.style.marginTop = "6px";
-    msg.textContent = isCorrect ? "正解！" : `不正解（正解: ${q.correct}）`;
+    msg.textContent = isCorrect ? "○ 正解！" : `不正解（正解: ${q.correct}）`;
     footEl.appendChild(msg);
 
     const actions = document.createElement("div");
