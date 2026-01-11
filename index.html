@@ -14,7 +14,7 @@
 
   <meta name="theme-color" content="#00c896" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=3.6.0" />
 </head>
 <body>
   <header class="app-header">
@@ -170,10 +170,11 @@
 
   <footer class="app-footer">
     <button id="ttsTestBtn" class="ghost-btn small">🔊 テスト</button>
+    <button id="soundToggleBtn" class="ghost-btn small" title="クイズ効果音">🔔 ON</button>
     <span class="footer-text">発音: Web Speech API / 翻訳: HF Spaces → DeepL</span>
   </footer>
 
-  <script src="script.js"></script>
+  <script src="script.js?v=3.6.0"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {

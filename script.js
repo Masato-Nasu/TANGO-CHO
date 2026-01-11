@@ -2,8 +2,55 @@ const STORAGE_KEY = "tangoChoWords";
 const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
 const FILTER_KEY = "tangoChoFilter";
+const QUIZ_SOUND_KEY = "tangoChoQuizSound";
 
 let editId = null;
+
+let __audioCtx = null;
+
+function isQuizSoundOn() {
+  // default ON
+  const v = (localStorage.getItem(QUIZ_SOUND_KEY) || "1").trim();
+  return v !== "0";
+}
+
+function setQuizSoundOn(on) {
+  localStorage.setItem(QUIZ_SOUND_KEY, on ? "1" : "0");
+}
+
+function updateQuizSoundToggle() {
+  const btn = document.getElementById("soundToggleBtn");
+  if (!btn) return;
+  const on = isQuizSoundOn();
+  btn.textContent = on ? "🔔 ON" : "🔕 OFF";
+  btn.setAttribute("aria-pressed", on ? "true" : "false");
+}
+
+function playQuizSound(isCorrect) {
+  if (!isQuizSoundOn()) return;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  try {
+    if (!__audioCtx) __audioCtx = new AC();
+    const ctx = __audioCtx;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = "sine";
+    o.frequency.value = isCorrect ? 880 : 220;
+
+    const t0 = ctx.currentTime;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.16, t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.11);
+
+    o.connect(g);
+    g.connect(ctx.destination);
+    o.start(t0);
+    o.stop(t0 + 0.12);
+  } catch (_) {
+    // ignore
+  }
+}
 
 const STATUS_LABEL = {
   forgot: "覚えてない",
@@ -753,6 +800,7 @@ function renderQuiz() {
   area.innerHTML = `
     <p class="quiz-mini">${modeLabel}</p>
     <p class="quiz-q">${promptLabel}<br><span style="font-size:1.25rem;">${escapeHtml(q.prompt)}</span></p>
+    <div class="quiz-result" id="quizResult" aria-live="polite" style="display:none;"></div>
     <div class="quiz-choices" id="choices"></div>
     <div class="quiz-foot" id="quizFoot"></div>
   `;
@@ -789,12 +837,22 @@ function onAnswer(selected) {
   const isCorrect = selected === q.correct;
   if (isCorrect) quizState.correct += 1;
 
+  // result banner + sound
+  const resEl = document.getElementById("quizResult");
+  if (resEl) {
+    resEl.style.display = "block";
+    resEl.className = `quiz-result ${isCorrect ? "ok" : "err"}`;
+    resEl.textContent = isCorrect ? "○ 正解" : "× 不正解";
+  }
+  playQuizSound(isCorrect);
+
   // mark buttons
   const btns = Array.from(document.querySelectorAll(".choice-btn"));
   btns.forEach((b) => {
     const txt = b.textContent;
     if (txt === q.correct) b.classList.add("correct");
     if (txt === selected && !isCorrect) b.classList.add("wrong");
+    if (txt !== q.correct && txt !== selected) b.classList.add("dim");
     b.disabled = true;
   });
 
@@ -968,6 +1026,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   renderWordList();
   renderQuiz();
+
+  updateQuizSoundToggle();
+  document.getElementById("soundToggleBtn")?.addEventListener("click", () => {
+    setQuizSoundOn(!isQuizSoundOn());
+    updateQuizSoundToggle();
+  });
 
   document.getElementById("ttsTestBtn")?.addEventListener("click", () => speak("Hello, this is a test."));
 });

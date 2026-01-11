@@ -1,9 +1,10 @@
-const CACHE = "tango-cho-cache-v3.5.9-root";
+const CACHE = "tango-cho-cache-v3.6.0-root";
 const ASSETS = [
   "./",
   "./index.html",
-  "./style.css",
-  "./script.js",
+  "./index.html?v=3.6.0",
+  "./style.css?v=3.6.0",
+  "./script.js?v=3.6.0",
   "./manifest.json",
   "./icons/apple-touch-icon-v25.png",
   "./icons/icon-192-v25.png",
