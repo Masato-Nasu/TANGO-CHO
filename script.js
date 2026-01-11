@@ -2,124 +2,49 @@ const STORAGE_KEY = "tangoChoWords";
 const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
 const FILTER_KEY = "tangoChoFilter";
-const QUIZ_SOUND_KEY = "tangoChoQuizSound";
+
+const SHARE_PAYLOAD_KEY = "tangoChoSharePayload";
+
+function extractFirstWord(text) {
+  const t = (text || "").trim();
+  // Prefer a single "word-like" token (letters / apostrophe / hyphen).
+  const m = t.match(/[A-Za-z][A-Za-z'’\-]*/);
+  return m ? m[0] : t;
+}
+
+function consumeSharePayload() {
+  let raw = null;
+  try { raw = localStorage.getItem(SHARE_PAYLOAD_KEY); } catch (e) {}
+  if (!raw) return;
+
+  try { localStorage.removeItem(SHARE_PAYLOAD_KEY); } catch (e) {}
+
+  let payload = null;
+  try { payload = JSON.parse(raw); } catch (e) {
+    payload = { text: String(raw || "") };
+  }
+  const txt = (payload && payload.text ? String(payload.text) : "").trim();
+  if (!txt) return;
+
+  const w = extractFirstWord(txt);
+  const wordEl = document.getElementById("word");
+  if (!wordEl) return;
+
+  // Move to Add tab and prefill only if the field is empty.
+  switchToAddTab();
+  if (!wordEl.value.trim()) {
+    wordEl.value = w;
+    const statePill = document.getElementById("translateState");
+    if (statePill) statePill.textContent = "未翻訳";
+    setMsg("共有したテキストを取り込みました。", "ok");
+    try { wordEl.focus(); } catch (e) {}
+  } else {
+    setMsg("共有したテキストを取り込みました（英単語欄が入力済みのため未反映）。", "ok");
+  }
+}
+
 
 let editId = null;
-
-let __audioCtx = null;
-
-function isQuizSoundOn() {
-  // default ON
-  const v = (localStorage.getItem(QUIZ_SOUND_KEY) || "1").trim();
-  return v !== "0";
-}
-
-function setQuizSoundOn(on) {
-  localStorage.setItem(QUIZ_SOUND_KEY, on ? "1" : "0");
-}
-
-function updateQuizSoundToggle() {
-  const btn = document.getElementById("soundToggleBtn");
-  if (!btn) return;
-  const on = isQuizSoundOn();
-  btn.textContent = on ? "🔔 ON" : "🔕 OFF";
-  btn.setAttribute("aria-pressed", on ? "true" : "false");
-}
-
-function playQuizSound(isCorrect) {
-  if (!isQuizSoundOn()) return;
-
-  const AC = window.AudioContext || window.webkitAudioContext;
-  if (!AC) return;
-
-  function tone(ctx, freq, start, dur, type = "sine", peak = 0.18) {
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = type;
-    o.frequency.setValueAtTime(freq, start);
-
-    // click-free envelope
-    g.gain.setValueAtTime(0.0001, start);
-    g.gain.exponentialRampToValueAtTime(peak, start + 0.008);
-    g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
-
-    o.connect(g);
-    g.connect(ctx.destination);
-    o.start(start);
-    o.stop(start + dur + 0.03);
-  }
-
-  try {
-    if (!__audioCtx) __audioCtx = new AC();
-    const ctx = __audioCtx;
-
-    if (ctx.state === "suspended") {
-      ctx.resume().catch(() => {});
-    }
-
-    const t0 = ctx.currentTime + 0.01;
-
-    if (isCorrect) {
-      // "ピンポン"
-      tone(ctx, 1046.5, t0, 0.08, "sine", 0.16);
-      tone(ctx, 1318.5, t0 + 0.10, 0.10, "sine", 0.16);
-    } else {
-      // "ブブー" (low buzz)
-      const start = t0;
-      const dur = 0.22;
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.type = "square";
-      o.frequency.setValueAtTime(180, start);
-      o.frequency.exponentialRampToValueAtTime(110, start + dur);
-
-      g.gain.setValueAtTime(0.0001, start);
-      g.gain.exponentialRampToValueAtTime(0.22, start + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, start + dur + 0.02);
-
-      o.connect(g);
-      g.connect(ctx.destination);
-      o.start(start);
-      o.stop(start + dur + 0.05);
-    }
-  } catch (_) {
-    // ignore
-  }
-}
-
-// Prevent horizontal panning (keeps the app from drifting left/right on touch devices)
-(function lockHorizontalPan(){
-  let sx = 0, sy = 0, lock = false;
-  const EDGE = 24;
-
-  document.addEventListener("touchstart", (e) => {
-    if (!e.touches || e.touches.length !== 1) { lock = false; return; }
-    const t = e.touches[0];
-    sx = t.clientX; sy = t.clientY;
-    const w = window.innerWidth || 0;
-    // allow OS edge-swipe gestures
-    lock = !(sx < EDGE || sx > w - EDGE);
-  }, { passive: true });
-
-  document.addEventListener("touchmove", (e) => {
-    if (!lock) return;
-    if (!e.touches || e.touches.length !== 1) return;
-
-    const target = e.target;
-    const tag = target && target.tagName ? target.tagName.toLowerCase() : "";
-    if (tag === "input" || tag === "textarea" || (target && target.isContentEditable)) return;
-
-    const t = e.touches[0];
-    const dx = t.clientX - sx;
-    const dy = t.clientY - sy;
-
-    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 6) {
-      e.preventDefault();
-    }
-  }, { passive: false });
-})();
-
-
 
 const STATUS_LABEL = {
   forgot: "覚えてない",
@@ -869,7 +794,6 @@ function renderQuiz() {
   area.innerHTML = `
     <p class="quiz-mini">${modeLabel}</p>
     <p class="quiz-q">${promptLabel}<br><span style="font-size:1.25rem;">${escapeHtml(q.prompt)}</span></p>
-    <div class="quiz-result" id="quizResult" aria-live="polite" style="display:none;"></div>
     <div class="quiz-choices" id="choices"></div>
     <div class="quiz-foot" id="quizFoot"></div>
   `;
@@ -906,22 +830,12 @@ function onAnswer(selected) {
   const isCorrect = selected === q.correct;
   if (isCorrect) quizState.correct += 1;
 
-  // result banner + sound
-  const resEl = document.getElementById("quizResult");
-  if (resEl) {
-    resEl.style.display = "block";
-    resEl.className = `quiz-result ${isCorrect ? "ok" : "err"}`;
-    resEl.textContent = isCorrect ? "○ 正解" : "× 不正解";
-  }
-  playQuizSound(isCorrect);
-
   // mark buttons
   const btns = Array.from(document.querySelectorAll(".choice-btn"));
   btns.forEach((b) => {
     const txt = b.textContent;
     if (txt === q.correct) b.classList.add("correct");
     if (txt === selected && !isCorrect) b.classList.add("wrong");
-    if (txt !== q.correct && txt !== selected) b.classList.add("dim");
     b.disabled = true;
   });
 
@@ -1088,6 +1002,7 @@ document.addEventListener("DOMContentLoaded", () => {
   setupTabs();
   setupSettings();
   setupAddForm();
+  consumeSharePayload();
   setupFilter();
   setupExport();
   setupImport();
@@ -1095,12 +1010,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   renderWordList();
   renderQuiz();
-
-  updateQuizSoundToggle();
-  document.getElementById("soundToggleBtn")?.addEventListener("click", () => {
-    setQuizSoundOn(!isQuizSoundOn());
-    updateQuizSoundToggle();
-  });
 
   document.getElementById("ttsTestBtn")?.addEventListener("click", () => speak("Hello, this is a test."));
 });

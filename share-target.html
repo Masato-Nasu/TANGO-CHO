@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>TANGO-CHO Share</title>
+</head>
+<body>
+<script>
+(() => {
+  const p = new URLSearchParams(location.search);
+  const text = (p.get("text") || "").trim();
+  const title = (p.get("title") || "").trim();
+  const url = (p.get("url") || "").trim();
+
+  const payload = { text: text || title || url, title, url, ts: Date.now() };
+  try {
+    localStorage.setItem("tangoChoSharePayload", JSON.stringify(payload));
+  } catch (e) {}
+
+  location.replace("./index.html?v=3.6.0");
+})();
+</script>
+</body>
+</html>

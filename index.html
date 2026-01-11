@@ -3,36 +3,34 @@
 <head>
   <meta charset="UTF-8" />
   <title>TANGO-CHO</title>
-  <!-- lock layout to device width (no pinch-zoom). "viewport-fit=cover" helps PWA on iOS -->
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <!-- iOS (Safari) standalone support -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="TANGO-CHO" />
-  <link rel="apple-touch-icon" href="./icon-192.png" />
-  <link rel="icon" sizes="192x192" href="./icon-192.png" />
-  <link rel="icon" sizes="512x512" href="./icon-512.png" />
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon-v25.png" />
+  <link rel="icon" sizes="192x192" href="./icons/icon-192-v25.png" />
+  <link rel="icon" sizes="512x512" href="./icons/icon-512-v25.png" />
 
   <meta name="theme-color" content="#00c896" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="style.css?v=3.6.3" />
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <header class="app-header">
     <h1>TANGO-CHO</h1>
+    <p class="app-subtitle">調べる＋手入力を1画面に統合 / 単語帳 / 4択クイズ</p>
   </header>
 
   <nav class="tab-bar">
-    <div class="tab-inner">
-      <button class="tab-button active" data-section="addSection">追加</button>
-      <button class="tab-button" data-section="listSection">単語帳</button>
-      <button class="tab-button" data-section="quizSection">クイズ</button>
-    </div>
+    <button class="tab-button active" data-section="addSection">追加</button>
+    <button class="tab-button" data-section="listSection">単語帳</button>
+    <button class="tab-button" data-section="quizSection">クイズ</button>
   </nav>
 
   <main class="main">
     <section id="addSection" class="section active">
-      <h2>追加</h2>
+      <h2>追加（検索＋手入力）</h2>
 
       <details class="card" id="settingsCard">
         <summary class="summary">⚙️ 接続設定（HF Spaces） <span id="connStatus" class="conn-status"></span></summary>
@@ -172,11 +170,10 @@
 
   <footer class="app-footer">
     <button id="ttsTestBtn" class="ghost-btn small">🔊 テスト</button>
-    <button id="soundToggleBtn" class="ghost-btn small" title="クイズ効果音">🔔 ON</button>
     <span class="footer-text">発音: Web Speech API / 翻訳: HF Spaces → DeepL</span>
   </footer>
 
-  <script src="script.js?v=3.6.3"></script>
+  <script src="script.js"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
