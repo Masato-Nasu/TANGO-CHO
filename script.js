@@ -11,6 +11,46 @@ const STATUS_LABEL = {
   learned: "覚えた",
 };
 
+// --- Quiz SFX (no external audio files) ---
+let __audioCtx = null;
+function __getAudioCtx(){
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return null;
+  if (!__audioCtx) __audioCtx = new Ctx();
+  if (__audioCtx.state === "suspended") {
+    __audioCtx.resume().catch(() => {});
+  }
+  return __audioCtx;
+}
+function __beep(freq, dur, type="sine", vol=0.14){
+  const ctx = __getAudioCtx();
+  if (!ctx) return;
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = type;
+  o.frequency.value = freq;
+  g.gain.value = vol;
+  o.connect(g);
+  g.connect(ctx.destination);
+  const t = ctx.currentTime;
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.start(t);
+  o.stop(t + dur);
+}
+function sfxCorrect(){
+  __beep(880, 0.08, "sine", 0.12);
+  setTimeout(() => __beep(1320, 0.10, "sine", 0.12), 120);
+}
+function sfxWrong(){
+  __beep(160, 0.22, "sawtooth", 0.18);
+}
+function vib(pattern){
+  try { if (navigator.vibrate) navigator.vibrate(pattern); } catch(e) {}
+}
+
+
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -30,170 +70,11 @@ function saveWords(words) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
 }
 
-let __ttsVoices = [];
-let __ttsVoicesReady = false;
-
-function __loadTtsVoices() {
-  try {
-    if (!("speechSynthesis" in window)) return;
-    const v = window.speechSynthesis.getVoices();
-    if (v && v.length) {
-      __ttsVoices = v;
-      __ttsVoicesReady = true;
-    }
-  } catch (e) {}
-}
-
-function __pickVoiceForLang(lang) {
-  try {
-    if (!lang) return null;
-    if (!__ttsVoicesReady) __loadTtsVoices();
-    const target = String(lang).toLowerCase();
-    // exact match
-    let v = __ttsVoices.find((x) => (x.lang || "").toLowerCase() === target);
-    if (v) return v;
-    // prefix match (en-*, ja-*)
-    const prefix = target.split("-")[0];
-    v = __ttsVoices.find((x) => (x.lang || "").toLowerCase().startsWith(prefix + "-"));
-    return v || null;
-  } catch (e) {
-    return null;
+function speak(text) {
+  if (!("speechSynthesis" in window)) {
+    alert("この端末では音声読み上げが利用できません。");
+    return;
   }
-}
-
-function __detectTtsLang(text) {
-  const t = String(text || "");
-  // Hiragana/Katakana/Kanji
-  return /[ぁ-んァ-ン一-龯]/.test(t) ? "ja-JP" : "en-US";
-}
-
-function speak(text, langHint) {
-  try {
-    if (!("speechSynthesis" in window)) return;
-    const t = String(text || "").trim();
-    if (!t) return;
-
-    const lang = langHint || __detectTtsLang(t);
-
-    const run = () => {
-      try {
-        window.speechSynthesis.cancel();
-        const u = new SpeechSynthesisUtterance(t);
-        u.lang = lang;
-        u.rate = 1.0;
-        u.pitch = 1.0;
-
-        const v = __pickVoiceForLang(lang);
-        if (v) u.voice = v;
-
-        window.speechSynthesis.speak(u);
-      } catch (e) {}
-    };
-
-    // iOS: voices may be empty at first call. Try once immediately, and again very shortly after.
-    const voicesNow = window.speechSynthesis.getVoices();
-    if (!voicesNow || !voicesNow.length) {
-      __loadTtsVoices();
-      run();
-      setTimeout(() => {
-        __loadTtsVoices();
-        run();
-      }, 120);
-      return;
-    }
-
-    __loadTtsVoices();
-    run();
-  } catch (e) {}
-}
-
-// keep voices cache fresh
-if ("speechSynthesis" in window) {
-  __loadTtsVoices();
-  window.speechSynthesis.onvoiceschanged = () => __loadTtsVoices();
-}
-
-// --- Quiz SFX (WebAudio; iOS-safe unlock) ---
-let __audioCtx = null;
-
-function __getAudioCtx() {
-  const Ctx = window.AudioContext || window.webkitAudioContext;
-  if (!Ctx) return null;
-  if (!__audioCtx) __audioCtx = new Ctx();
-  return __audioCtx;
-}
-
-function __unlockAudio() {
-  const ctx = __getAudioCtx();
-  if (!ctx) return;
-  if (ctx.state === "suspended") {
-    // Resume inside a user gesture if possible
-    ctx.resume().catch(() => {});
-  }
-  // A tiny near-silent tick helps iOS reliably unlock audio in PWA mode.
-  try {
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = "sine";
-    o.frequency.value = 440;
-    g.gain.value = 0.00001;
-    o.connect(g);
-    g.connect(ctx.destination);
-    const t = ctx.currentTime;
-    o.start(t);
-    o.stop(t + 0.01);
-  } catch (e) {}
-}
-
-function setupAudioUnlock() {
-  // Bind once: first tap/click/keypress unlocks audio on iOS PWA.
-  const once = () => __unlockAudio();
-  window.addEventListener("pointerdown", once, { once: true, passive: true });
-  window.addEventListener("touchend", once, { once: true, passive: true });
-  window.addEventListener("mousedown", once, { once: true, passive: true });
-  window.addEventListener("keydown", once, { once: true, passive: true });
-}
-
-function __beep(freq, dur, type = "sine", vol = 0.14, offset = 0) {
-  const ctx = __getAudioCtx();
-  if (!ctx) return;
-
-  const start = () => {
-    try {
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.type = type;
-      o.frequency.value = freq;
-
-      const t0 = ctx.currentTime + (offset || 0);
-      g.gain.setValueAtTime(0.0001, t0);
-      g.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-
-      o.connect(g);
-      g.connect(ctx.destination);
-      o.start(t0);
-      o.stop(t0 + dur + 0.02);
-    } catch (e) {}
-  };
-
-  if (ctx.state === "suspended") {
-    ctx.resume().then(start).catch(start);
-  } else {
-    start();
-  }
-}
-
-function sfxCorrect() {
-  __beep(880, 0.10, "sine", 0.15, 0.00);
-  __beep(1320, 0.12, "sine", 0.13, 0.14);
-}
-
-function sfxWrong() {
-  __beep(220, 0.18, "square", 0.14, 0.00);
-  __beep(160, 0.22, "square", 0.12, 0.20);
-}
-
   const u = new SpeechSynthesisUtterance(text);
   u.lang = "en-US";
   u.rate = 0.95;
@@ -525,7 +406,7 @@ function setupAddForm() {
   }
 
 
-  saveBtn.addEventListener("click", () => {
+  saveBtn.addEventListener("click", async () => {
     const w = wordEl.value.trim();
     const m = meaningEl.value.trim();
     if (!w) return setMsg("英単語が空です。", "err");
@@ -582,8 +463,9 @@ function setupAddForm() {
 
     const seen = new Set();
     const baseLower = w.toLowerCase();
-    const existingKey = new Set(words.map((x) => `${String(x.word || "").toLowerCase()}|${String(x.meaning || "")}`));
+    const existingWordLower = new Set(words.map((x) => String(x.word || "").toLowerCase()));
     let synAdded = 0;
+    const synFailed = [];
 
     for (const t of synTokens) {
       const tl = t.toLowerCase();
@@ -591,13 +473,26 @@ function setupAddForm() {
       if (seen.has(tl)) continue;
       seen.add(tl);
 
-      const key = `${tl}|${m}`;
-      if (existingKey.has(key)) continue;
+      // already exists -> skip (do not overwrite)
+      if (existingWordLower.has(tl)) continue;
+
+      // re-translate each synonym before carding (avoid "meaning" reuse)
+      let meaningSyn = "";
+      try {
+        meaningSyn = await translateToJaViaSpace(t);
+      } catch (e) {
+        synFailed.push(t);
+        continue;
+      }
+      if (!meaningSyn) {
+        synFailed.push(t);
+        continue;
+      }
 
       words.push({
         id: `${baseId}-syn-${Math.random().toString(36).slice(2, 8)}`,
         word: t,
-        meaning: m,
+        meaning: meaningSyn,
         status: statusEl.value || "default",
         example: "",
         memo: `同義語（${w}）`,
@@ -606,18 +501,23 @@ function setupAddForm() {
         source: "synonym",
         createdAt: nowIso(),
       });
-      existingKey.add(key);
+      existingWordLower.add(tl);
       synAdded += 1;
     }
+
+    const synFailNote = synFailed.length
+      ? `（類似語の再翻訳失敗: ${synFailed.slice(0, 3).join(", ")}${synFailed.length > 3 ? " 他" + (synFailed.length - 3) : ""}）`
+      : "";
+
 
     saveWords(words);
 
     if (editId) {
       exitEditMode(false);
-      setMsg(`更新しました（入力をクリアしました）。${synAdded ? ` 類似語カード +${synAdded}` : ""}`.trim(), "ok");
+      setMsg(`更新しました（入力をクリアしました）。${synAdded ? ` 類似語カード +${synAdded}` : ""}${synFailNote}`.trim(), "ok");
     } else {
       clearForm(true);
-      setMsg(`保存しました（入力をクリアしました）。${synAdded ? ` 類似語カード +${synAdded}` : ""}`.trim(), "ok");
+      setMsg(`保存しました（入力をクリアしました）。${synAdded ? ` 類似語カード +${synAdded}` : ""}${synFailNote}`.trim(), "ok");
     }
 
     renderWordList();
@@ -891,12 +791,16 @@ function renderQuiz() {
   area.innerHTML = `
     <p class="quiz-mini">${modeLabel}</p>
     <p class="quiz-q">${promptLabel}<br><span style="font-size:1.25rem;">${escapeHtml(q.prompt)}</span></p>
+    <div id="quizResult" class="quiz-result" aria-live="polite"></div>
     <div class="quiz-choices" id="choices"></div>
     <div class="quiz-foot" id="quizFoot"></div>
   `;
 
   const choicesEl = document.getElementById("choices");
   const footEl = document.getElementById("quizFoot");
+  const resultEl = document.getElementById("quizResult");
+  if (resultEl) { resultEl.className = "quiz-result"; resultEl.textContent = ""; }
+
   choicesEl.innerHTML = "";
 
   q.choices.forEach((c) => {
@@ -927,7 +831,18 @@ function onAnswer(selected) {
   const isCorrect = selected === q.correct;
   if (isCorrect) quizState.correct += 1;
 
-  try { (isCorrect ? sfxCorrect : sfxWrong)(); } catch (e) {}
+  // SFX + big mark
+  const resultEl = document.getElementById("quizResult");
+  if (isCorrect) { sfxCorrect(); vib(40); }
+  else { sfxWrong(); vib([60,40,120]); }
+  if (resultEl) {
+    resultEl.classList.add(isCorrect ? "correct" : "wrong");
+    if (isCorrect) {
+      resultEl.innerHTML = `<span class="mark">○</span><span>正解</span>`;
+    } else {
+      resultEl.innerHTML = `<span class="mark">✕</span><span>不正解</span><span class="quiz-mini">正解: ${escapeHtml(q.correct)}</span>`;
+    }
+  }
 
   // mark buttons
   const btns = Array.from(document.querySelectorAll(".choice-btn"));
@@ -1098,8 +1013,6 @@ function setupImport() {
 
 
 document.addEventListener("DOMContentLoaded", () => {
-  try { setupAudioUnlock(); } catch (e) {}
-
   setupTabs();
   setupSettings();
   setupAddForm();
