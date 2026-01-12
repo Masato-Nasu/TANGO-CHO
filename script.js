@@ -41,7 +41,11 @@ function __unlockAudioOnce(){
   if (__audioUnlocked) return;
   const ctx = __getAudioCtx();
   if (!ctx) return;
+
   try {
+    // Resume ASAP (must be called from user gesture). Do not await; just kick.
+    if (ctx.state !== "running") ctx.resume().catch(() => {});
+
     // A near-silent oscillator tick tends to be more reliable than a 1-sample buffer on iOS.
     const o = ctx.createOscillator();
     const g = ctx.createGain();
@@ -49,16 +53,16 @@ function __unlockAudioOnce(){
     o.frequency.value = 440;
     o.connect(g);
     g.connect(ctx.destination);
-    const t = ctx.currentTime;
+    const t = ctx.currentTime + 0.02;
     o.start(t);
-    o.stop(t + 0.01);
+    o.stop(t + 0.02);
   } catch (e) {
     // ignore
   }
+
   __audioUnlocked = true;
-  // Resume ASAP (must be called from user gesture)
-  __resumeAudio();
 }
+
 
 function __beep(freq, dur, type="sine", vol=0.14){
   // Ensure audio is unlocked (iOS)
@@ -66,30 +70,37 @@ function __beep(freq, dur, type="sine", vol=0.14){
   const ctx = __getAudioCtx();
   if (!ctx) return;
 
-  const play = () => {
+  try {
+    // Build the graph synchronously inside the user gesture and schedule it slightly ahead.
+    // This avoids relying on Promise callbacks, which iOS can treat as "not user-initiated".
     const o = ctx.createOscillator();
     const g = ctx.createGain();
-    o.type = type;
-    o.frequency.setValueAtTime(freq, ctx.currentTime);
 
-    const t = ctx.currentTime;
-    // Soft attack/release (avoid clicks) + keep the same overall loudness intent.
+    o.type = type;
+
+    const t = ctx.currentTime + 0.02;
+
+    o.frequency.setValueAtTime(freq, t);
+
+    // Soft attack/release (avoid clicks)
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
 
     o.connect(g);
     g.connect(ctx.destination);
-    o.start(t);
-    o.stop(t + dur + 0.02);
-  };
 
-  if (ctx.state === "running") {
-    play();
-  } else {
-    __resumeAudio().then((ok) => { if (ok) play(); }).catch(() => {});
+    // Schedule start/stop even if the context is currently suspended.
+    o.start(t);
+    o.stop(t + dur + 0.03);
+
+    // Kick resume (no await)
+    if (ctx.state !== "running") ctx.resume().catch(() => {});
+  } catch (e) {
+    // ignore
   }
 }
+
 
 function sfxCorrect(){
   __beep(880, 0.08, "sine", 0.12);
