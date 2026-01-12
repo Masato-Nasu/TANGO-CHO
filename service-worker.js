@@ -1,21 +1,19 @@
-const CACHE = "tango-cho-cache-v3.6.8-root";
+const CACHE = "tango-cho-cache-v3.5.1-root";
 const ASSETS = [
   "./",
   "./index.html",
   "./style.css",
   "./script.js",
   "./manifest.json",
-  "./icons/apple-touch-icon-v26.png",
-  "./icons/icon-192-v26.png",
-  "./icons/icon-512-v26.png",];
+  "./icons/apple-touch-icon-v25.png",
+  "./icons/icon-192-v25.png",
+  "./icons/icon-512-v25.png",];
 
 self.addEventListener("install", (e) => {
-  self.skipWaiting();
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));
 });
 
 self.addEventListener("activate", (e) => {
-  self.clients.claim && self.clients.claim();
   e.waitUntil(
     caches.keys().then((keys) => Promise.all(keys.map((k) => (k !== CACHE ? caches.delete(k) : null))))
   );

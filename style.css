@@ -12,7 +12,7 @@ body{min-height:100vh;display:flex;flex-direction:column}
 .app-header h1{margin:0;font-size:2.0rem;letter-spacing:.04em}
 .app-subtitle{margin:6px 0 0;font-size:1.0rem;color:var(--sub)}
 .tab-bar{display:flex;flex-direction:column;gap:10px;padding:10px 12px 8px;position:sticky;top:0;z-index:10;
-  background:transparent;backdrop-filter:none}
+  background:linear-gradient(to bottom,#111,rgba(17,17,17,.95));backdrop-filter:blur(10px)}
 .tab-button{width:100%;padding:14px 14px;font-size:1.05rem;border-radius:18px;border:1px solid var(--border);
   background:rgba(0,0,0,.4);color:var(--sub);cursor:pointer}
 .tab-button.active{background:var(--accentSoft);border-color:var(--accent);color:var(--accent);font-weight:600}
@@ -110,9 +110,3 @@ details summary::-webkit-details-marker{display:none}
 .edit-banner{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px 14px;border:1px solid var(--border);background:#0f1412;border-radius:16px;margin:10px 0 12px;}
 .edit-title{font-weight:800;font-size:1.05rem;color:var(--text)}
 .edit-sub{flex:1;color:var(--sub);font-size:0.98rem;line-height:1.2}
-
-
-/* Quiz feedback: big marks */
-.choice-btn{position:relative}
-.choice-btn.correct::after{content:"○";position:absolute;right:14px;top:12px;font-size:1.6rem;font-weight:800;color:var(--accent)}
-.choice-btn.wrong::after{content:"✕";position:absolute;right:14px;top:12px;font-size:1.6rem;font-weight:800;color:var(--danger)}

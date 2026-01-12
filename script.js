@@ -2,7 +2,6 @@ const STORAGE_KEY = "tangoChoWords";
 const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
 const FILTER_KEY = "tangoChoFilter";
-const APP_VERSION = "3.6.8";
 
 let editId = null;
 
@@ -11,69 +10,6 @@ const STATUS_LABEL = {
   default: "デフォルト",
   learned: "覚えた",
 };
-// --- Quiz SFX (WebAudio) ---
-// iOS Safari/PWA needs user gesture to unlock audio. We create/resume AudioContext inside clicks.
-let __audioCtx = null;
-
-function getAudioCtx() {
-  const Ctx = window.AudioContext || window.webkitAudioContext;
-  if (!Ctx) return null;
-  if (!__audioCtx) __audioCtx = new Ctx();
-  return __audioCtx;
-}
-
-async function ensureAudioUnlocked() {
-  const ctx = getAudioCtx();
-  if (!ctx) return false;
-  try {
-    if (ctx.state === "suspended") await ctx.resume();
-    return ctx.state === "running";
-  } catch {
-    return false;
-  }
-}
-
-function playTone(freq, durationMs, type = "sine", gainValue = 0.08) {
-  const ctx = getAudioCtx();
-  if (!ctx) return;
-  const now = ctx.currentTime;
-
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = type;
-  osc.frequency.setValueAtTime(freq, now);
-
-  gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(gainValue, now + 0.01);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + durationMs / 1000);
-
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-
-  osc.start(now);
-  osc.stop(now + durationMs / 1000 + 0.02);
-}
-
-async function playQuizSfx(kind) {
-  const ok = await ensureAudioUnlocked();
-  if (!ok) return; // blocked → silent fallback
-
-  if (kind === "correct") {
-    // ピンポン
-    playTone(880, 90, "sine", 0.09);
-    setTimeout(() => playTone(1320, 120, "sine", 0.08), 110);
-  } else if (kind === "wrong") {
-    // ブブー
-    playTone(180, 220, "square", 0.07);
-    setTimeout(() => playTone(140, 260, "square", 0.06), 120);
-  }
-}
-
-// Try to unlock as early as possible (first tap anywhere)
-document.addEventListener("pointerdown", () => { ensureAudioUnlocked(); }, { once: true });
-document.addEventListener("touchstart", () => { ensureAudioUnlocked(); }, { once: true, passive: true });
-
-
 
 function nowIso() {
   return new Date().toISOString();
@@ -94,50 +30,177 @@ function saveWords(words) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
 }
 
-function isJapaneseText(text) {
-  return /[\u3040-\u30FF\u3400-\u9FFF]/.test(String(text || ""));
+let __ttsVoices = [];
+let __ttsVoicesReady = false;
+
+function __loadTtsVoices() {
+  try {
+    if (!("speechSynthesis" in window)) return;
+    const v = window.speechSynthesis.getVoices();
+    if (v && v.length) {
+      __ttsVoices = v;
+      __ttsVoicesReady = true;
+    }
+  } catch (e) {}
 }
 
-let __voices = [];
-function refreshVoices() {
+function __pickVoiceForLang(lang) {
   try {
-    __voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
-  } catch {
-    __voices = [];
+    if (!lang) return null;
+    if (!__ttsVoicesReady) __loadTtsVoices();
+    const target = String(lang).toLowerCase();
+    // exact match
+    let v = __ttsVoices.find((x) => (x.lang || "").toLowerCase() === target);
+    if (v) return v;
+    // prefix match (en-*, ja-*)
+    const prefix = target.split("-")[0];
+    v = __ttsVoices.find((x) => (x.lang || "").toLowerCase().startsWith(prefix + "-"));
+    return v || null;
+  } catch (e) {
+    return null;
   }
 }
-if ("speechSynthesis" in window) {
-  refreshVoices();
-  window.speechSynthesis.onvoiceschanged = refreshVoices;
-}
 
-function pickVoice(lang) {
-  const l = String(lang || "").toLowerCase();
-  if (!__voices || __voices.length === 0) return null;
-  let v = __voices.find((vv) => (vv.lang || "").toLowerCase().startsWith(l));
-  if (v) return v;
-  const base = l.split("-")[0];
-  v = __voices.find((vv) => (vv.lang || "").toLowerCase().startsWith(base));
-  return v || null;
+function __detectTtsLang(text) {
+  const t = String(text || "");
+  // Hiragana/Katakana/Kanji
+  return /[ぁ-んァ-ン一-龯]/.test(t) ? "ja-JP" : "en-US";
 }
 
 function speak(text, langHint) {
-  if (!("speechSynthesis" in window)) {
-    alert("この端末では音声読み上げが利用できません。");
-    return;
+  try {
+    if (!("speechSynthesis" in window)) return;
+    const t = String(text || "").trim();
+    if (!t) return;
+
+    const lang = langHint || __detectTtsLang(t);
+
+    const run = () => {
+      try {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(t);
+        u.lang = lang;
+        u.rate = 1.0;
+        u.pitch = 1.0;
+
+        const v = __pickVoiceForLang(lang);
+        if (v) u.voice = v;
+
+        window.speechSynthesis.speak(u);
+      } catch (e) {}
+    };
+
+    // iOS: voices may be empty at first call. Try once immediately, and again very shortly after.
+    const voicesNow = window.speechSynthesis.getVoices();
+    if (!voicesNow || !voicesNow.length) {
+      __loadTtsVoices();
+      run();
+      setTimeout(() => {
+        __loadTtsVoices();
+        run();
+      }, 120);
+      return;
+    }
+
+    __loadTtsVoices();
+    run();
+  } catch (e) {}
+}
+
+// keep voices cache fresh
+if ("speechSynthesis" in window) {
+  __loadTtsVoices();
+  window.speechSynthesis.onvoiceschanged = () => __loadTtsVoices();
+}
+
+// --- Quiz SFX (WebAudio; iOS-safe unlock) ---
+let __audioCtx = null;
+
+function __getAudioCtx() {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return null;
+  if (!__audioCtx) __audioCtx = new Ctx();
+  return __audioCtx;
+}
+
+function __unlockAudio() {
+  const ctx = __getAudioCtx();
+  if (!ctx) return;
+  if (ctx.state === "suspended") {
+    // Resume inside a user gesture if possible
+    ctx.resume().catch(() => {});
   }
-  const lang = langHint || (isJapaneseText(text) ? "ja-JP" : "en-US");
-  const u = new SpeechSynthesisUtterance(String(text || ""));
-  u.lang = lang;
+  // A tiny near-silent tick helps iOS reliably unlock audio in PWA mode.
+  try {
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = "sine";
+    o.frequency.value = 440;
+    g.gain.value = 0.00001;
+    o.connect(g);
+    g.connect(ctx.destination);
+    const t = ctx.currentTime;
+    o.start(t);
+    o.stop(t + 0.01);
+  } catch (e) {}
+}
+
+function setupAudioUnlock() {
+  // Bind once: first tap/click/keypress unlocks audio on iOS PWA.
+  const once = () => __unlockAudio();
+  window.addEventListener("pointerdown", once, { once: true, passive: true });
+  window.addEventListener("touchend", once, { once: true, passive: true });
+  window.addEventListener("mousedown", once, { once: true, passive: true });
+  window.addEventListener("keydown", once, { once: true, passive: true });
+}
+
+function __beep(freq, dur, type = "sine", vol = 0.14, offset = 0) {
+  const ctx = __getAudioCtx();
+  if (!ctx) return;
+
+  const start = () => {
+    try {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = type;
+      o.frequency.value = freq;
+
+      const t0 = ctx.currentTime + (offset || 0);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+
+      o.connect(g);
+      g.connect(ctx.destination);
+      o.start(t0);
+      o.stop(t0 + dur + 0.02);
+    } catch (e) {}
+  };
+
+  if (ctx.state === "suspended") {
+    ctx.resume().then(start).catch(start);
+  } else {
+    start();
+  }
+}
+
+function sfxCorrect() {
+  __beep(880, 0.10, "sine", 0.15, 0.00);
+  __beep(1320, 0.12, "sine", 0.13, 0.14);
+}
+
+function sfxWrong() {
+  __beep(220, 0.18, "square", 0.14, 0.00);
+  __beep(160, 0.22, "square", 0.12, 0.20);
+}
+
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "en-US";
   u.rate = 0.95;
-
-  refreshVoices();
-  const v = pickVoice(lang);
-  if (v) u.voice = v;
-
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(u);
 }
+
 function setMsg(text, kind) {
   const el = document.getElementById("msg");
   if (!el) return;
@@ -703,61 +766,35 @@ function setupFilter() {
   });
 }
 
-
 function setupExport() {
   const btn = document.getElementById("exportBtn");
   if (!btn) return;
-
-  btn.addEventListener("click", async () => {
+  btn.addEventListener("click", () => {
     const words = loadWords();
-    const now = new Date();
-    const ts = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
-    const filename = `tango-cho-backup-${ts}.json`;
-
-    const payload = {
-      app: "TANGO-CHO",
-      version: APP_VERSION,
-      exportedAt: now.toISOString(),
-      words
-    };
-    const jsonText = JSON.stringify(payload, null, 2);
-    const blob = new Blob([jsonText], { type: "application/json" });
-
-    // Best for iPhone: Web Share →「ファイルに保存」
-    try {
-      const file = new File([blob], filename, { type: "application/json" });
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ title: "TANGO-CHO JSONバックアップ", files: [file] });
-        setListMsg("JSONを共有しました。iPhoneなら「ファイルに保存」で保存できます。", "ok");
-        return;
-      }
-    } catch {
-      // ignore → fallback
-    }
-
+    const blob = new Blob([JSON.stringify(words, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
-    const ua = navigator.userAgent || "";
-    const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
-
-    if (isIOS) {
-      // iOSはdownload属性が効きにくい → 新規タブで開く → 共有から保存
-      window.open(url, "_blank");
-      setListMsg("JSONを新しいタブで開きました。共有 →「ファイルに保存」で保存してください。", "ok");
-      setTimeout(() => URL.revokeObjectURL(url), 8000);
-      return;
-    }
-
     const a = document.createElement("a");
+    const now = new Date();
+    const ts = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
     a.href = url;
-    a.download = filename;
+    a.download = `tango-cho-backup-${ts}.json`;
     document.body.appendChild(a);
     a.click();
     a.remove();
-    setListMsg("JSONを保存しました。", "ok");
-    setTimeout(() => URL.revokeObjectURL(url), 3000);
+    URL.revokeObjectURL(url);
   });
 }
 
+// --------------------
+// Quiz (4-choice)
+// --------------------
+let quizState = {
+  active: false,
+  current: null,
+  answered: false,
+  correct: 0,
+  total: 0,
+};
 
 function choiceShuffle(arr) {
   const a = [...arr];
@@ -888,8 +925,9 @@ function onAnswer(selected) {
 
   const q = quizState.current;
   const isCorrect = selected === q.correct;
-  playQuizSfx(isCorrect ? "correct" : "wrong");
   if (isCorrect) quizState.correct += 1;
+
+  try { (isCorrect ? sfxCorrect : sfxWrong)(); } catch (e) {}
 
   // mark buttons
   const btns = Array.from(document.querySelectorAll(".choice-btn"));
@@ -906,7 +944,7 @@ function onAnswer(selected) {
     const msg = document.createElement("div");
     msg.className = "quiz-mini";
     msg.style.marginTop = "6px";
-    msg.textContent = isCorrect ? "○ 正解！" : `不正解（正解: ${q.correct}）`;
+    msg.textContent = isCorrect ? "正解！" : `不正解（正解: ${q.correct}）`;
     footEl.appendChild(msg);
 
     const actions = document.createElement("div");
@@ -1060,6 +1098,8 @@ function setupImport() {
 
 
 document.addEventListener("DOMContentLoaded", () => {
+  try { setupAudioUnlock(); } catch (e) {}
+
   setupTabs();
   setupSettings();
   setupAddForm();
