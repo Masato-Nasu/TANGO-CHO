@@ -64,11 +64,14 @@ function __beep(freq, dur, type="sine", vol=0.14){
   o.stop(t + dur);
 }
 function sfxCorrect(){
-  __beep(880, 0.08, "sine", 0.12);
-  setTimeout(() => __beep(1320, 0.10, "sine", 0.12), 120);
+// "ピンポン" (two bright taps)
+__beep(1046.5, 0.06, "sine", 0.13); // C6
+setTimeout(() => __beep(1568.0, 0.07, "sine", 0.13), 90); // G6
 }
 function sfxWrong(){
-  __beep(160, 0.22, "sawtooth", 0.18);
+// "ブブー" (low buzzer)
+__beep(220, 0.10, "sawtooth", 0.18);
+setTimeout(() => __beep(196, 0.20, "sawtooth", 0.18), 90);
 }
 function vib(pattern){
   try { if (navigator.vibrate) navigator.vibrate(pattern); } catch(e) {}
