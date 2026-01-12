@@ -14,6 +14,7 @@ const STATUS_LABEL = {
 // --- Quiz SFX (no external audio files) ---
 let __audioCtx = null;
 let __audioUnlocked = false;
+let __audioResumePromise = null;
 
 function __getAudioCtx(){
   const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -22,79 +23,81 @@ function __getAudioCtx(){
   return __audioCtx;
 }
 
-function __unlockAudio(){
+function __resumeAudio(){
   const ctx = __getAudioCtx();
-  if (!ctx) return;
-  // iOS: must be resumed from a user gesture at least once
-  if (__audioUnlocked && ctx.state === "running") return;
-
-  const doSilentKick = () => {
-    try {
-      const buf = ctx.createBuffer(1, 1, 22050);
-      const src = ctx.createBufferSource();
-      src.buffer = buf;
-      src.connect(ctx.destination);
-      src.start(0);
-      src.stop(0);
-    } catch {}
-  };
-
-  if (ctx.state === "suspended") {
-    ctx.resume().then(() => {
-      doSilentKick();
-      __audioUnlocked = true;
-    }).catch(() => {});
-  } else {
-    doSilentKick();
-    __audioUnlocked = true;
-  }
+  if (!ctx) return Promise.resolve(false);
+  if (ctx.state === "running") return Promise.resolve(true);
+  if (__audioResumePromise) return __audioResumePromise;
+  __audioResumePromise = ctx.resume()
+    .then(() => true)
+    .catch(() => false)
+    .finally(() => { __audioResumePromise = null; });
+  return __audioResumePromise;
 }
 
-// One-time global unlock (works best on iOS/Safari/PWA)
-["pointerdown","touchstart","keydown"].forEach((evt) => {
-  document.addEventListener(evt, __unlockAudio, { once: true, passive: true, capture: true });
-});
-
-function __playBeep(ctx, freq, dur, type="sine", vol=0.14){
-  const o = ctx.createOscillator();
-  const g = ctx.createGain();
-  o.type = type;
-  o.frequency.value = freq;
-  o.connect(g);
-  g.connect(ctx.destination);
-  const t = ctx.currentTime;
-  g.gain.setValueAtTime(vol, t);
-  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-  o.start(t);
-  o.stop(t + dur);
+// iOS (Safari/PWA) often requires an explicit "unlock" on a user gesture
+// before WebAudio will produce sound. We do this once, without changing UI.
+function __unlockAudioOnce(){
+  if (__audioUnlocked) return;
+  const ctx = __getAudioCtx();
+  if (!ctx) return;
+  try {
+    // A near-silent oscillator tick tends to be more reliable than a 1-sample buffer on iOS.
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    g.gain.value = 0.0001;
+    o.frequency.value = 440;
+    o.connect(g);
+    g.connect(ctx.destination);
+    const t = ctx.currentTime;
+    o.start(t);
+    o.stop(t + 0.01);
+  } catch (e) {
+    // ignore
+  }
+  __audioUnlocked = true;
+  // Resume ASAP (must be called from user gesture)
+  __resumeAudio();
 }
 
 function __beep(freq, dur, type="sine", vol=0.14){
+  // Ensure audio is unlocked (iOS)
+  __unlockAudioOnce();
   const ctx = __getAudioCtx();
   if (!ctx) return;
 
-  // Ensure unlocked on iOS; if still suspended, resume then play.
-  __unlockAudio();
-  if (ctx.state === "suspended") {
-    ctx.resume().then(() => __playBeep(ctx, freq, dur, type, vol)).catch(() => {});
-    return;
+  const play = () => {
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, ctx.currentTime);
+
+    const t = ctx.currentTime;
+    // Soft attack/release (avoid clicks) + keep the same overall loudness intent.
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+
+    o.connect(g);
+    g.connect(ctx.destination);
+    o.start(t);
+    o.stop(t + dur + 0.02);
+  };
+
+  if (ctx.state === "running") {
+    play();
+  } else {
+    __resumeAudio().then((ok) => { if (ok) play(); }).catch(() => {});
   }
-  __playBeep(ctx, freq, dur, type, vol);
 }
 
-// "ピンポン" / "ブブー" SFX
 function sfxCorrect(){
-  // ping
-  __beep(988, 0.08, "sine", 0.12);
-  // pong
-  setTimeout(() => __beep(1319, 0.10, "sine", 0.12), 120);
+  __beep(880, 0.08, "sine", 0.12);
+  setTimeout(() => __beep(1320, 0.10, "sine", 0.12), 120);
 }
 function sfxWrong(){
-  // buzzer (low + slight second tone)
-  __beep(196, 0.22, "sawtooth", 0.18);
-  setTimeout(() => __beep(165, 0.18, "square", 0.12), 120);
+  __beep(160, 0.22, "sawtooth", 0.18);
 }
-
 function vib(pattern){
   try { if (navigator.vibrate) navigator.vibrate(pattern); } catch(e) {}
 }
@@ -120,14 +123,49 @@ function saveWords(words) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
 }
 
+// --- TTS: ensure English voice on iPhone/iOS ---
+let __preferredEnVoice = null;
+function __pickEnglishVoice(voices){
+  if (!Array.isArray(voices) || voices.length === 0) return null;
+  function score(v){
+    const lang = String(v?.lang || "").toLowerCase();
+    const name = String(v?.name || "").toLowerCase();
+    let s = 0;
+    if (lang === "en-us") s += 120;
+    if (lang === "en-gb") s += 110;
+    if (lang.startsWith("en-")) s += 100;
+    if (lang.startsWith("en")) s += 80;
+    if (v?.localService) s += 5;
+    // Avoid Japanese voices that can be chosen as default on some iPhones
+    if (name.includes("kyoko") || name.includes("otoya") || name.includes("japanese")) s -= 80;
+    return s;
+  }
+  const sorted = [...voices].sort((a,b) => score(b) - score(a));
+  const best = sorted[0];
+  return score(best) > 0 ? best : null;
+}
+function __loadVoices(){
+  try {
+    const voices = window.speechSynthesis?.getVoices?.() || [];
+    if (voices.length) {
+      __preferredEnVoice = __pickEnglishVoice(voices);
+    }
+  } catch(e) {}
+}
+
 function speak(text) {
   if (!("speechSynthesis" in window)) {
     alert("この端末では音声読み上げが利用できません。");
     return;
   }
+
+  // iOS loads voices asynchronously. Try to cache an English voice.
+  __loadVoices();
+
   const u = new SpeechSynthesisUtterance(text);
   u.lang = "en-US";
   u.rate = 0.95;
+  if (__preferredEnVoice) u.voice = __preferredEnVoice;
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(u);
 }
@@ -1063,6 +1101,20 @@ function setupImport() {
 
 
 document.addEventListener("DOMContentLoaded", () => {
+  // Prime iOS audio + voices with the first user gesture (no UI changes)
+  const __primeOnce = () => {
+    __unlockAudioOnce();
+    __loadVoices();
+  };
+  ["pointerdown","touchstart","mousedown","keydown"].forEach((ev) => {
+    document.addEventListener(ev, __primeOnce, { once: true, passive: true });
+  });
+  try {
+    window.speechSynthesis?.addEventListener?.("voiceschanged", __loadVoices);
+    // Some iOS versions don't fire voiceschanged reliably; try again shortly.
+    setTimeout(__loadVoices, 250);
+  } catch(e) {}
+
   setupTabs();
   setupSettings();
   setupAddForm();
