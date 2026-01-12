@@ -13,6 +13,7 @@ const STATUS_LABEL = {
 
 // --- Quiz SFX (no external audio files) ---
 let __audioCtx = null;
+let __audioUnlocked = false;
 function __getAudioCtx(){
   const Ctx = window.AudioContext || window.webkitAudioContext;
   if (!Ctx) return null;
@@ -22,7 +23,31 @@ function __getAudioCtx(){
   }
   return __audioCtx;
 }
+
+// iOS (Safari/PWA) often requires an explicit "unlock" on a user gesture
+// before WebAudio will produce sound. We do this once, without changing UI.
+function __unlockAudioOnce(){
+  if (__audioUnlocked) return;
+  const ctx = __getAudioCtx();
+  if (!ctx) return;
+  try {
+    // A 1-sample silent buffer played once is a common unlock trick.
+    const buffer = ctx.createBuffer(1, 1, ctx.sampleRate || 44100);
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(ctx.destination);
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
+    src.start(0);
+    __audioUnlocked = true;
+  } catch (e) {
+    // ignore
+  }
+}
 function __beep(freq, dur, type="sine", vol=0.14){
+  // Ensure audio is unlocked (iOS)
+  __unlockAudioOnce();
   const ctx = __getAudioCtx();
   if (!ctx) return;
   const o = ctx.createOscillator();
@@ -70,14 +95,49 @@ function saveWords(words) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
 }
 
+// --- TTS: ensure English voice on iPhone/iOS ---
+let __preferredEnVoice = null;
+function __pickEnglishVoice(voices){
+  if (!Array.isArray(voices) || voices.length === 0) return null;
+  function score(v){
+    const lang = String(v?.lang || "").toLowerCase();
+    const name = String(v?.name || "").toLowerCase();
+    let s = 0;
+    if (lang === "en-us") s += 120;
+    if (lang === "en-gb") s += 110;
+    if (lang.startsWith("en-")) s += 100;
+    if (lang.startsWith("en")) s += 80;
+    if (v?.localService) s += 5;
+    // Avoid Japanese voices that can be chosen as default on some iPhones
+    if (name.includes("kyoko") || name.includes("otoya") || name.includes("japanese")) s -= 80;
+    return s;
+  }
+  const sorted = [...voices].sort((a,b) => score(b) - score(a));
+  const best = sorted[0];
+  return score(best) > 0 ? best : null;
+}
+function __loadVoices(){
+  try {
+    const voices = window.speechSynthesis?.getVoices?.() || [];
+    if (voices.length) {
+      __preferredEnVoice = __pickEnglishVoice(voices);
+    }
+  } catch(e) {}
+}
+
 function speak(text) {
   if (!("speechSynthesis" in window)) {
     alert("この端末では音声読み上げが利用できません。");
     return;
   }
+
+  // iOS loads voices asynchronously. Try to cache an English voice.
+  __loadVoices();
+
   const u = new SpeechSynthesisUtterance(text);
   u.lang = "en-US";
   u.rate = 0.95;
+  if (__preferredEnVoice) u.voice = __preferredEnVoice;
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(u);
 }
@@ -1013,6 +1073,20 @@ function setupImport() {
 
 
 document.addEventListener("DOMContentLoaded", () => {
+  // Prime iOS audio + voices with the first user gesture (no UI changes)
+  const __primeOnce = () => {
+    __unlockAudioOnce();
+    __loadVoices();
+  };
+  ["pointerdown","touchstart","mousedown","keydown"].forEach((ev) => {
+    document.addEventListener(ev, __primeOnce, { once: true, passive: true });
+  });
+  try {
+    window.speechSynthesis?.addEventListener?.("voiceschanged", __loadVoices);
+    // Some iOS versions don't fire voiceschanged reliably; try again shortly.
+    setTimeout(__loadVoices, 250);
+  } catch(e) {}
+
   setupTabs();
   setupSettings();
   setupAddForm();
