@@ -2,6 +2,7 @@ const STORAGE_KEY = "tangoChoWords";
 const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
 const FILTER_KEY = "tangoChoFilter";
+const SORT_KEY = "tangoChoSort";
 
 let editId = null;
 
@@ -670,12 +671,19 @@ function renderWordList() {
   const listEl = document.getElementById("wordList");
   const countEl = document.getElementById("wordCount");
   const filter = (localStorage.getItem(FILTER_KEY) || "all").trim();
+  const sortOrder = (localStorage.getItem(SORT_KEY) || "time").trim();
   const all = loadWords();
 
   if (countEl) countEl.textContent = String(all.length);
   if (!listEl) return;
 
-  let words = [...all].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+  let words = [...all];
+  if (sortOrder === "alpha") {
+    words.sort((a, b) => String(a.word || "").toLowerCase().localeCompare(String(b.word || "").toLowerCase()));
+  } else {
+    // time (default): newest first
+    words.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+  }
   if (filter !== "all") words = words.filter((w) => (w.status || "default") === filter);
 
   listEl.innerHTML = "";
@@ -807,6 +815,16 @@ function setupFilter() {
   });
 }
 
+function setupSort() {
+  const sel = document.getElementById("sortOrder");
+  if (!sel) return;
+  sel.value = (localStorage.getItem(SORT_KEY) || "time").trim();
+  sel.addEventListener("change", () => {
+    localStorage.setItem(SORT_KEY, sel.value);
+    renderWordList();
+  });
+}
+
 function setupExport() {
   const btn = document.getElementById("exportBtn");
   if (!btn) return;
@@ -916,6 +934,7 @@ function renderQuiz() {
   if (!quizState.active || !quizState.current) {
     area.innerHTML = `<p class="note">「出題」を押すと始まります。※ 4択クイズは、単語が最低4つ必要です。</p>`;
     nextBtn.disabled = true;
+    nextBtn.style.display = "none";
     return;
   }
 
@@ -923,6 +942,7 @@ function renderQuiz() {
   if (q.error) {
     area.innerHTML = `<p class="note" style="color:#ff4f4f;">${q.error}</p>`;
     nextBtn.disabled = true;
+    nextBtn.style.display = "none";
     return;
   }
 
@@ -933,14 +953,18 @@ function renderQuiz() {
     <p class="quiz-mini">${modeLabel}</p>
     <p class="quiz-q">${promptLabel}<br><span style="font-size:1.25rem;">${escapeHtml(q.prompt)}</span></p>
     <div id="quizResult" class="quiz-result" aria-live="polite"></div>
+    <div id="quizReveal" class="quiz-reveal" aria-live="polite"></div>
     <div class="quiz-choices" id="choices"></div>
     <div class="quiz-foot" id="quizFoot"></div>
+    <div id="quizNextWrap" class="quiz-next-wrap"></div>
   `;
 
   const choicesEl = document.getElementById("choices");
   const footEl = document.getElementById("quizFoot");
   const resultEl = document.getElementById("quizResult");
+  const revealEl = document.getElementById("quizReveal");
   if (resultEl) { resultEl.className = "quiz-result"; resultEl.textContent = ""; }
+  if (revealEl) revealEl.innerHTML = "";
 
   choicesEl.innerHTML = "";
 
@@ -954,6 +978,13 @@ function renderQuiz() {
   });
 
   footEl.innerHTML = `<span class="quiz-mini">出題元カテゴリ: ${STATUS_LABEL[q.target.status || "default"]}</span>`;
+  // Move the existing next button to the bottom of the quiz area (full width)
+  const nextWrap = document.getElementById("quizNextWrap");
+  if (nextWrap && nextBtn.parentElement !== nextWrap) {
+    nextWrap.appendChild(nextBtn);
+  }
+  nextBtn.classList.add("full-width", "quiz-next-btn");
+  nextBtn.style.display = "";
   nextBtn.disabled = !quizState.answered;
 }
 
@@ -982,6 +1013,21 @@ function onAnswer(selected) {
       resultEl.innerHTML = `<span class="mark">○</span><span>正解</span>`;
     } else {
       resultEl.innerHTML = `<span class="mark">✕</span><span>不正解</span><span class="quiz-mini">正解: ${escapeHtml(q.correct)}</span>`;
+    }
+  }
+
+  // After answering: always show "English word" and its Japanese meaning (under the word)
+  const revealEl = document.getElementById("quizReveal");
+  if (revealEl) {
+    const en = q.target?.word || "";
+    const ja = q.target?.meaning || "";
+    if (en || ja) {
+      revealEl.innerHTML = `
+        <div class="quiz-reveal-word">${escapeHtml(en)}</div>
+        <div class="quiz-reveal-meaning">${escapeHtml(ja)}</div>
+      `;
+    } else {
+      revealEl.textContent = "";
     }
   }
 
@@ -1173,6 +1219,7 @@ document.addEventListener("DOMContentLoaded", () => {
   setupSettings();
   setupAddForm();
   setupFilter();
+  setupSort();
   setupExport();
   setupImport();
   setupQuiz();

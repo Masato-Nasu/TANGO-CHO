@@ -120,5 +120,11 @@ details summary::-webkit-details-marker{display:none}
 .quiz-result.correct{color:var(--accent);}
 .quiz-result.wrong{color:var(--danger);}
 
+.quiz-reveal{margin-top:6px;margin-bottom:6px;}
+.quiz-reveal-word{font-size:1.05rem;font-weight:800;letter-spacing:0.01em;}
+.quiz-reveal-meaning{margin-top:4px;font-size:0.95rem;opacity:0.9;}
+.quiz-next-wrap{margin-top:10px;}
+.quiz-next-btn{height:46px;}
+
 .choice-btn.correct::after{content:"○";position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:1.5rem;font-weight:900;color:var(--accent)}
 .choice-btn.wrong::after{content:"✕";position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:1.5rem;font-weight:900;color:var(--danger)}
