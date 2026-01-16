@@ -22,8 +22,6 @@
 
 ## 📸 Screenshots
 
-> `screenshot1.png`〜`screenshot4.png` をリポジトリ直下に置いてください。
-
 | | |
 |---|---|
 | ![Screenshot 1](./screenshot1.png) | ![Screenshot 2](./screenshot2.png) |
