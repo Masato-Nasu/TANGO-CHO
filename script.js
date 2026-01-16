@@ -893,6 +893,15 @@ function buildQuestion(mode, pool) {
   const poolWords = getPoolWords(pool);
   if (poolWords.length < 4) return { error: "4択クイズには、同じ出題カテゴリ内に単語が最低4つ必要です。" };
 
+  // For 日→英 (ja2en): show Japanese meaning under each English choice.
+  // Build a quick lookup table: { [word]: meaning }
+  const wordToMeaning = {};
+  for (const w of poolWords) {
+    const k = (w && w.word) ? String(w.word) : "";
+    if (!k) continue;
+    if (wordToMeaning[k] == null) wordToMeaning[k] = String(w.meaning || "");
+  }
+
   const target = weightedPick(poolWords, w => statusWeight(w.status || "default"));
 
   const prompt = mode === "en2ja" ? target.word : (target.meaning || "");
@@ -920,7 +929,7 @@ function buildQuestion(mode, pool) {
 
   const choices = choiceShuffle([correct, ...distract]);
 
-  return { target, mode, prompt, correct, choices };
+  return { target, mode, prompt, correct, choices, wordToMeaning };
 }
 
 function renderQuiz() {
@@ -971,7 +980,16 @@ function renderQuiz() {
   q.choices.forEach((c) => {
     const b = document.createElement("button");
     b.className = "choice-btn";
-    b.textContent = c;
+    // 日→英クイズは「英単語（選択肢）」の下に日本語訳も表示する
+    if (q.mode === "ja2en") {
+      const ja = (q.wordToMeaning && q.wordToMeaning[c]) ? q.wordToMeaning[c] : "";
+      b.innerHTML = `
+        <div class="choice-main">${escapeHtml(c)}</div>
+        <div class="choice-sub">${escapeHtml(ja)}</div>
+      `;
+    } else {
+      b.textContent = c;
+    }
     b.disabled = quizState.answered;
     b.addEventListener("click", () => onAnswer(c));
     choicesEl.appendChild(b);
