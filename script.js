@@ -980,12 +980,14 @@ function renderQuiz() {
   q.choices.forEach((c) => {
     const b = document.createElement("button");
     b.className = "choice-btn";
-    // 日→英クイズは「英単語（選択肢）」の下に日本語訳も表示する
+    // keep the raw choice for marking (don't rely on textContent because we may add subtext)
+    b.dataset.choice = c;
     if (q.mode === "ja2en") {
+      // 日→英クイズ：日本語訳は「解答後のみ」表示する
       const ja = (q.wordToMeaning && q.wordToMeaning[c]) ? q.wordToMeaning[c] : "";
       b.innerHTML = `
         <div class="choice-main">${escapeHtml(c)}</div>
-        <div class="choice-sub">${escapeHtml(ja)}</div>
+        <div class="choice-sub" data-ja="${escapeHtml(ja)}"></div>
       `;
     } else {
       b.textContent = c;
@@ -1030,31 +1032,49 @@ function onAnswer(selected) {
     if (isCorrect) {
       resultEl.innerHTML = `<span class="mark">○</span><span>正解</span>`;
     } else {
-      resultEl.innerHTML = `<span class="mark">✕</span><span>不正解</span><span class="quiz-mini">正解: ${escapeHtml(q.correct)}</span>`;
+      // Avoid duplicate "answer" display; the correct answer is revealed below.
+      resultEl.innerHTML = `<span class="mark">✕</span><span>不正解</span>`;
     }
   }
 
-  // After answering: always show "English word" and its Japanese meaning (under the word)
+  // After answering: reveal the answer (minimal, without duplicating the prompt)
   const revealEl = document.getElementById("quizReveal");
   if (revealEl) {
     const en = q.target?.word || "";
     const ja = q.target?.meaning || "";
-    if (en || ja) {
-      revealEl.innerHTML = `
-        <div class="quiz-reveal-word">${escapeHtml(en)}</div>
-        <div class="quiz-reveal-meaning">${escapeHtml(ja)}</div>
-      `;
+    if (q.mode === "ja2en") {
+      // Prompt already shows Japanese meaning; reveal only the English word to avoid duplication.
+      revealEl.innerHTML = en ? `<div class="quiz-reveal-word">${escapeHtml(en)}</div>` : "";
     } else {
-      revealEl.textContent = "";
+      // en2ja: reveal both English + Japanese
+      if (en || ja) {
+        revealEl.innerHTML = `
+          <div class="quiz-reveal-word">${escapeHtml(en)}</div>
+          <div class="quiz-reveal-meaning">${escapeHtml(ja)}</div>
+        `;
+      } else {
+        revealEl.textContent = "";
+      }
     }
+  }
+
+  // 日→英：解答後のみ、各選択肢の下に日本語訳を表示
+  if (q.mode === "ja2en") {
+    const btns = Array.from(document.querySelectorAll(".choice-btn"));
+    btns.forEach((b) => {
+      const sub = b.querySelector(".choice-sub");
+      if (!sub) return;
+      const ja = sub.getAttribute("data-ja") || "";
+      sub.textContent = ja;
+    });
   }
 
   // mark buttons
   const btns = Array.from(document.querySelectorAll(".choice-btn"));
   btns.forEach((b) => {
-    const txt = b.textContent;
-    if (txt === q.correct) b.classList.add("correct");
-    if (txt === selected && !isCorrect) b.classList.add("wrong");
+    const choice = b.dataset.choice || "";
+    if (choice === q.correct) b.classList.add("correct");
+    if (choice === selected && !isCorrect) b.classList.add("wrong");
     b.disabled = true;
   });
 
@@ -1064,7 +1084,8 @@ function onAnswer(selected) {
     const msg = document.createElement("div");
     msg.className = "quiz-mini";
     msg.style.marginTop = "6px";
-    msg.textContent = isCorrect ? "正解！" : `不正解（正解: ${q.correct}）`;
+    // Avoid showing the correct answer text redundantly; it's revealed in the main reveal area.
+    msg.textContent = isCorrect ? "正解！" : "不正解";
     footEl.appendChild(msg);
 
     const actions = document.createElement("div");

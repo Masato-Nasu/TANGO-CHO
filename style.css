@@ -81,6 +81,7 @@ details summary::-webkit-details-marker{display:none}
 /* 日→英クイズ: 選択肢（英単語）の下に日本語訳を表示 */
 .choice-main{font-weight:700;line-height:1.2}
 .choice-sub{margin-top:6px;font-size:0.92rem;color:var(--sub);line-height:1.25}
+.choice-sub:empty{display:none}
 .choice-btn.correct{border-color:var(--accent);background:rgba(0,200,150,.12)}
 .choice-btn.wrong{border-color:var(--danger);background:rgba(255,79,79,.10)}
 .quiz-foot{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
