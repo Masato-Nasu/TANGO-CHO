@@ -1,4 +1,4 @@
-const CACHE_NAME = "tango-cho-cache-v3.7.6-root";
+const CACHE_NAME = "tango-cho-cache-v3.7.7-root";
 const ASSETS = [
   "./",
   "./index.html",
@@ -19,6 +19,7 @@ self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys().then((keys) => Promise.all(keys.map((k) => (k !== CACHE_NAME ? caches.delete(k) : null))))
   );
+  self.clients.claim();
 });
 
 self.addEventListener("fetch", (e) => {
@@ -36,8 +37,6 @@ self.addEventListener("fetch", (e) => {
     caches.open(CACHE_NAME).then(async (cache) => {
       if (isNav) {
         const cachedIndex = await cache.match("./index.html", { ignoreSearch: true });
-        if (cachedIndex) return cachedIndex;
-
         try {
           const fresh = await fetch("./index.html", { cache: "no-store" });
           if (fresh && fresh.ok) cache.put("./index.html", fresh.clone());

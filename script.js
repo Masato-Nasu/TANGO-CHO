@@ -32,7 +32,39 @@ function __playHtmlAudio(src, vol=1.0) {
     const a = new Audio(src);
     a.preload = "auto";
     a.volume = vol;
-    // Ensure starts from head even on rapid taps
+    /
+
+  // 0) Direct query params (bookmarklet/shortcut)
+  const fromQuery = (() => {
+    try {
+      const u = new URL(location.href);
+      const w = (u.searchParams.get("word") || "").trim();
+      const q = (u.searchParams.get("q") || "").trim();
+      const t = (u.searchParams.get("text") || "").trim();
+      const best = w || q || t;
+      return best ? best.trim() : "";
+    } catch {
+      return "";
+    }
+  })();
+
+  if (fromQuery) {
+    const wordEl = document.getElementById("word");
+    const meaningEl = document.getElementById("meaning");
+    if (wordEl) {
+      const picked = normalizeSharedText(fromQuery);
+      if (picked) {
+        wordEl.value = picked;
+        if (meaningEl) meaningEl.value = "";
+        switchToAddTab();
+        setMsg("外部から受け取ったテキストを追加フォームに入れました。", "ok");
+      }
+    }
+    return;
+  }
+
+  // 1) If we're on share-target.html (opened by Android share sheet/bookmarklet), store payload.
+  /// Ensure starts from head even on rapid taps
     a.currentTime = 0;
     const p = a.play();
     if (p && typeof p.catch === "function") p.catch(() => {});
@@ -374,10 +406,12 @@ function switchToAddTab() {
 function extractShareTextFromUrl() {
   try {
     const u = new URL(location.href);
+    const w = (u.searchParams.get("word") || "").trim();
     const t = (u.searchParams.get("text") || "").trim();
     const title = (u.searchParams.get("title") || "").trim();
     const url = (u.searchParams.get("url") || "").trim();
-    const best = t || title || url;
+    const q = (u.searchParams.get("q") || "").trim();
+    const best = w || t || q || title || url;
     return best ? best.trim() : "";
   } catch {
     return "";
@@ -406,6 +440,30 @@ function consumeIncomingShareToAddForm() {
   }
 
   // 2) On index.html: prefill Add form once.
+
+  // 2-a) Direct deep link: index.html?word=... / ?text=... (shortcut/bookmarklet fallback)
+  const direct = extractShareTextFromUrl();
+  if (direct) {
+    const wordEl = document.getElementById("word");
+    const meaningEl = document.getElementById("meaning");
+    if (wordEl) {
+      const picked = normalizeSharedText(direct);
+      if (picked) {
+        wordEl.value = picked;
+        if (meaningEl) meaningEl.value = "";
+        switchToAddTab();
+        // Clean URL (keep the app tidy)
+        try {
+          const u = new URL(location.href);
+          u.search = "";
+          history.replaceState(null, "", u.toString());
+        } catch {}
+        setMsg("外部から受け取ったテキストを追加フォームに入れました。", "ok");
+        return;
+      }
+    }
+  }
+
   let payload = null;
   try {
     payload = JSON.parse(localStorage.getItem(SHARE_PAYLOAD_KEY) || "null");
