@@ -375,11 +375,20 @@ function switchToAddTab() {
 const SHARE_PAYLOAD_KEY = "tangoChoSharePayload";
 
 function extractEnglishWord(s) {
-  const raw = String(s || "").trim();
+  const raw0 = String(s || "").trim();
+  if (!raw0) return "";
+
+  // Normalize spaces, strip URLs
+  let raw = raw0.replace(/https?:\/\/\S+/g, " ").replace(/\s+/g, " ").trim();
   if (!raw) return "";
-  // Prefer the first plausible English token
-  const m = raw.match(/[A-Za-z][A-Za-z\-']{0,49}/);
-  return m ? m[0].toLowerCase() : "";
+
+  // Prefer an English phrase up to 4 words (handles "take a break")
+  const m = raw.match(/[A-Za-z][A-Za-z\-']*(?:\s+[A-Za-z][A-Za-z\-']*){0,3}/);
+  if (!m) return "";
+
+  const term = m[0].trim();
+  if (!term) return "";
+  return term.toLowerCase();
 }
 
 function consumeIncomingShareToAddForm() {
@@ -971,47 +980,67 @@ function buildQuestion(mode, pool) {
   if (poolWords.length < 4) return { error: '4択クイズには、同じ出題カテゴリ内に単語が最低4つ必要です。' };
 
   // Pick next target from a no-repeat deck
-  const currentPool = ensureQuizDeck(mode, pool);
+  let currentPool = ensureQuizDeck(mode, pool);
   let targetId = quizState.deckIds[quizState.deckPos];
   let target = currentPool.find(w => w.id === targetId);
   if (!target) {
     // Pool changed unexpectedly; rebuild once
     quizState.deckSig = '';
-    ensureQuizDeck(mode, pool);
+    currentPool = ensureQuizDeck(mode, pool);
     targetId = quizState.deckIds[quizState.deckPos];
     target = currentPool.find(w => w.id === targetId);
   }
   if (!target) return { error: '出題対象が見つかりませんでした（単語帳が更新された可能性）。もう一度「出題」を押してください。' };
 
-  // advance deck pointer now (so even if user backs out, the deck stays fair)
-  quizState.deckPos += 1;
+  const prompt = mode === 'en2ja' ? (target.word || '') : (target.meaning || '');
 
-  const prompt = mode === 'en2ja' ? target.word : (target.meaning || '');
-  const correct = mode === 'en2ja' ? (target.meaning || '') : target.word;
-
-  // distractors
-  const others = poolWords.filter(w => w.id !== target.id);
-  const seen = new Set([correct]);
-  const distract = [];
+  // For correctness check we use the displayed string itself.
+  // (Duplicates are disambiguated for distractors only.)
   const keyOf = (w) => mode === 'en2ja' ? (w.meaning || '') : (w.word || '');
+  const auxOf = (w) => mode === 'en2ja' ? (w.word || '') : (w.meaning || '');
+
+  const correctBase = keyOf(target);
+  const correctDisplay = correctBase;
+
+  // distractors (robust against duplicates)
+  const others = currentPool.filter(w => w.id !== target.id);
   const shuffled = choiceShuffle(others);
+  const seen = new Set([correctDisplay]);
+  const distract = [];
 
   for (const w of shuffled) {
-    const k = keyOf(w);
-    if (!k) continue;
-    if (seen.has(k)) continue;
-    seen.add(k);
-    distract.push(k);
+    const base = keyOf(w);
+    if (!base) continue;
+
+    let disp = base;
+    if (seen.has(disp)) {
+      const aux = auxOf(w);
+      if (aux) disp = `${base} (${aux})`;
+    }
+    if (seen.has(disp)) {
+      // last resort disambiguation
+      const aux = auxOf(w) || w.id || '';
+      disp = aux ? `${base} (${aux})` : base;
+    }
+
+    if (seen.has(disp)) continue;
+    seen.add(disp);
+    distract.push(disp);
     if (distract.length >= 3) break;
   }
 
-  if (distract.length < 3) {
-    return { error: '4択の選択肢を作れませんでした（訳/単語の重複が多い可能性）。別カテゴリを選ぶか、単語数を増やしてください。' };
+  if (!correctDisplay || distract.length < 3) {
+    return { error: '4択の選択肢を作れませんでした（訳/単語の重複や空欄が多い可能性）。別カテゴリを選ぶか、単語数を増やしてください。' };
   }
 
-  const choices = choiceShuffle([correct, ...distract]);
-  return { target, mode, prompt, correct, choices };
+  const choices = choiceShuffle([correctDisplay, ...distract]);
+
+  // advance deck pointer only after a question is successfully built
+  quizState.deckPos += 1;
+
+  return { target, mode, prompt, correct: correctDisplay, choices };
 }
+
 
 function renderQuiz() {
   const area = document.getElementById("quizArea");

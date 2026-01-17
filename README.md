@@ -102,28 +102,32 @@
 
 ---
 
-## Web上の英単語を、このアプリの「追加」に一発で持ってくる（iPhone向け）
+## Web上の英単語を、このアプリの「追加」に一発で持ってくる（iPhone / Android）
 
 このPWAは、外部から渡されたテキスト（選択した単語など）を受け取り、**追加画面の英単語欄に自動入力**できます。
 
-### 1) 共有（Web Share Target）
-- Safariで単語を選択 → 共有 → **TANGO-CHO**（または「TANGO-CHO Share」）を選ぶ
-- 共有されたテキストから英単語を抽出して、追加画面に入ります
+### Web上の英単語を「追加」に送る（iPhone / Android）
 
-> iOSはShare Targetの表示が環境差があります。出てこない場合は次の方法が確実です。
+このアプリは、URLパラメータ `?word=`（またはShare Target）で受け取ったテキストから英単語を抽出し、**「追加」画面の入力欄に自動で入れます**。
 
-### 2) iOSショートカット（確実）
-Safariで単語を選択 → 共有 → ショートカット実行 → TANGO-CHOが開いて入力されます。
+#### 1) Android（Chrome / PWA）: 共有 → TANGO-CHO（Share Target）
+- 事前に **TANGO-CHO をPWAとしてインストール**（Chromeの「ホーム画面に追加」）
+- Webページで英単語を選択 → 共有 → **TANGO-CHO**
+- 自動でアプリが開き、追加画面に入力されます
 
-ショートカットの最後は「URLを開く」で、次のように渡します：
+#### 2) iPhone（iOS）: ショートカット（確実）
+iOSのPWAはShare Targetが共有先に出ないことが多いため、ショートカットが最も確実です。
 
-```text
-https://<あなたの公開URL>/index.html?word=[ショートカット入力]
-```
+- 「ショートカット」アプリで新規作成
+- 設定で「共有シートで表示」をON（入力: テキスト）
+- アクション例：
+  1. 入力をURLエンコード
+  2. URLを作成: `https://masato-nasu.github.io/TANGO-CHO/index.html?word=<ENCODED>`
+  3. URLを開く
 
-### 3) ブックマークレット（最短）
-Safariのブックマークに、次を登録して使えます（共有が不安定な場合の保険）。
+#### 3) 保険: ブックマークレット（iPhone / Android）
+ブラウザのブックマークに次を登録し、**単語を選択した状態で実行**します。
 
 ```javascript
-javascript:(()=>{const t=window.getSelection?String(getSelection()):'';location.href='https://<あなたの公開URL>/index.html?word='+encodeURIComponent(t.trim());})();
+javascript:(()=>{const t=window.getSelection?String(getSelection()):'';location.href='https://masato-nasu.github.io/TANGO-CHO/index.html?word='+encodeURIComponent((t||'').trim());})();
 ```
