@@ -3,7 +3,6 @@ const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
 const FILTER_KEY = "tangoChoFilter";
 const SORT_KEY = "tangoChoSort";
-const SHARE_PAYLOAD_KEY = "tangoChoSharePayload";
 
 let editId = null;
 
@@ -368,89 +367,6 @@ function setupTabs() {
 function switchToAddTab() {
   const btn = document.querySelector('.tab-button[data-section="addSection"]');
   if (btn) btn.click();
-}
-
-// -------- Web share / deep link (selected text -> Add tab) --------
-function extractShareTextFromUrl() {
-  try {
-    const u = new URL(location.href);
-    const w = (u.searchParams.get("word") || "").trim();
-    const t = (u.searchParams.get("text") || "").trim();
-    const q = (u.searchParams.get("q") || "").trim();
-    const title = (u.searchParams.get("title") || "").trim();
-    const url = (u.searchParams.get("url") || "").trim();
-    const best = w || t || q || title || url;
-    return best ? best.trim() : "";
-  } catch {
-    return "";
-  }
-}
-
-function normalizeSharedText(raw) {
-  const s = (raw || "").trim();
-  if (!s) return "";
-  // Prefer a plausible token (word/phrase) while keeping user's intent.
-  const m = s.match(/[A-Za-z][A-Za-z\-']*(?:\s+[A-Za-z][A-Za-z\-']*)*/);
-  return (m ? m[0] : s).trim();
-}
-
-function consumeIncomingShareToAddForm() {
-  // 1) If we're on share-target.html (opened by Android share sheet / bookmarklet), store payload.
-  if (location.pathname.endsWith("/share-target.html") || location.pathname.endsWith("share-target.html")) {
-    const fromUrl = extractShareTextFromUrl();
-    if (fromUrl) {
-      localStorage.setItem(SHARE_PAYLOAD_KEY, JSON.stringify({
-        text: fromUrl,
-        ts: Date.now()
-      }));
-    }
-    return;
-  }
-
-  // 2-a) Direct deep link: index.html?word=... / ?text=... / ?q=...
-  // (useful as a fallback when sharing is not available on some platforms)
-  const direct = extractShareTextFromUrl();
-  if (direct) {
-    const wordEl = document.getElementById("word");
-    const meaningEl = document.getElementById("meaning");
-    if (wordEl) {
-      const picked = normalizeSharedText(direct);
-      if (picked) {
-        wordEl.value = picked;
-        if (meaningEl) meaningEl.value = "";
-        switchToAddTab();
-        // Clean URL (keep the app tidy)
-        try {
-          const u = new URL(location.href);
-          u.search = "";
-          history.replaceState(null, "", u.toString());
-        } catch {}
-        setMsg("外部から受け取ったテキストを追加フォームに入れました。", "ok");
-        return;
-      }
-    }
-  }
-
-  // 2) On index.html: prefill Add form once (share-target.html stored to localStorage).
-  let payload = null;
-  try {
-    payload = JSON.parse(localStorage.getItem(SHARE_PAYLOAD_KEY) || "null");
-  } catch {}
-  if (!payload || !payload.text) return;
-
-  localStorage.removeItem(SHARE_PAYLOAD_KEY);
-
-  const wordEl = document.getElementById("word");
-  const meaningEl = document.getElementById("meaning");
-  if (!wordEl) return;
-
-  const picked = normalizeSharedText(payload.text);
-  if (!picked) return;
-
-  wordEl.value = picked;
-  if (meaningEl) meaningEl.value = "";
-  switchToAddTab();
-  setMsg("外部から受け取ったテキストを追加フォームに入れました。", "ok");
 }
 
 
@@ -937,12 +853,79 @@ let quizState = {
   answered: false,
   correct: 0,
   total: 0,
-  // deck: ensure each word appears once per cycle
-  deckKey: "",
-  deckSig: "",
-  deckIds: [],
-  deckPos: 0,
 };
+
+// --- Quiz deck (no repeats until one full cycle) ---
+// Purpose: once a word is asked, it will not appear again until the pool is fully cycled.
+// For pool=all, we bias the early order: forgot > default > learned.
+let quizDeckState = {
+  key: "",
+  order: [],
+  idx: 0,
+};
+
+// Ratio used only when pool="all" (bigger = earlier/more frequent in the early phase)
+const QUIZ_ALL_RATIO = { forgot: 5, default: 3, learned: 1 };
+
+function _buildQuizDeckOrder(poolWords, pool) {
+  const ids = poolWords.map(w => w.id);
+  if (pool !== "all") {
+    return choiceShuffle(ids);
+  }
+
+  const groups = { forgot: [], default: [], learned: [] };
+  for (const w of poolWords) {
+    const st = (w && w.status) ? String(w.status) : "default";
+    if (st === "forgot" || st === "default" || st === "learned") groups[st].push(w.id);
+    else groups.default.push(w.id);
+  }
+
+  groups.forgot = choiceShuffle(groups.forgot);
+  groups.default = choiceShuffle(groups.default);
+  groups.learned = choiceShuffle(groups.learned);
+
+  const order = [];
+  const steps = [
+    ["forgot", QUIZ_ALL_RATIO.forgot],
+    ["default", QUIZ_ALL_RATIO.default],
+    ["learned", QUIZ_ALL_RATIO.learned],
+  ];
+
+  // Interleave by ratio while any items remain
+  while (groups.forgot.length || groups.default.length || groups.learned.length) {
+    for (const [k, n] of steps) {
+      for (let i = 0; i < n; i++) {
+        if (groups[k].length) order.push(groups[k].pop());
+      }
+    }
+  }
+
+  return order;
+}
+
+function _ensureQuizDeck(mode, pool, poolWords) {
+  const key = `${mode}|${pool}`;
+  const needsNew = (quizDeckState.key !== key) || (quizDeckState.order.length === 0) || (quizDeckState.idx >= quizDeckState.order.length);
+  if (!needsNew) return;
+  quizDeckState.key = key;
+  quizDeckState.order = _buildQuizDeckOrder(poolWords, pool);
+  quizDeckState.idx = 0;
+}
+
+function _pickNextTargetFromDeck(mode, pool, poolWords) {
+  _ensureQuizDeck(mode, pool, poolWords);
+  const idToWord = new Map(poolWords.map(w => [w.id, w]));
+  const total = quizDeckState.order.length;
+  for (let i = 0; i < total; i++) {
+    const id = quizDeckState.order[quizDeckState.idx % total];
+    quizDeckState.idx += 1;
+    const w = idToWord.get(id);
+    if (w) return w;
+  }
+  // Fallback (should be rare)
+  return poolWords[Math.floor(Math.random() * poolWords.length)];
+}
+
 
 function choiceShuffle(arr) {
   const a = [...arr];
@@ -963,53 +946,6 @@ function weightedPick(items, weightFn) {
     if (r <= 0) return items[i];
   }
   return items[items.length - 1];
-}
-
-function poolSignature(poolWords) {
-  // stable signature for "same set of candidates"
-  return poolWords
-    .map((w) => w.id)
-    .slice()
-    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
-    .join(",");
-}
-
-function weightedDeckOrder(poolWords) {
-  // Produce a full permutation where higher-weight items tend to appear earlier,
-  // but still exactly once per cycle.
-  const decorated = poolWords.map((w) => {
-    const wgt = Math.max(0.0001, statusWeight(w.status));
-    const u = Math.random() || 1e-9;
-    const key = -Math.log(u) / wgt;
-    return { id: w.id, key };
-  });
-  decorated.sort((a, b) => a.key - b.key);
-  return decorated.map((x) => x.id);
-}
-
-function ensureQuizDeck(mode, pool, poolWords) {
-  const key = `${mode}|${pool || "ALL"}`;
-  const sig = poolSignature(poolWords);
-
-  const needsRebuild =
-    quizState.deckKey !== key ||
-    quizState.deckSig !== sig ||
-    !Array.isArray(quizState.deckIds) ||
-    quizState.deckIds.length !== poolWords.length ||
-    quizState.deckPos >= quizState.deckIds.length;
-
-  if (needsRebuild) {
-    quizState.deckKey = key;
-    quizState.deckSig = sig;
-    quizState.deckIds = weightedDeckOrder(poolWords);
-    quizState.deckPos = 0;
-  }
-
-  // Safety: avoid pathological states
-  if (!quizState.deckIds || quizState.deckIds.length !== poolWords.length) {
-    quizState.deckIds = choiceShuffle(poolWords.map((w) => w.id));
-    quizState.deckPos = 0;
-  }
 }
 
 function getPoolWords(pool) {
@@ -1038,16 +974,7 @@ function buildQuestion(mode, pool) {
     if (wordToMeaning[k] == null) wordToMeaning[k] = String(w.meaning || "");
   }
 
-  // Build deck so that each word appears once per cycle (no immediate repeats)
-  ensureQuizDeck(mode, pool, poolWords);
-  const deckId = quizState.deckIds[quizState.deckPos];
-  quizState.deckPos += 1;
-  let target = poolWords.find(w => w.id === deckId);
-  if (!target) {
-    // Fallback (should be rare): choose by weight
-    target = weightedPick(poolWords, w => statusWeight(w.status || "default"));
-  }
-
+  const target = _pickNextTargetFromDeck(mode, pool, poolWords);
   const prompt = mode === "en2ja" ? target.word : (target.meaning || "");
   const correct = mode === "en2ja" ? (target.meaning || "") : target.word;
 
@@ -1190,8 +1117,15 @@ function onAnswer(selected) {
       // Prompt already shows Japanese meaning; reveal only the English word to avoid duplication.
       revealEl.innerHTML = en ? `<div class="quiz-reveal-word">${escapeHtml(en)}</div>` : "";
     } else {
-      // en->ja: avoid duplication (prompt shows English, choices already show Japanese)
-      revealEl.innerHTML = "";
+      // en2ja: reveal both English + Japanese
+      if (en || ja) {
+        revealEl.innerHTML = `
+          <div class="quiz-reveal-word">${escapeHtml(en)}</div>
+          <div class="quiz-reveal-meaning">${escapeHtml(ja)}</div>
+        `;
+      } else {
+        revealEl.textContent = "";
+      }
     }
   }
 
@@ -1294,13 +1228,14 @@ function setupQuiz() {
     quizState.active = true;
     quizState.current = null;
     quizState.answered = false;
-    quizState.deckKey = "";
-    quizState.deckSig = "";
-    quizState.deckIds = [];
-    quizState.deckPos = 0;
     // keep score (or reset?). Better to reset on new start.
     quizState.correct = 0;
     quizState.total = 0;
+
+    // Reset quiz deck to avoid carrying order across sessions
+    quizDeckState.key = "";
+    quizDeckState.order = [];
+    quizDeckState.idx = 0;
     nextQuestion();
   });
 
@@ -1398,7 +1333,6 @@ document.addEventListener("DOMContentLoaded", () => {
   setupTabs();
   setupSettings();
   setupAddForm();
-  consumeIncomingShareToAddForm();
   setupFilter();
   setupSort();
   setupExport();
