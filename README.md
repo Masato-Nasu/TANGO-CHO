@@ -15,8 +15,6 @@
   https://masato-nasu.github.io/TANGO-CHO/
 - **Hugging Face Spaces（API / DeepL中継）**  
   https://huggingface.co/spaces/mazzGOGO/TANGO-CHO
-- **API Base（例）**  
-  https://mazzgogo-tango-cho.hf.space
 
 ---
 
