@@ -369,6 +369,76 @@ function switchToAddTab() {
   if (btn) btn.click();
 }
 
+// --- Incoming word (Android share target / iOS shortcut / URL param) ---
+const SHARE_PAYLOAD_KEY = 'tangoChoSharePayload';
+
+function extractFirstEnglishToken(s) {
+  const str = String(s || '').trim();
+  // Pick the first latin token (hyphen / apostrophe allowed)
+  const m = str.match(/[A-Za-z][A-Za-z\-\u2019\']{0,60}/);
+  if (!m) return '';
+  return m[0].replace(/\u2019/g, "'").toLowerCase();
+}
+
+function consumeSharePayloadText() {
+  try {
+    const raw = localStorage.getItem(SHARE_PAYLOAD_KEY);
+    if (!raw) return '';
+    localStorage.removeItem(SHARE_PAYLOAD_KEY);
+    const j = JSON.parse(raw);
+    return String(j?.text || j?.title || j?.url || '').trim();
+  } catch (_) {
+    try { localStorage.removeItem(SHARE_PAYLOAD_KEY); } catch (e) {}
+    return '';
+  }
+}
+
+function getIncomingTextFromUrl() {
+  try {
+    const p = new URLSearchParams(location.search);
+    const word = (p.get('word') || p.get('text') || p.get('q') || p.get('t') || '').trim();
+    const title = (p.get('title') || '').trim();
+    const url = (p.get('url') || '').trim();
+    return (word || title || url) ? [word, title, url].filter(Boolean).join(' ') : '';
+  } catch (_) {
+    return '';
+  }
+}
+
+function cleanupIncomingParams() {
+  try {
+    const u = new URL(location.href);
+    ['word','text','q','t','title','url','from','v'].forEach((k) => u.searchParams.delete(k));
+    history.replaceState(null, '', u.pathname + (u.search ? ('?' + u.searchParams.toString()) : '') + u.hash);
+  } catch (_) {}
+}
+
+function applyIncomingWordToAddForm() {
+  const urlText = getIncomingTextFromUrl();
+  const shareText = consumeSharePayloadText();
+  const raw = (urlText || shareText || '').trim();
+  if (!raw) return;
+  const token = extractFirstEnglishToken(raw);
+  if (!token) { cleanupIncomingParams(); return; }
+
+  const wordEl = document.getElementById('word');
+  if (!wordEl) { cleanupIncomingParams(); return; }
+
+  // Move user to Add tab and prefill the word field (no UI changes)
+  switchToAddTab();
+  wordEl.value = token;
+  try { wordEl.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
+  setTimeout(() => {
+    try {
+      wordEl.focus();
+      const n = wordEl.value.length;
+      wordEl.setSelectionRange(n, n);
+    } catch (_) {}
+  }, 50);
+
+  cleanupIncomingParams();
+}
+
 
 function setupSettings() {
   const hfBase = document.getElementById("hfBase");
@@ -1333,6 +1403,7 @@ document.addEventListener("DOMContentLoaded", () => {
   setupTabs();
   setupSettings();
   setupAddForm();
+  applyIncomingWordToAddForm();
   setupFilter();
   setupSort();
   setupExport();
