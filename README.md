@@ -189,12 +189,6 @@ PWAはService Workerのキャッシュで、古い版が残ることがありま
 
 ---
 
-## Key / Token
-- HF Spaces URL（必須）
-- APP_TOKEN（Spaces側で必要な場合のみ）
-
----
-
 ## Thanks
 - DeepL API
 - Hugging Face Spaces
