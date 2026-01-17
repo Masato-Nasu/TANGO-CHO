@@ -13,13 +13,12 @@
   const title = (p.get("title") || "").trim();
   const url = (p.get("url") || "").trim();
 
-  const payload = { text: text || title || url, title, url, ts: Date.now() };
+  const payload = { text: (text || title || url), title, url, ts: Date.now() };
   try {
     localStorage.setItem("tangoChoSharePayload", JSON.stringify(payload));
   } catch (e) {}
 
-  // cache-bust for SW update
-      location.replace("./index.html?v=3.7.8");
+  location.replace("./index.html");
 })();
 </script>
 </body>
