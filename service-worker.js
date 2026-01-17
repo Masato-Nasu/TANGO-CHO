@@ -1,4 +1,4 @@
-const CACHE_NAME = "tango-cho-cache-v3.7.7-root";
+const CACHE_NAME = "tango-cho-cache-v3.7.8-root";
 const ASSETS = [
   "./",
   "./index.html",
@@ -19,7 +19,6 @@ self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys().then((keys) => Promise.all(keys.map((k) => (k !== CACHE_NAME ? caches.delete(k) : null))))
   );
-  self.clients.claim();
 });
 
 self.addEventListener("fetch", (e) => {
@@ -36,13 +35,20 @@ self.addEventListener("fetch", (e) => {
   e.respondWith(
     caches.open(CACHE_NAME).then(async (cache) => {
       if (isNav) {
-        const cachedIndex = await cache.match("./index.html", { ignoreSearch: true });
+        // AppShell: serve index.html for normal navigation, but serve share-target.html
+        // when the PWA is launched via Web Share Target (Android share sheet).
+        const isShareTarget = url.pathname.endsWith("/share-target.html") || url.pathname.endsWith("share-target.html");
+        const shellPath = isShareTarget ? "./share-target.html" : "./index.html";
+
+        const cachedShell = await cache.match(shellPath, { ignoreSearch: true });
+        if (cachedShell) return cachedShell;
+
         try {
-          const fresh = await fetch("./index.html", { cache: "no-store" });
-          if (fresh && fresh.ok) cache.put("./index.html", fresh.clone());
+          const fresh = await fetch(shellPath, { cache: "no-store" });
+          if (fresh && fresh.ok) cache.put(shellPath, fresh.clone());
           return fresh;
         } catch (err) {
-          return cachedIndex || Response.error();
+          return cachedShell || Response.error();
         }
       }
 
