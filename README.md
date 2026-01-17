@@ -35,11 +35,9 @@
 
 1. アプリの「追加」タブ内にある **接続設定（HF Spaces）** を開く  
 2. **HF Spaces API Base** に Spaces のURLを入力して保存  
-   - 例：`https://mazzgogo-tango-cho.hf.space`
+   - 必要な方はご連絡ください
 3. Spaces側でトークン認証している場合のみ **APP_TOKEN** を入力して保存  
-   - 使っていない場合は空でOK
-
-※ DeepLキー（DEEPL_KEY）は **Spaces側のSecrets** に設定します（PWA側には不要）。
+   - 必要な方はご連絡ください
 
 ---
 
