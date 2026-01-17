@@ -2,6 +2,8 @@ const STORAGE_KEY = "tangoChoWords";
 const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
 const FILTER_KEY = "tangoChoFilter";
+const SORT_KEY = "tangoChoSort";
+const SHARE_PAYLOAD_KEY = "tangoChoSharePayload";
 
 let editId = null;
 
@@ -368,62 +370,61 @@ function switchToAddTab() {
   if (btn) btn.click();
 }
 
+// -------- Web share / deep link (selected text -> Add tab) --------
+function extractShareTextFromUrl() {
+  try {
+    const u = new URL(location.href);
+    const t = (u.searchParams.get("text") || "").trim();
+    const title = (u.searchParams.get("title") || "").trim();
+    const url = (u.searchParams.get("url") || "").trim();
+    const best = t || title || url;
+    return best ? best.trim() : "";
+  } catch {
+    return "";
+  }
+}
 
-// --------------------
-// Incoming share / deep link (iOS-friendly)
-// --------------------
-const SHARE_PAYLOAD_KEY = "tangoChoSharePayload";
-
-function extractEnglishWord(s) {
-  const raw0 = String(s || "").trim();
-  if (!raw0) return "";
-
-  // Normalize spaces, strip URLs
-  let raw = raw0.replace(/https?:\/\/\S+/g, " ").replace(/\s+/g, " ").trim();
-  if (!raw) return "";
-
-  // Prefer an English phrase up to 4 words (handles "take a break")
-  const m = raw.match(/[A-Za-z][A-Za-z\-']*(?:\s+[A-Za-z][A-Za-z\-']*){0,3}/);
-  if (!m) return "";
-
-  const term = m[0].trim();
-  if (!term) return "";
-  return term.toLowerCase();
+function normalizeSharedText(raw) {
+  const s = (raw || "").trim();
+  if (!s) return "";
+  // Prefer a plausible token (word/phrase) while keeping user's intent.
+  const m = s.match(/[A-Za-z][A-Za-z\-']*(?:\s+[A-Za-z][A-Za-z\-']*)*/);
+  return (m ? m[0] : s).trim();
 }
 
 function consumeIncomingShareToAddForm() {
-  // 1) URL params (works with iOS Shortcuts / bookmarklet)
-  const sp = new URLSearchParams(location.search);
-  const fromParam = sp.get('word') || sp.get('text') || sp.get('q') || sp.get('t') || '';
-
-  // 2) LocalStorage payload (share-target.html writes this)
-  let fromLS = '';
-  try {
-    const raw = localStorage.getItem(SHARE_PAYLOAD_KEY);
-    if (raw) {
-      const j = JSON.parse(raw);
-      fromLS = (j?.text || j?.title || j?.url || '').trim();
+  // 1) If we're on share-target.html (opened by Android share sheet / bookmarklet), store payload.
+  if (location.pathname.endsWith("/share-target.html") || location.pathname.endsWith("share-target.html")) {
+    const fromUrl = extractShareTextFromUrl();
+    if (fromUrl) {
+      localStorage.setItem(SHARE_PAYLOAD_KEY, JSON.stringify({
+        text: fromUrl,
+        ts: Date.now()
+      }));
     }
-  } catch (_) {}
-
-  const picked = extractEnglishWord(fromParam) || extractEnglishWord(fromLS);
-  if (!picked) return;
-
-  // Clear LS payload so it won't re-apply on next load
-  try { localStorage.removeItem(SHARE_PAYLOAD_KEY); } catch (_) {}
-
-  // Move user to Add tab and prefill
-  switchToAddTab();
-  const wordEl = document.getElementById('word');
-  if (wordEl) {
-    wordEl.value = picked;
-    wordEl.focus();
+    return;
   }
 
-  // Remove the query string after consuming (so refresh won't re-apply)
+  // 2) On index.html: prefill Add form once.
+  let payload = null;
   try {
-    if (location.search) history.replaceState({}, '', location.pathname + location.hash);
-  } catch (_) {}
+    payload = JSON.parse(localStorage.getItem(SHARE_PAYLOAD_KEY) || "null");
+  } catch {}
+  if (!payload || !payload.text) return;
+
+  localStorage.removeItem(SHARE_PAYLOAD_KEY);
+
+  const wordEl = document.getElementById("word");
+  const meaningEl = document.getElementById("meaning");
+  if (!wordEl) return;
+
+  const picked = normalizeSharedText(payload.text);
+  if (!picked) return;
+
+  wordEl.value = picked;
+  if (meaningEl) meaningEl.value = "";
+  switchToAddTab();
+  setMsg("外部から受け取ったテキストを追加フォームに入れました。", "ok");
 }
 
 
@@ -728,12 +729,19 @@ function renderWordList() {
   const listEl = document.getElementById("wordList");
   const countEl = document.getElementById("wordCount");
   const filter = (localStorage.getItem(FILTER_KEY) || "all").trim();
+  const sortOrder = (localStorage.getItem(SORT_KEY) || "time").trim();
   const all = loadWords();
 
   if (countEl) countEl.textContent = String(all.length);
   if (!listEl) return;
 
-  let words = [...all].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+  let words = [...all];
+  if (sortOrder === "alpha") {
+    words.sort((a, b) => String(a.word || "").toLowerCase().localeCompare(String(b.word || "").toLowerCase()));
+  } else {
+    // time (default): newest first
+    words.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+  }
   if (filter !== "all") words = words.filter((w) => (w.status || "default") === filter);
 
   listEl.innerHTML = "";
@@ -865,6 +873,16 @@ function setupFilter() {
   });
 }
 
+function setupSort() {
+  const sel = document.getElementById("sortOrder");
+  if (!sel) return;
+  sel.value = (localStorage.getItem(SORT_KEY) || "time").trim();
+  sel.addEventListener("change", () => {
+    localStorage.setItem(SORT_KEY, sel.value);
+    renderWordList();
+  });
+}
+
 function setupExport() {
   const btn = document.getElementById("exportBtn");
   if (!btn) return;
@@ -893,9 +911,9 @@ let quizState = {
   answered: false,
   correct: 0,
   total: 0,
-  // deck (no-repeat until all words shown)
-  deckKey: '',
-  deckSig: '',
+  // deck: ensure each word appears once per cycle
+  deckKey: "",
+  deckSig: "",
   deckIds: [],
   deckPos: 0,
 };
@@ -921,6 +939,53 @@ function weightedPick(items, weightFn) {
   return items[items.length - 1];
 }
 
+function poolSignature(poolWords) {
+  // stable signature for "same set of candidates"
+  return poolWords
+    .map((w) => w.id)
+    .slice()
+    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+    .join(",");
+}
+
+function weightedDeckOrder(poolWords) {
+  // Produce a full permutation where higher-weight items tend to appear earlier,
+  // but still exactly once per cycle.
+  const decorated = poolWords.map((w) => {
+    const wgt = Math.max(0.0001, statusWeight(w.status));
+    const u = Math.random() || 1e-9;
+    const key = -Math.log(u) / wgt;
+    return { id: w.id, key };
+  });
+  decorated.sort((a, b) => a.key - b.key);
+  return decorated.map((x) => x.id);
+}
+
+function ensureQuizDeck(mode, pool, poolWords) {
+  const key = `${mode}|${pool || "ALL"}`;
+  const sig = poolSignature(poolWords);
+
+  const needsRebuild =
+    quizState.deckKey !== key ||
+    quizState.deckSig !== sig ||
+    !Array.isArray(quizState.deckIds) ||
+    quizState.deckIds.length !== poolWords.length ||
+    quizState.deckPos >= quizState.deckIds.length;
+
+  if (needsRebuild) {
+    quizState.deckKey = key;
+    quizState.deckSig = sig;
+    quizState.deckIds = weightedDeckOrder(poolWords);
+    quizState.deckPos = 0;
+  }
+
+  // Safety: avoid pathological states
+  if (!quizState.deckIds || quizState.deckIds.length !== poolWords.length) {
+    quizState.deckIds = choiceShuffle(poolWords.map((w) => w.id));
+    quizState.deckPos = 0;
+  }
+}
+
 function getPoolWords(pool) {
   const all = loadWords();
   if (pool === "all") return all;
@@ -934,113 +999,56 @@ function statusWeight(st) {
   return 2;
 }
 
-function poolSignature(poolWords) {
-  // Stable signature to detect pool changes
-  return poolWords.map(w => w.id).sort().join('|');
-}
-
-function weightedShuffleNoReplace(items, weightFn) {
-  // Efraimidis-Spirakis: weighted random permutation without replacement
-  const scored = items.map((it) => {
-    const w = Math.max(0.0001, Number(weightFn(it)) || 1);
-    const u = Math.random();
-    const key = -Math.log(Math.max(u, 1e-12)) / w;
-    return { it, key };
-  });
-  scored.sort((a, b) => a.key - b.key);
-  return scored.map(x => x.it);
-}
-
-function ensureQuizDeck(mode, pool) {
-  const poolWords = getPoolWords(pool);
-  const sig = poolSignature(poolWords);
-  const key = `${mode}|${pool}`;
-
-  const needRebuild =
-    quizState.deckKey !== key ||
-    quizState.deckSig !== sig ||
-    !Array.isArray(quizState.deckIds) ||
-    quizState.deckIds.length !== poolWords.length ||
-    quizState.deckPos >= quizState.deckIds.length;
-
-  if (needRebuild) {
-    const ordered = weightedShuffleNoReplace(poolWords, w => statusWeight(w.status || 'default'));
-    quizState.deckKey = key;
-    quizState.deckSig = sig;
-    quizState.deckIds = ordered.map(w => w.id);
-    quizState.deckPos = 0;
-  }
-
-  return poolWords;
-}
-
-
 function buildQuestion(mode, pool) {
   const poolWords = getPoolWords(pool);
-  if (poolWords.length < 4) return { error: '4択クイズには、同じ出題カテゴリ内に単語が最低4つ必要です。' };
+  if (poolWords.length < 4) return { error: "4択クイズには、同じ出題カテゴリ内に単語が最低4つ必要です。" };
 
-  // Pick next target from a no-repeat deck
-  let currentPool = ensureQuizDeck(mode, pool);
-  let targetId = quizState.deckIds[quizState.deckPos];
-  let target = currentPool.find(w => w.id === targetId);
-  if (!target) {
-    // Pool changed unexpectedly; rebuild once
-    quizState.deckSig = '';
-    currentPool = ensureQuizDeck(mode, pool);
-    targetId = quizState.deckIds[quizState.deckPos];
-    target = currentPool.find(w => w.id === targetId);
+  // For 日→英 (ja2en): show Japanese meaning under each English choice.
+  // Build a quick lookup table: { [word]: meaning }
+  const wordToMeaning = {};
+  for (const w of poolWords) {
+    const k = (w && w.word) ? String(w.word) : "";
+    if (!k) continue;
+    if (wordToMeaning[k] == null) wordToMeaning[k] = String(w.meaning || "");
   }
-  if (!target) return { error: '出題対象が見つかりませんでした（単語帳が更新された可能性）。もう一度「出題」を押してください。' };
 
-  const prompt = mode === 'en2ja' ? (target.word || '') : (target.meaning || '');
+  // Build deck so that each word appears once per cycle (no immediate repeats)
+  ensureQuizDeck(mode, pool, poolWords);
+  const deckId = quizState.deckIds[quizState.deckPos];
+  quizState.deckPos += 1;
+  let target = poolWords.find(w => w.id === deckId);
+  if (!target) {
+    // Fallback (should be rare): choose by weight
+    target = weightedPick(poolWords, w => statusWeight(w.status || "default"));
+  }
 
-  // For correctness check we use the displayed string itself.
-  // (Duplicates are disambiguated for distractors only.)
-  const keyOf = (w) => mode === 'en2ja' ? (w.meaning || '') : (w.word || '');
-  const auxOf = (w) => mode === 'en2ja' ? (w.word || '') : (w.meaning || '');
+  const prompt = mode === "en2ja" ? target.word : (target.meaning || "");
+  const correct = mode === "en2ja" ? (target.meaning || "") : target.word;
 
-  const correctBase = keyOf(target);
-  const correctDisplay = correctBase;
-
-  // distractors (robust against duplicates)
-  const others = currentPool.filter(w => w.id !== target.id);
-  const shuffled = choiceShuffle(others);
-  const seen = new Set([correctDisplay]);
+  // distractors
+  const others = poolWords.filter(w => w.id !== target.id);
+  const seen = new Set([correct]);
   const distract = [];
+  const keyOf = (w) => mode === "en2ja" ? (w.meaning || "") : (w.word || "");
+  const shuffled = choiceShuffle(others);
 
   for (const w of shuffled) {
-    const base = keyOf(w);
-    if (!base) continue;
-
-    let disp = base;
-    if (seen.has(disp)) {
-      const aux = auxOf(w);
-      if (aux) disp = `${base} (${aux})`;
-    }
-    if (seen.has(disp)) {
-      // last resort disambiguation
-      const aux = auxOf(w) || w.id || '';
-      disp = aux ? `${base} (${aux})` : base;
-    }
-
-    if (seen.has(disp)) continue;
-    seen.add(disp);
-    distract.push(disp);
+    const k = keyOf(w);
+    if (!k) continue;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    distract.push(k);
     if (distract.length >= 3) break;
   }
 
-  if (!correctDisplay || distract.length < 3) {
-    return { error: '4択の選択肢を作れませんでした（訳/単語の重複や空欄が多い可能性）。別カテゴリを選ぶか、単語数を増やしてください。' };
+  if (distract.length < 3) {
+    return { error: "4択の選択肢を作れませんでした（訳/単語の重複が多い可能性）。別カテゴリを選ぶか、単語数を増やしてください。" };
   }
 
-  const choices = choiceShuffle([correctDisplay, ...distract]);
+  const choices = choiceShuffle([correct, ...distract]);
 
-  // advance deck pointer only after a question is successfully built
-  quizState.deckPos += 1;
-
-  return { target, mode, prompt, correct: correctDisplay, choices };
+  return { target, mode, prompt, correct, choices, wordToMeaning };
 }
-
 
 function renderQuiz() {
   const area = document.getElementById("quizArea");
@@ -1053,6 +1061,7 @@ function renderQuiz() {
   if (!quizState.active || !quizState.current) {
     area.innerHTML = `<p class="note">「出題」を押すと始まります。※ 4択クイズは、単語が最低4つ必要です。</p>`;
     nextBtn.disabled = true;
+    nextBtn.style.display = "none";
     return;
   }
 
@@ -1060,6 +1069,7 @@ function renderQuiz() {
   if (q.error) {
     area.innerHTML = `<p class="note" style="color:#ff4f4f;">${q.error}</p>`;
     nextBtn.disabled = true;
+    nextBtn.style.display = "none";
     return;
   }
 
@@ -1070,27 +1080,49 @@ function renderQuiz() {
     <p class="quiz-mini">${modeLabel}</p>
     <p class="quiz-q">${promptLabel}<br><span style="font-size:1.25rem;">${escapeHtml(q.prompt)}</span></p>
     <div id="quizResult" class="quiz-result" aria-live="polite"></div>
+    <div id="quizReveal" class="quiz-reveal" aria-live="polite"></div>
     <div class="quiz-choices" id="choices"></div>
     <div class="quiz-foot" id="quizFoot"></div>
+    <div id="quizNextWrap" class="quiz-next-wrap"></div>
   `;
 
   const choicesEl = document.getElementById("choices");
   const footEl = document.getElementById("quizFoot");
   const resultEl = document.getElementById("quizResult");
+  const revealEl = document.getElementById("quizReveal");
   if (resultEl) { resultEl.className = "quiz-result"; resultEl.textContent = ""; }
+  if (revealEl) revealEl.innerHTML = "";
 
   choicesEl.innerHTML = "";
 
   q.choices.forEach((c) => {
     const b = document.createElement("button");
     b.className = "choice-btn";
-    b.textContent = c;
+    // keep the raw choice for marking (don't rely on textContent because we may add subtext)
+    b.dataset.choice = c;
+    if (q.mode === "ja2en") {
+      // 日→英クイズ：日本語訳は「解答後のみ」表示する
+      const ja = (q.wordToMeaning && q.wordToMeaning[c]) ? q.wordToMeaning[c] : "";
+      b.innerHTML = `
+        <div class="choice-main">${escapeHtml(c)}</div>
+        <div class="choice-sub" data-ja="${escapeHtml(ja)}"></div>
+      `;
+    } else {
+      b.textContent = c;
+    }
     b.disabled = quizState.answered;
     b.addEventListener("click", () => onAnswer(c));
     choicesEl.appendChild(b);
   });
 
   footEl.innerHTML = `<span class="quiz-mini">出題元カテゴリ: ${STATUS_LABEL[q.target.status || "default"]}</span>`;
+  // Move the existing next button to the bottom of the quiz area (full width)
+  const nextWrap = document.getElementById("quizNextWrap");
+  if (nextWrap && nextBtn.parentElement !== nextWrap) {
+    nextWrap.appendChild(nextBtn);
+  }
+  nextBtn.classList.add("full-width", "quiz-next-btn");
+  nextBtn.style.display = "";
   nextBtn.disabled = !quizState.answered;
 }
 
@@ -1118,16 +1150,42 @@ function onAnswer(selected) {
     if (isCorrect) {
       resultEl.innerHTML = `<span class="mark">○</span><span>正解</span>`;
     } else {
-      resultEl.innerHTML = `<span class="mark">✕</span><span>不正解</span><span class="quiz-mini">正解: ${escapeHtml(q.correct)}</span>`;
+      // Avoid duplicate "answer" display; the correct answer is revealed below.
+      resultEl.innerHTML = `<span class="mark">✕</span><span>不正解</span>`;
     }
+  }
+
+  // After answering: reveal the answer (minimal, without duplicating the prompt)
+  const revealEl = document.getElementById("quizReveal");
+  if (revealEl) {
+    const en = q.target?.word || "";
+    const ja = q.target?.meaning || "";
+    if (q.mode === "ja2en") {
+      // Prompt already shows Japanese meaning; reveal only the English word to avoid duplication.
+      revealEl.innerHTML = en ? `<div class="quiz-reveal-word">${escapeHtml(en)}</div>` : "";
+    } else {
+      // en->ja: avoid duplication (prompt shows English, choices already show Japanese)
+      revealEl.innerHTML = "";
+    }
+  }
+
+  // 日→英：解答後のみ、各選択肢の下に日本語訳を表示
+  if (q.mode === "ja2en") {
+    const btns = Array.from(document.querySelectorAll(".choice-btn"));
+    btns.forEach((b) => {
+      const sub = b.querySelector(".choice-sub");
+      if (!sub) return;
+      const ja = sub.getAttribute("data-ja") || "";
+      sub.textContent = ja;
+    });
   }
 
   // mark buttons
   const btns = Array.from(document.querySelectorAll(".choice-btn"));
   btns.forEach((b) => {
-    const txt = b.textContent;
-    if (txt === q.correct) b.classList.add("correct");
-    if (txt === selected && !isCorrect) b.classList.add("wrong");
+    const choice = b.dataset.choice || "";
+    if (choice === q.correct) b.classList.add("correct");
+    if (choice === selected && !isCorrect) b.classList.add("wrong");
     b.disabled = true;
   });
 
@@ -1137,7 +1195,8 @@ function onAnswer(selected) {
     const msg = document.createElement("div");
     msg.className = "quiz-mini";
     msg.style.marginTop = "6px";
-    msg.textContent = isCorrect ? "正解！" : `不正解（正解: ${q.correct}）`;
+    // Avoid showing the correct answer text redundantly; it's revealed in the main reveal area.
+    msg.textContent = isCorrect ? "正解！" : "不正解";
     footEl.appendChild(msg);
 
     const actions = document.createElement("div");
@@ -1209,15 +1268,13 @@ function setupQuiz() {
     quizState.active = true;
     quizState.current = null;
     quizState.answered = false;
+    quizState.deckKey = "";
+    quizState.deckSig = "";
+    quizState.deckIds = [];
+    quizState.deckPos = 0;
     // keep score (or reset?). Better to reset on new start.
     quizState.correct = 0;
     quizState.total = 0;
-    // reset deck for a fresh run
-    quizState.deckKey = '';
-    quizState.deckSig = '';
-    quizState.deckIds = [];
-    quizState.deckPos = 0;
-
     nextQuestion();
   });
 
@@ -1317,6 +1374,7 @@ document.addEventListener("DOMContentLoaded", () => {
   setupAddForm();
   consumeIncomingShareToAddForm();
   setupFilter();
+  setupSort();
   setupExport();
   setupImport();
   setupQuiz();

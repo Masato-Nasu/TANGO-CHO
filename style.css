@@ -77,6 +77,11 @@ details summary::-webkit-details-marker{display:none}
   border-radius:16px;border:2px solid var(--border);background:#111;color:var(--text);
   padding:16px 52px 16px 16px;text-align:left;cursor:pointer;font-size:1.05rem;min-height:56px;position:relative
 }
+
+/* 日→英クイズ: 選択肢（英単語）の下に日本語訳を表示 */
+.choice-main{font-weight:700;line-height:1.2}
+.choice-sub{margin-top:6px;font-size:0.92rem;color:var(--sub);line-height:1.25}
+.choice-sub:empty{display:none}
 .choice-btn.correct{border-color:var(--accent);background:rgba(0,200,150,.12)}
 .choice-btn.wrong{border-color:var(--danger);background:rgba(255,79,79,.10)}
 .quiz-foot{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -119,6 +124,12 @@ details summary::-webkit-details-marker{display:none}
 .quiz-result .mark{font-size:1.8rem;line-height:1;}
 .quiz-result.correct{color:var(--accent);}
 .quiz-result.wrong{color:var(--danger);}
+
+.quiz-reveal{margin-top:6px;margin-bottom:6px;}
+.quiz-reveal-word{font-size:1.05rem;font-weight:800;letter-spacing:0.01em;}
+.quiz-reveal-meaning{margin-top:4px;font-size:0.95rem;opacity:0.9;}
+.quiz-next-wrap{margin-top:10px;}
+.quiz-next-btn{height:46px;}
 
 .choice-btn.correct::after{content:"○";position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:1.5rem;font-weight:900;color:var(--accent)}
 .choice-btn.wrong::after{content:"✕";position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:1.5rem;font-weight:900;color:var(--danger)}

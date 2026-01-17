@@ -18,7 +18,8 @@
     localStorage.setItem("tangoChoSharePayload", JSON.stringify(payload));
   } catch (e) {}
 
-  location.replace("./index.html?v=3.7.5");
+  // cache-bust for SW update
+  location.replace("./index.html?v=3.7.6");
 })();
 </script>
 </body>
