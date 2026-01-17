@@ -22,6 +22,8 @@
 
 ## 📸 Screenshots
 
+> `screenshot1.png`〜`screenshot4.png` をリポジトリ直下に置いてください。
+
 | | |
 |---|---|
 | ![Screenshot 1](./screenshot1.png) | ![Screenshot 2](./screenshot2.png) |
@@ -96,3 +98,32 @@
 - DeepL API
 - Hugging Face Spaces
 - GitHub Pages / PWA
+
+
+---
+
+## Web上の英単語を、このアプリの「追加」に一発で持ってくる（iPhone向け）
+
+このPWAは、外部から渡されたテキスト（選択した単語など）を受け取り、**追加画面の英単語欄に自動入力**できます。
+
+### 1) 共有（Web Share Target）
+- Safariで単語を選択 → 共有 → **TANGO-CHO**（または「TANGO-CHO Share」）を選ぶ
+- 共有されたテキストから英単語を抽出して、追加画面に入ります
+
+> iOSはShare Targetの表示が環境差があります。出てこない場合は次の方法が確実です。
+
+### 2) iOSショートカット（確実）
+Safariで単語を選択 → 共有 → ショートカット実行 → TANGO-CHOが開いて入力されます。
+
+ショートカットの最後は「URLを開く」で、次のように渡します：
+
+```text
+https://<あなたの公開URL>/index.html?word=[ショートカット入力]
+```
+
+### 3) ブックマークレット（最短）
+Safariのブックマークに、次を登録して使えます（共有が不安定な場合の保険）。
+
+```javascript
+javascript:(()=>{const t=window.getSelection?String(getSelection()):'';location.href='https://<あなたの公開URL>/index.html?word='+encodeURIComponent(t.trim());})();
+```

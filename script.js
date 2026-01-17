@@ -2,7 +2,6 @@ const STORAGE_KEY = "tangoChoWords";
 const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
 const FILTER_KEY = "tangoChoFilter";
-const SORT_KEY = "tangoChoSort";
 
 let editId = null;
 
@@ -370,6 +369,55 @@ function switchToAddTab() {
 }
 
 
+// --------------------
+// Incoming share / deep link (iOS-friendly)
+// --------------------
+const SHARE_PAYLOAD_KEY = "tangoChoSharePayload";
+
+function extractEnglishWord(s) {
+  const raw = String(s || "").trim();
+  if (!raw) return "";
+  // Prefer the first plausible English token
+  const m = raw.match(/[A-Za-z][A-Za-z\-']{0,49}/);
+  return m ? m[0].toLowerCase() : "";
+}
+
+function consumeIncomingShareToAddForm() {
+  // 1) URL params (works with iOS Shortcuts / bookmarklet)
+  const sp = new URLSearchParams(location.search);
+  const fromParam = sp.get('word') || sp.get('text') || sp.get('q') || sp.get('t') || '';
+
+  // 2) LocalStorage payload (share-target.html writes this)
+  let fromLS = '';
+  try {
+    const raw = localStorage.getItem(SHARE_PAYLOAD_KEY);
+    if (raw) {
+      const j = JSON.parse(raw);
+      fromLS = (j?.text || j?.title || j?.url || '').trim();
+    }
+  } catch (_) {}
+
+  const picked = extractEnglishWord(fromParam) || extractEnglishWord(fromLS);
+  if (!picked) return;
+
+  // Clear LS payload so it won't re-apply on next load
+  try { localStorage.removeItem(SHARE_PAYLOAD_KEY); } catch (_) {}
+
+  // Move user to Add tab and prefill
+  switchToAddTab();
+  const wordEl = document.getElementById('word');
+  if (wordEl) {
+    wordEl.value = picked;
+    wordEl.focus();
+  }
+
+  // Remove the query string after consuming (so refresh won't re-apply)
+  try {
+    if (location.search) history.replaceState({}, '', location.pathname + location.hash);
+  } catch (_) {}
+}
+
+
 function setupSettings() {
   const hfBase = document.getElementById("hfBase");
   const saveHfBaseBtn = document.getElementById("saveHfBaseBtn");
@@ -671,19 +719,12 @@ function renderWordList() {
   const listEl = document.getElementById("wordList");
   const countEl = document.getElementById("wordCount");
   const filter = (localStorage.getItem(FILTER_KEY) || "all").trim();
-  const sortOrder = (localStorage.getItem(SORT_KEY) || "time").trim();
   const all = loadWords();
 
   if (countEl) countEl.textContent = String(all.length);
   if (!listEl) return;
 
-  let words = [...all];
-  if (sortOrder === "alpha") {
-    words.sort((a, b) => String(a.word || "").toLowerCase().localeCompare(String(b.word || "").toLowerCase()));
-  } else {
-    // time (default): newest first
-    words.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
-  }
+  let words = [...all].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
   if (filter !== "all") words = words.filter((w) => (w.status || "default") === filter);
 
   listEl.innerHTML = "";
@@ -815,16 +856,6 @@ function setupFilter() {
   });
 }
 
-function setupSort() {
-  const sel = document.getElementById("sortOrder");
-  if (!sel) return;
-  sel.value = (localStorage.getItem(SORT_KEY) || "time").trim();
-  sel.addEventListener("change", () => {
-    localStorage.setItem(SORT_KEY, sel.value);
-    renderWordList();
-  });
-}
-
 function setupExport() {
   const btn = document.getElementById("exportBtn");
   if (!btn) return;
@@ -853,6 +884,11 @@ let quizState = {
   answered: false,
   correct: 0,
   total: 0,
+  // deck (no-repeat until all words shown)
+  deckKey: '',
+  deckSig: '',
+  deckIds: [],
+  deckPos: 0,
 };
 
 function choiceShuffle(arr) {
@@ -889,29 +925,75 @@ function statusWeight(st) {
   return 2;
 }
 
-function buildQuestion(mode, pool) {
-  const poolWords = getPoolWords(pool);
-  if (poolWords.length < 4) return { error: "4択クイズには、同じ出題カテゴリ内に単語が最低4つ必要です。" };
+function poolSignature(poolWords) {
+  // Stable signature to detect pool changes
+  return poolWords.map(w => w.id).sort().join('|');
+}
 
-  // For 日→英 (ja2en): show Japanese meaning under each English choice.
-  // Build a quick lookup table: { [word]: meaning }
-  const wordToMeaning = {};
-  for (const w of poolWords) {
-    const k = (w && w.word) ? String(w.word) : "";
-    if (!k) continue;
-    if (wordToMeaning[k] == null) wordToMeaning[k] = String(w.meaning || "");
+function weightedShuffleNoReplace(items, weightFn) {
+  // Efraimidis-Spirakis: weighted random permutation without replacement
+  const scored = items.map((it) => {
+    const w = Math.max(0.0001, Number(weightFn(it)) || 1);
+    const u = Math.random();
+    const key = -Math.log(Math.max(u, 1e-12)) / w;
+    return { it, key };
+  });
+  scored.sort((a, b) => a.key - b.key);
+  return scored.map(x => x.it);
+}
+
+function ensureQuizDeck(mode, pool) {
+  const poolWords = getPoolWords(pool);
+  const sig = poolSignature(poolWords);
+  const key = `${mode}|${pool}`;
+
+  const needRebuild =
+    quizState.deckKey !== key ||
+    quizState.deckSig !== sig ||
+    !Array.isArray(quizState.deckIds) ||
+    quizState.deckIds.length !== poolWords.length ||
+    quizState.deckPos >= quizState.deckIds.length;
+
+  if (needRebuild) {
+    const ordered = weightedShuffleNoReplace(poolWords, w => statusWeight(w.status || 'default'));
+    quizState.deckKey = key;
+    quizState.deckSig = sig;
+    quizState.deckIds = ordered.map(w => w.id);
+    quizState.deckPos = 0;
   }
 
-  const target = weightedPick(poolWords, w => statusWeight(w.status || "default"));
+  return poolWords;
+}
 
-  const prompt = mode === "en2ja" ? target.word : (target.meaning || "");
-  const correct = mode === "en2ja" ? (target.meaning || "") : target.word;
+
+function buildQuestion(mode, pool) {
+  const poolWords = getPoolWords(pool);
+  if (poolWords.length < 4) return { error: '4択クイズには、同じ出題カテゴリ内に単語が最低4つ必要です。' };
+
+  // Pick next target from a no-repeat deck
+  const currentPool = ensureQuizDeck(mode, pool);
+  let targetId = quizState.deckIds[quizState.deckPos];
+  let target = currentPool.find(w => w.id === targetId);
+  if (!target) {
+    // Pool changed unexpectedly; rebuild once
+    quizState.deckSig = '';
+    ensureQuizDeck(mode, pool);
+    targetId = quizState.deckIds[quizState.deckPos];
+    target = currentPool.find(w => w.id === targetId);
+  }
+  if (!target) return { error: '出題対象が見つかりませんでした（単語帳が更新された可能性）。もう一度「出題」を押してください。' };
+
+  // advance deck pointer now (so even if user backs out, the deck stays fair)
+  quizState.deckPos += 1;
+
+  const prompt = mode === 'en2ja' ? target.word : (target.meaning || '');
+  const correct = mode === 'en2ja' ? (target.meaning || '') : target.word;
 
   // distractors
   const others = poolWords.filter(w => w.id !== target.id);
   const seen = new Set([correct]);
   const distract = [];
-  const keyOf = (w) => mode === "en2ja" ? (w.meaning || "") : (w.word || "");
+  const keyOf = (w) => mode === 'en2ja' ? (w.meaning || '') : (w.word || '');
   const shuffled = choiceShuffle(others);
 
   for (const w of shuffled) {
@@ -924,12 +1006,11 @@ function buildQuestion(mode, pool) {
   }
 
   if (distract.length < 3) {
-    return { error: "4択の選択肢を作れませんでした（訳/単語の重複が多い可能性）。別カテゴリを選ぶか、単語数を増やしてください。" };
+    return { error: '4択の選択肢を作れませんでした（訳/単語の重複が多い可能性）。別カテゴリを選ぶか、単語数を増やしてください。' };
   }
 
   const choices = choiceShuffle([correct, ...distract]);
-
-  return { target, mode, prompt, correct, choices, wordToMeaning };
+  return { target, mode, prompt, correct, choices };
 }
 
 function renderQuiz() {
@@ -943,7 +1024,6 @@ function renderQuiz() {
   if (!quizState.active || !quizState.current) {
     area.innerHTML = `<p class="note">「出題」を押すと始まります。※ 4択クイズは、単語が最低4つ必要です。</p>`;
     nextBtn.disabled = true;
-    nextBtn.style.display = "none";
     return;
   }
 
@@ -951,7 +1031,6 @@ function renderQuiz() {
   if (q.error) {
     area.innerHTML = `<p class="note" style="color:#ff4f4f;">${q.error}</p>`;
     nextBtn.disabled = true;
-    nextBtn.style.display = "none";
     return;
   }
 
@@ -962,49 +1041,27 @@ function renderQuiz() {
     <p class="quiz-mini">${modeLabel}</p>
     <p class="quiz-q">${promptLabel}<br><span style="font-size:1.25rem;">${escapeHtml(q.prompt)}</span></p>
     <div id="quizResult" class="quiz-result" aria-live="polite"></div>
-    <div id="quizReveal" class="quiz-reveal" aria-live="polite"></div>
     <div class="quiz-choices" id="choices"></div>
     <div class="quiz-foot" id="quizFoot"></div>
-    <div id="quizNextWrap" class="quiz-next-wrap"></div>
   `;
 
   const choicesEl = document.getElementById("choices");
   const footEl = document.getElementById("quizFoot");
   const resultEl = document.getElementById("quizResult");
-  const revealEl = document.getElementById("quizReveal");
   if (resultEl) { resultEl.className = "quiz-result"; resultEl.textContent = ""; }
-  if (revealEl) revealEl.innerHTML = "";
 
   choicesEl.innerHTML = "";
 
   q.choices.forEach((c) => {
     const b = document.createElement("button");
     b.className = "choice-btn";
-    // keep the raw choice for marking (don't rely on textContent because we may add subtext)
-    b.dataset.choice = c;
-    if (q.mode === "ja2en") {
-      // 日→英クイズ：日本語訳は「解答後のみ」表示する
-      const ja = (q.wordToMeaning && q.wordToMeaning[c]) ? q.wordToMeaning[c] : "";
-      b.innerHTML = `
-        <div class="choice-main">${escapeHtml(c)}</div>
-        <div class="choice-sub" data-ja="${escapeHtml(ja)}"></div>
-      `;
-    } else {
-      b.textContent = c;
-    }
+    b.textContent = c;
     b.disabled = quizState.answered;
     b.addEventListener("click", () => onAnswer(c));
     choicesEl.appendChild(b);
   });
 
   footEl.innerHTML = `<span class="quiz-mini">出題元カテゴリ: ${STATUS_LABEL[q.target.status || "default"]}</span>`;
-  // Move the existing next button to the bottom of the quiz area (full width)
-  const nextWrap = document.getElementById("quizNextWrap");
-  if (nextWrap && nextBtn.parentElement !== nextWrap) {
-    nextWrap.appendChild(nextBtn);
-  }
-  nextBtn.classList.add("full-width", "quiz-next-btn");
-  nextBtn.style.display = "";
   nextBtn.disabled = !quizState.answered;
 }
 
@@ -1032,49 +1089,16 @@ function onAnswer(selected) {
     if (isCorrect) {
       resultEl.innerHTML = `<span class="mark">○</span><span>正解</span>`;
     } else {
-      // Avoid duplicate "answer" display; the correct answer is revealed below.
-      resultEl.innerHTML = `<span class="mark">✕</span><span>不正解</span>`;
+      resultEl.innerHTML = `<span class="mark">✕</span><span>不正解</span><span class="quiz-mini">正解: ${escapeHtml(q.correct)}</span>`;
     }
-  }
-
-  // After answering: reveal the answer (minimal, without duplicating the prompt)
-  const revealEl = document.getElementById("quizReveal");
-  if (revealEl) {
-    const en = q.target?.word || "";
-    const ja = q.target?.meaning || "";
-    if (q.mode === "ja2en") {
-      // Prompt already shows Japanese meaning; reveal only the English word to avoid duplication.
-      revealEl.innerHTML = en ? `<div class="quiz-reveal-word">${escapeHtml(en)}</div>` : "";
-    } else {
-      // en2ja: reveal both English + Japanese
-      if (en || ja) {
-        revealEl.innerHTML = `
-          <div class="quiz-reveal-word">${escapeHtml(en)}</div>
-          <div class="quiz-reveal-meaning">${escapeHtml(ja)}</div>
-        `;
-      } else {
-        revealEl.textContent = "";
-      }
-    }
-  }
-
-  // 日→英：解答後のみ、各選択肢の下に日本語訳を表示
-  if (q.mode === "ja2en") {
-    const btns = Array.from(document.querySelectorAll(".choice-btn"));
-    btns.forEach((b) => {
-      const sub = b.querySelector(".choice-sub");
-      if (!sub) return;
-      const ja = sub.getAttribute("data-ja") || "";
-      sub.textContent = ja;
-    });
   }
 
   // mark buttons
   const btns = Array.from(document.querySelectorAll(".choice-btn"));
   btns.forEach((b) => {
-    const choice = b.dataset.choice || "";
-    if (choice === q.correct) b.classList.add("correct");
-    if (choice === selected && !isCorrect) b.classList.add("wrong");
+    const txt = b.textContent;
+    if (txt === q.correct) b.classList.add("correct");
+    if (txt === selected && !isCorrect) b.classList.add("wrong");
     b.disabled = true;
   });
 
@@ -1084,8 +1108,7 @@ function onAnswer(selected) {
     const msg = document.createElement("div");
     msg.className = "quiz-mini";
     msg.style.marginTop = "6px";
-    // Avoid showing the correct answer text redundantly; it's revealed in the main reveal area.
-    msg.textContent = isCorrect ? "正解！" : "不正解";
+    msg.textContent = isCorrect ? "正解！" : `不正解（正解: ${q.correct}）`;
     footEl.appendChild(msg);
 
     const actions = document.createElement("div");
@@ -1160,6 +1183,12 @@ function setupQuiz() {
     // keep score (or reset?). Better to reset on new start.
     quizState.correct = 0;
     quizState.total = 0;
+    // reset deck for a fresh run
+    quizState.deckKey = '';
+    quizState.deckSig = '';
+    quizState.deckIds = [];
+    quizState.deckPos = 0;
+
     nextQuestion();
   });
 
@@ -1257,8 +1286,8 @@ document.addEventListener("DOMContentLoaded", () => {
   setupTabs();
   setupSettings();
   setupAddForm();
+  consumeIncomingShareToAddForm();
   setupFilter();
-  setupSort();
   setupExport();
   setupImport();
   setupQuiz();
