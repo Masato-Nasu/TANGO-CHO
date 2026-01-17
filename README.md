@@ -145,18 +145,6 @@ https://masato-nasu.github.io/TANGO-CHO/index.html?word=subscription
 
 ---
 
-## ⚙️ 接続設定（HF Spaces）
-
-「翻訳（DeepL）」と「類義語取得」は、HF Spaces 側のAPIを使用します。
-
-- HF Spaces API Base（例）  
-  `https://mazzgogo-tango-cho.hf.space`
-- APP_TOKEN は Spaces 側で設定している場合のみ入力（未設定なら空でOK）
-- DeepLキーは **SpacesのSecrets（DEEPL_KEY）** に入れます  
-  → PWA側には不要です
-
----
-
 ## キーについて
 
 - このアプリには入力が必要なキーがあります。必要な方はご連絡ください。
