@@ -1,7 +1,9 @@
-const CACHE_NAME = "tango-cho-cache-v3.7.11";
+const CACHE_NAME = "tango-cho-cache-v3.7.11-v7";
 const ASSETS = [
   "./",
   "./index.html",
+  "./bank_enja.js",
+  "./vocab_pool.js",
   "./style.css",
   "./script.js",
   "./manifest.json",
@@ -46,12 +48,18 @@ self.addEventListener("fetch", (e) => {
   e.respondWith(
     caches.open(CACHE_NAME).then(async (cache) => {
       if (isNav) {
-        const cachedIndex = await cache.match("./index.html", { ignoreSearch: true });
+        const cachedIndex = await cache.match("./index.html",
+  "./bank_enja.js",
+  "./vocab_pool.js", { ignoreSearch: true });
         if (cachedIndex) return cachedIndex;
 
         try {
-          const fresh = await fetch("./index.html", { cache: "no-store" });
-          if (fresh && fresh.ok) cache.put("./index.html", fresh.clone());
+          const fresh = await fetch("./index.html",
+  "./bank_enja.js",
+  "./vocab_pool.js", { cache: "no-store" });
+          if (fresh && fresh.ok) cache.put("./index.html",
+  "./bank_enja.js",
+  "./vocab_pool.js", fresh.clone());
           return fresh;
         } catch (err) {
           return cachedIndex || Response.error();

@@ -3,6 +3,9 @@ const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
 const FILTER_KEY = "tangoChoFilter";
 const SORT_KEY = "tangoChoSort";
+const DIFF_CAP_KEY = "tangoChoDifficultyCap";
+const STUDY_HIST_KEY = "tangoChoStudyHist";
+const FORTUNE_MANUAL_KEY = "tangoChoFortuneLevelManual";
 
 let editId = null;
 
@@ -360,6 +363,7 @@ function setupTabs() {
       document.getElementById(id)?.classList.add("active");
       // When entering list tab, rerender to reflect any changes
       if (id === "listSection") renderWordList();
+      if (id === "addSection") renderVocabSuggest();
     });
   });
 }
@@ -737,6 +741,101 @@ function setupAddForm() {
   });
 }
 
+
+// --- Deterministic helpers (seeded shuffle etc.) ---
+function __hash32(str){
+  // xmur3 (simple 32-bit hash)
+  let h = 1779033703 ^ (str ? str.length : 0);
+  for (let i = 0; i < (str ? str.length : 0); i++){
+    h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
+  return (h >>> 0);
+}
+function __mulberry32(a){
+  return function(){
+    let t = (a += 0x6D2B79F5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function __todayKey(){
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,"0");
+  const day = String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+}
+function __shuffleInPlace(arr, seedStr){
+  const rnd = __mulberry32(__hash32(String(seedStr||"seed")));
+  for (let i = arr.length - 1; i > 0; i--){
+    const j = Math.floor(rnd() * (i + 1));
+    const tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+  }
+  return arr;
+}
+
+// --- Adaptive difficulty cap (no extra UI) ---
+function getDifficultyCap(){
+  const max = (window.VOCAB_POOL && Array.isArray(window.VOCAB_POOL)) ? window.VOCAB_POOL.length : 12000;
+  const minCap = 800;
+  let v = parseInt(localStorage.getItem(DIFF_CAP_KEY) || "1200", 10);
+  if (!Number.isFinite(v)) v = 1200;
+  v = Math.max(minCap, Math.min(max, v));
+  return v;
+}
+function setDifficultyCap(v){
+  const max = (window.VOCAB_POOL && Array.isArray(window.VOCAB_POOL)) ? window.VOCAB_POOL.length : 12000;
+  const minCap = 800;
+  let x = parseInt(String(v||0), 10);
+  if (!Number.isFinite(x)) x = 1200;
+  x = Math.max(minCap, Math.min(max, x));
+  localStorage.setItem(DIFF_CAP_KEY, String(x));
+  return x;
+}
+function getStudyHist(){
+  try{
+    const raw = localStorage.getItem(STUDY_HIST_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.slice(-80) : [];
+  }catch(_){ return []; }
+}
+function setStudyHist(arr){
+  try{
+    const a = Array.isArray(arr) ? arr.slice(-80) : [];
+    localStorage.setItem(STUDY_HIST_KEY, JSON.stringify(a));
+  }catch(_){}
+}
+function recordStudyResult(isCorrect){
+  const hist = getStudyHist();
+  hist.push(isCorrect ? 1 : 0);
+  setStudyHist(hist);
+
+  // Adjust only when we have enough signal
+  const n = hist.length;
+  const windowN = Math.min(50, n);
+  const slice = hist.slice(-windowN);
+  const correct = slice.reduce((s,x)=>s+(x?1:0),0);
+  const rate = correct / windowN;
+
+  let cap = getDifficultyCap();
+  if (windowN >= 20){
+    if (rate >= 0.85) cap += 120;
+    else if (rate <= 0.55) cap -= 120;
+    // else: keep
+    setDifficultyCap(cap);
+  }
+}
+function capToFortuneLevel(cap){
+  // Simple thresholds; tuned to feel natural.
+  if (cap < 1200) return "jhs";
+  if (cap < 2200) return "hs";
+  return "adult";
+}
+
+
 function renderWordList() {
   const listEl = document.getElementById("wordList");
   const countEl = document.getElementById("wordCount");
@@ -754,7 +853,14 @@ function renderWordList() {
     // time (default): newest first
     words.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
   }
-  if (filter !== "all") words = words.filter((w) => (w.status || "default") === filter);
+  
+  if (filter === "random") {
+    // Shuffle the whole list (stable within a day)
+    __shuffleInPlace(words, `list:${__todayKey()}:${words.length}`);
+  } else if (filter !== "all") {
+    words = words.filter((w) => (w.status || "default") === filter);
+  }
+
 
   listEl.innerHTML = "";
 
@@ -883,6 +989,58 @@ function setupFilter() {
     localStorage.setItem(FILTER_KEY, sel.value);
     renderWordList();
   });
+}
+
+function renderVocabSuggest(){
+  const box = document.getElementById("vocabSuggest");
+  const input = document.getElementById("word");
+  if (!box || !input) return;
+
+  const q = String(input.value || "").trim();
+  if (q) { box.innerHTML = ""; return; }
+
+  const pool = window.VOCAB_POOL;
+  if (!Array.isArray(pool) || pool.length === 0) { box.innerHTML = ""; return; }
+
+  const cap = getDifficultyCap();
+  const subset = pool.slice(0, Math.min(cap, pool.length));
+
+  const registered = new Set(loadWords().map(w => String(w.word || "").toLowerCase()));
+  const picked = new Set();
+
+  const rnd = __mulberry32(__hash32(`suggest:${__todayKey()}:${cap}:${registered.size}`));
+  const picks = [];
+  let guard = 0;
+  while (picks.length < 14 && guard < 400){
+    guard++;
+    const w = subset[Math.floor(rnd() * subset.length)];
+    if (!w) continue;
+    if (registered.has(w)) continue;
+    if (picked.has(w)) continue;
+    picked.add(w);
+    picks.push(w);
+  }
+
+  box.innerHTML = "";
+  picks.forEach((w) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "small-btn";
+    b.textContent = w;
+    b.addEventListener("click", () => {
+      input.value = w;
+      input.focus();
+      box.innerHTML = "";
+    });
+    box.appendChild(b);
+  });
+}
+
+function setupVocabSuggest(){
+  const input = document.getElementById("word");
+  if (!input) return;
+  input.addEventListener("focus", renderVocabSuggest);
+  input.addEventListener("input", renderVocabSuggest);
 }
 
 function setupSort() {
@@ -1163,6 +1321,7 @@ function onAnswer(selected) {
   const q = quizState.current;
   const isCorrect = selected === q.correct;
   if (isCorrect) quizState.correct += 1;
+  try{ recordStudyResult(isCorrect); }catch(_){}
 
   // SFX + big mark
   const resultEl = document.getElementById("quizResult");
@@ -1404,6 +1563,7 @@ document.addEventListener("DOMContentLoaded", () => {
   setupSettings();
   setupAddForm();
   applyIncomingWordToAddForm();
+  setupVocabSuggest();
   setupFilter();
   setupSort();
   setupExport();
@@ -1413,8 +1573,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   renderWordList();
   renderQuiz();
-
-  document.getElementById("ttsTestBtn")?.addEventListener("click", () => speak("Hello, this is a test."));
+  renderVocabSuggest();
 });
 
 // ============================================================================
@@ -1463,9 +1622,21 @@ function setupFortune(){
     } catch(_) {}
   }
 
+
+  // Auto-select English level from study progress (unless user has explicitly chosen)
+  try{
+    if (!localStorage.getItem(FORTUNE_MANUAL_KEY)) {
+      levelEl.value = capToFortuneLevel(getDifficultyCap());
+      persist();
+    }
+  }catch(_){}
+
   birthEl.addEventListener("change", persist);
   dateEl.addEventListener("change", persist);
-  levelEl.addEventListener("change", persist);
+  levelEl.addEventListener("change", () => {
+    try{ localStorage.setItem(FORTUNE_MANUAL_KEY, "1"); }catch(_){}
+    persist();
+  });
 
   genBtn.addEventListener("click", () => {
     const birth = birthEl.value;
