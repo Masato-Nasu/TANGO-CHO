@@ -631,64 +631,20 @@ function setupAddForm() {
   }
 
   if (randomBtn) {
-    randomBtn.addEventListener("click", async () => {
+    randomBtn.addEventListener("click", () => {
       if (editId) return setMsg("編集中はランダムを使えません（編集を解除してください）。", "err");
 
-      // reset UI
+      // reset UI (do NOT auto-fetch synonyms)
       try { if (synonymsEl) synonymsEl.value = ""; } catch (_) {}
       try { meaningEl.value = ""; } catch (_) {}
       setState("未翻訳");
+      setMsg("", "");
 
-      setMsg("ランダムで単語を選択中...", "");
-
-      let picked = null;
-      let syns = [];
-      let synError = null;
-
-      // Prefer words that return at least 1 synonym (avoid "0件" experience)
-      for (let i = 0; i < 5; i++) {
-        const w = pickRandomWord();
-        if (!w) break;
-        picked = w;
-
-        try {
-          const a = await getSynonymsSmart(w, 8);
-          syns = Array.isArray(a) ? a : [];
-          if (syns.length > 0) break;
-        } catch (e) {
-          synError = e;
-          // Don't block; we'll still translate and let user retry later
-          break;
-        }
-      }
-
+      const picked = pickRandomWord();
       if (!picked) return setMsg("ランダム候補が見つかりません。", "err");
 
       wordEl.value = picked;
-
-      // Fill synonyms if we have them
-      if (synonymsEl) {
-        if (syns && syns.length) synonymsEl.value = syns.slice(0, 8).join(", ");
-      }
-
-      // Translate (so user can save immediately)
-      setMsg("翻訳中...", "");
-      setState("翻訳中");
-      try {
-        const ja = await translateToJaViaSpace(picked);
-        meaningEl.value = ja;
-        if (synError) {
-          setMsg("翻訳しました。類義語は取得できませんでした（後で『類義語取得』で再試行できます）。", "ok");
-        } else if (syns && syns.length) {
-          setMsg(`翻訳しました。類義語も取得しました（${Math.min(8, syns.length)}件）。`, "ok");
-        } else {
-          setMsg("翻訳しました。類義語は見つからない単語の可能性があります（必要なら別の単語で）。", "ok");
-        }
-        setState("翻訳済み");
-      } catch (e) {
-        setMsg(String(e && e.message ? e.message : e), "err");
-        setState("失敗");
-      }
+      wordEl.focus();
     });
   }
 
