@@ -582,7 +582,8 @@ function setupAddForm() {
     if (!Array.isArray(pool) || pool.length === 0) return null;
 
     const cap = getDifficultyCap();
-    const subset = pool.slice(0, Math.min(cap, pool.length));
+    const hardLimit = 5000; // keep random practical (avoid very rare words)
+    const subset = pool.slice(0, Math.min(cap, hardLimit, pool.length));
 
     const registered = new Set(loadWords().map(w => String(w.word || "").toLowerCase()));
 
@@ -633,14 +634,61 @@ function setupAddForm() {
     randomBtn.addEventListener("click", async () => {
       if (editId) return setMsg("編集中はランダムを使えません（編集を解除してください）。", "err");
 
-      const w = pickRandomWord();
-      if (!w) return setMsg("ランダム候補が見つかりません。", "err");
-
-      wordEl.value = w;
+      // reset UI
+      try { if (synonymsEl) synonymsEl.value = ""; } catch (_) {}
+      try { meaningEl.value = ""; } catch (_) {}
       setState("未翻訳");
-      setMsg("", "");
-      // Auto-translate to enable quick save
-      try { translateBtn.click(); } catch (_) {}
+
+      setMsg("ランダムで単語を選択中...", "");
+
+      let picked = null;
+      let syns = [];
+      let synError = null;
+
+      // Prefer words that return at least 1 synonym (avoid "0件" experience)
+      for (let i = 0; i < 5; i++) {
+        const w = pickRandomWord();
+        if (!w) break;
+        picked = w;
+
+        try {
+          const a = await getSynonymsSmart(w, 8);
+          syns = Array.isArray(a) ? a : [];
+          if (syns.length > 0) break;
+        } catch (e) {
+          synError = e;
+          // Don't block; we'll still translate and let user retry later
+          break;
+        }
+      }
+
+      if (!picked) return setMsg("ランダム候補が見つかりません。", "err");
+
+      wordEl.value = picked;
+
+      // Fill synonyms if we have them
+      if (synonymsEl) {
+        if (syns && syns.length) synonymsEl.value = syns.slice(0, 8).join(", ");
+      }
+
+      // Translate (so user can save immediately)
+      setMsg("翻訳中...", "");
+      setState("翻訳中");
+      try {
+        const ja = await translateToJaViaSpace(picked);
+        meaningEl.value = ja;
+        if (synError) {
+          setMsg("翻訳しました。類義語は取得できませんでした（後で『類義語取得』で再試行できます）。", "ok");
+        } else if (syns && syns.length) {
+          setMsg(`翻訳しました。類義語も取得しました（${Math.min(8, syns.length)}件）。`, "ok");
+        } else {
+          setMsg("翻訳しました。類義語は見つからない単語の可能性があります（必要なら別の単語で）。", "ok");
+        }
+        setState("翻訳済み");
+      } catch (e) {
+        setMsg(String(e && e.message ? e.message : e), "err");
+        setState("失敗");
+      }
     });
   }
 
@@ -683,8 +731,13 @@ function setupAddForm() {
       try {
         const syns = await getSynonymsSmart(w, 8);
         synonymsEl.value = syns.slice(0, 8).join(", ");
-        setMsg(`類義語を取得しました（${Math.min(8, syns.length)}件）。`, "ok");
+        if (syns.length) {
+          setMsg(`類義語を取得しました（${Math.min(8, syns.length)}件）。`, "ok");
+        } else {
+          setMsg("類義語が見つかりませんでした。別の単語で試すか「ランダム」を押してください。", "ok");
+        }
       } catch (e) {
+
         setMsg(String(e && e.message ? e.message : "類義語の取得に失敗しました。"), "err");
       }
     });
