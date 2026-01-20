@@ -1,8 +1,9 @@
 // BANK_ENJA: English fortune sentences + Japanese paired translation.
-// Structure matches 100% horoscope bank.js style: category -> {a,b,c} -> array.
-// Note: Keep texts natural, avoid repeated stock phrases, and keep TOEIC-friendly vocabulary.
+// Structure: BANK_ENJA[level][category][tier] -> array of {en, ja}
+// Levels: jhs (中学生), hs (高校生), adult (大人)
 
-const BANK_ENJA = {
+// --- Adult / High school bank (full) ---
+const BANK_ADULT = {
   overall: {
     a: [
       { en: "Your timing is excellent today. If you act decisively, you can turn a small chance into a clear win.", ja: "今日はタイミングが良い日です。迷わず動けば、小さなチャンスを確かな成果に変えられます。" },
@@ -228,3 +229,655 @@ const BANK_ENJA = {
     ],
   },
 };
+
+// --- Junior high school bank (simpler) ---
+const BANK_JHS = {
+  "overall": {
+    "a": [
+      {
+        "en": "Today is a good day to start. Do one small thing first.",
+        "ja": "今日は始めるのに良い日。まず小さな一歩から。"
+      },
+      {
+        "en": "Your plan works well. Keep it simple and move on.",
+        "ja": "計画はうまくいきます。シンプルに進めてOK。"
+      },
+      {
+        "en": "If you focus on one goal, you can finish faster.",
+        "ja": "目標を一つに絞ると早く終わります。"
+      },
+      {
+        "en": "A kind message helps. Say it in short words.",
+        "ja": "短い一言が助けになります。やさしく伝えて。"
+      },
+      {
+        "en": "Good timing is on your side. Try now.",
+        "ja": "タイミングが良い日。今やってみて。"
+      },
+      {
+        "en": "You can do more than you think. Start with the easiest task.",
+        "ja": "思ったより進められます。簡単なものから。"
+      },
+      {
+        "en": "Small wins build confidence. Check one item off your list.",
+        "ja": "小さな達成で自信が出ます。ひとつ片付けよう。"
+      },
+      {
+        "en": "Your focus is strong today. Turn off distractions for a while.",
+        "ja": "集中しやすい日。少しだけ邪魔を切って。"
+      },
+      {
+        "en": "Ask for help if needed. People will respond kindly.",
+        "ja": "必要なら助けを求めて。優しく返ってきます。"
+      },
+      {
+        "en": "Keep your pace. Steady work brings good results.",
+        "ja": "今のペースでOK。コツコツが成果に。"
+      }
+    ],
+    "b": [
+      {
+        "en": "Go step by step. No need to rush.",
+        "ja": "一歩ずつで大丈夫。急がなくてOK。"
+      },
+      {
+        "en": "Do the basics first. That will clear your mind.",
+        "ja": "基本を先にやると頭がスッキリします。"
+      },
+      {
+        "en": "If you feel busy, write a short list.",
+        "ja": "忙しいなら短いリストを書いて。"
+      },
+      {
+        "en": "Check details once. Then keep moving.",
+        "ja": "細部を一度確認したら、そのまま進めて。"
+      },
+      {
+        "en": "Keep your promises small and realistic today.",
+        "ja": "約束は無理のない範囲で。"
+      },
+      {
+        "en": "Take a short break. It will help your focus.",
+        "ja": "短い休憩で集中が戻ります。"
+      },
+      {
+        "en": "Talk less, do more. Simple action works.",
+        "ja": "言いすぎず、行動を。シンプルが効きます。"
+      },
+      {
+        "en": "If you are unsure, ask one clear question.",
+        "ja": "迷ったら、はっきり一つ聞いてみて。"
+      },
+      {
+        "en": "Keep things tidy. A clean space helps.",
+        "ja": "少し整えると楽になります。"
+      },
+      {
+        "en": "Finish one thing before starting another.",
+        "ja": "次へ行く前に、ひとつ終わらせよう。"
+      }
+    ],
+    "c": [
+      {
+        "en": "Keep your day light. Do only what is needed.",
+        "ja": "今日は軽めに。必要なことだけでOK。"
+      },
+      {
+        "en": "If you feel tired, slow down and breathe.",
+        "ja": "疲れたらペースを落として深呼吸。"
+      },
+      {
+        "en": "Avoid big decisions today. Wait a little.",
+        "ja": "大きな決断は避けて。少し待つと良いです。"
+      },
+      {
+        "en": "Do not overbook. Leave extra time.",
+        "ja": "予定を詰めすぎないで。余裕を作って。"
+      },
+      {
+        "en": "Double-check simple mistakes.",
+        "ja": "うっかりミスに注意。確認を。"
+      },
+      {
+        "en": "If you feel upset, pause before you reply.",
+        "ja": "イラっとしたら返事の前に一呼吸。"
+      },
+      {
+        "en": "Choose the safe option.",
+        "ja": "安全側の選択が吉。"
+      },
+      {
+        "en": "Rest is important today.",
+        "ja": "今日は休むことが大事。"
+      },
+      {
+        "en": "Keep choices few. Less is better.",
+        "ja": "選択肢は少なく。少ないほど楽。"
+      },
+      {
+        "en": "End the day early if you can. Recovery first.",
+        "ja": "可能なら早めに切り上げて。回復が先。"
+      }
+    ]
+  },
+  "love": {
+    "a": [
+      {
+        "en": "A small hello brings a warm mood.",
+        "ja": "小さな挨拶で空気が温かくなります。"
+      },
+      {
+        "en": "Be honest and simple. It will be understood.",
+        "ja": "正直に、シンプルに。伝わります。"
+      },
+      {
+        "en": "Send a short message. Timing is good.",
+        "ja": "短い連絡が吉。タイミングが良い日です。"
+      },
+      {
+        "en": "Listen first. That shows care.",
+        "ja": "まず聞くこと。それが思いやりになります。"
+      },
+      {
+        "en": "A kind word can fix the mood fast.",
+        "ja": "やさしい一言で雰囲気がすぐ戻ります。"
+      },
+      {
+        "en": "Smile and relax. Your charm shows naturally.",
+        "ja": "笑ってリラックス。自然に魅力が出ます。"
+      },
+      {
+        "en": "Make a small plan together. Simple is best.",
+        "ja": "小さな予定を立てて。シンプルが一番。"
+      },
+      {
+        "en": "Say thanks. It will deepen trust.",
+        "ja": "ありがとうを言うと信頼が深まります。"
+      },
+      {
+        "en": "Ask, don’t guess. It avoids confusion.",
+        "ja": "想像より質問。誤解を避けられます。"
+      },
+      {
+        "en": "Warm feelings grow with small actions.",
+        "ja": "小さな行動で温かさが育ちます。"
+      }
+    ],
+    "b": [
+      {
+        "en": "Keep your tone gentle. That is enough.",
+        "ja": "口調をやさしく。それだけで十分。"
+      },
+      {
+        "en": "Give a little space if needed.",
+        "ja": "必要なら少し距離を。"
+      },
+      {
+        "en": "Do not overthink silence.",
+        "ja": "沈黙を考えすぎないで。"
+      },
+      {
+        "en": "Choose simple words over long talks.",
+        "ja": "長話より短い言葉が効きます。"
+      },
+      {
+        "en": "If you feel unsure, wait before you decide.",
+        "ja": "迷うなら決めるのは少し後で。"
+      },
+      {
+        "en": "Avoid comparing. Focus on your own bond.",
+        "ja": "比べないで。自分の関係を大切に。"
+      },
+      {
+        "en": "A small apology helps when needed.",
+        "ja": "必要なら小さく謝ると良いです。"
+      },
+      {
+        "en": "Reply calmly, even if you feel stressed.",
+        "ja": "焦っても落ち着いて返事を。"
+      },
+      {
+        "en": "Warmth beats speed.",
+        "ja": "速さより温かさ。"
+      },
+      {
+        "en": "Keep expectations light today.",
+        "ja": "期待を軽くすると楽です。"
+      }
+    ],
+    "c": [
+      {
+        "en": "Avoid hard topics today. Keep it light.",
+        "ja": "重い話題は避けて。軽くいきましょう。"
+      },
+      {
+        "en": "Do not test people. Ask directly.",
+        "ja": "試さないで。直接聞いて。"
+      },
+      {
+        "en": "If you feel hurt, take distance first.",
+        "ja": "傷ついたらまず距離を。"
+      },
+      {
+        "en": "Wait for facts, not guesses.",
+        "ja": "想像より事実を待って。"
+      },
+      {
+        "en": "A gentle “no” is okay.",
+        "ja": "やさしい「いいえ」で大丈夫。"
+      },
+      {
+        "en": "Choose calm places. Noise can make it worse.",
+        "ja": "落ち着く場所を。騒がしいと悪化しやすいです。"
+      },
+      {
+        "en": "Do not rush to close the issue.",
+        "ja": "結論を急がないで。"
+      },
+      {
+        "en": "Take care of yourself first.",
+        "ja": "まず自分を整えて。"
+      },
+      {
+        "en": "Let the mood settle. Time helps.",
+        "ja": "気分が落ち着くのを待って。時間が助けます。"
+      },
+      {
+        "en": "Keep messages short if emotions are strong.",
+        "ja": "感情が強いなら短い連絡に。"
+      }
+    ]
+  },
+  "work": {
+    "a": [
+      {
+        "en": "You can finish tasks well today. Start with one priority.",
+        "ja": "今日は作業が進みます。優先を一つ決めて。"
+      },
+      {
+        "en": "A short talk can solve a problem. Ask clearly.",
+        "ja": "短い相談で解決しそう。はっきり聞いて。"
+      },
+      {
+        "en": "Your work feels smooth if you follow your plan.",
+        "ja": "計画どおりに進めるとスムーズです。"
+      },
+      {
+        "en": "Small steps bring big progress.",
+        "ja": "小さな一歩が大きな前進に。"
+      },
+      {
+        "en": "Keep your desk tidy. It helps focus.",
+        "ja": "机を少し整えると集中できます。"
+      },
+      {
+        "en": "Do the hardest part first. Then it gets easy.",
+        "ja": "一番大変な所を先に。あとは楽になります。"
+      },
+      {
+        "en": "Write “done” rules. It helps you finish.",
+        "ja": "終わりのルールを書くと終わらせやすいです。"
+      },
+      {
+        "en": "Reply on time. Trust grows.",
+        "ja": "返信を早めに。信頼が増えます。"
+      },
+      {
+        "en": "Use simple notes. It prevents mistakes.",
+        "ja": "簡単なメモでミスを防げます。"
+      },
+      {
+        "en": "You can do quality work without extra effort.",
+        "ja": "無理せず質を上げられます。"
+      }
+    ],
+    "b": [
+      {
+        "en": "Steady work is best today. Do not change plans too much.",
+        "ja": "今日は手堅く。やり方を変えすぎないで。"
+      },
+      {
+        "en": "Split the task into small parts.",
+        "ja": "作業を小さく分けると楽です。"
+      },
+      {
+        "en": "Set a short timer and focus on one thing.",
+        "ja": "短いタイマーで一つに集中。"
+      },
+      {
+        "en": "Check your work once before you send it.",
+        "ja": "送る前に一度確認。"
+      },
+      {
+        "en": "Take breaks on purpose.",
+        "ja": "休憩は意図的に。"
+      },
+      {
+        "en": "Use bullet points. Keep messages clear.",
+        "ja": "箇条書きで明快に。"
+      },
+      {
+        "en": "If pressure rises, return to simple tasks.",
+        "ja": "プレッシャーなら簡単な作業へ。"
+      },
+      {
+        "en": "Finish one thing first.",
+        "ja": "まず一つ終わらせる。"
+      },
+      {
+        "en": "Ask for clarification if needed.",
+        "ja": "必要なら確認を取って。"
+      },
+      {
+        "en": "Keep the schedule realistic.",
+        "ja": "予定は現実的に。"
+      }
+    ],
+    "c": [
+      {
+        "en": "Do not pack your schedule. Keep it light.",
+        "ja": "予定を詰めないで。軽めが吉。"
+      },
+      {
+        "en": "Work in short sessions.",
+        "ja": "短い区切りで作業を。"
+      },
+      {
+        "en": "Avoid big decisions today.",
+        "ja": "大きな決断は避けて。"
+      },
+      {
+        "en": "Fix one thing at a time.",
+        "ja": "修正は一つずつ。"
+      },
+      {
+        "en": "If you feel tired, do maintenance tasks.",
+        "ja": "疲れたら保守タスクでOK。"
+      },
+      {
+        "en": "Rushing makes more work later.",
+        "ja": "急ぐと後で増えます。"
+      },
+      {
+        "en": "Keep replies short if you are stressed.",
+        "ja": "ストレスがあるなら返事は短く。"
+      },
+      {
+        "en": "Stop early if you can. Recovery matters.",
+        "ja": "可能なら早めに切り上げて。"
+      },
+      {
+        "en": "Protect your focus from noise.",
+        "ja": "雑音から集中を守って。"
+      },
+      {
+        "en": "Simplify the plan. Less is better.",
+        "ja": "計画を簡単に。少ないほど良い。"
+      }
+    ]
+  },
+  "money": {
+    "a": [
+      {
+        "en": "Good day to save a little. Small savings feel good.",
+        "ja": "少し貯めるのに良い日。小さな節約が効きます。"
+      },
+      {
+        "en": "Buy what you need, not what you feel.",
+        "ja": "気分より必要で選ぶと吉。"
+      },
+      {
+        "en": "Check one regular cost. You may find a win.",
+        "ja": "定期支出を一つ見直すと良さそう。"
+      },
+      {
+        "en": "Compare calmly and choose the best value.",
+        "ja": "落ち着いて比較すると良い選択に。"
+      },
+      {
+        "en": "A simple budget plan works.",
+        "ja": "シンプルな予算でOK。"
+      },
+      {
+        "en": "Keep your limit first. Then choose.",
+        "ja": "上限を先に決めてから選びましょう。"
+      },
+      {
+        "en": "Organize receipts. You will see patterns.",
+        "ja": "レシート整理で傾向が見えます。"
+      },
+      {
+        "en": "Small comfort spending is fine if planned.",
+        "ja": "計画的なら小さなご褒美はOK。"
+      },
+      {
+        "en": "Avoid impulse. Take one minute before paying.",
+        "ja": "衝動に注意。払う前に1分待って。"
+      },
+      {
+        "en": "Practical choices bring relief.",
+        "ja": "実用で選ぶと安心します。"
+      }
+    ],
+    "b": [
+      {
+        "en": "Pause before you buy. Waiting helps.",
+        "ja": "買う前に一度止まって。待つと良いです。"
+      },
+      {
+        "en": "Keep spending moderate today.",
+        "ja": "今日はほどほどの出費に。"
+      },
+      {
+        "en": "Do not shop when tired.",
+        "ja": "疲れている時の買い物は避けて。"
+      },
+      {
+        "en": "Small maintenance costs are okay.",
+        "ja": "小さなメンテ費はOK。"
+      },
+      {
+        "en": "Choose essentials first.",
+        "ja": "まず必需品を。"
+      },
+      {
+        "en": "If unsure, ask someone you trust.",
+        "ja": "迷ったら信頼できる人に相談。"
+      },
+      {
+        "en": "Avoid too many options.",
+        "ja": "選択肢を増やしすぎないで。"
+      },
+      {
+        "en": "Plan one small saving action.",
+        "ja": "小さな節約を一つ。"
+      },
+      {
+        "en": "Re-check deals that feel too urgent.",
+        "ja": "急かすセールは再確認。"
+      },
+      {
+        "en": "Balance is better than extremes.",
+        "ja": "極端よりバランスが吉。"
+      }
+    ],
+    "c": [
+      {
+        "en": "Avoid big purchases today.",
+        "ja": "今日は大きな買い物は避けて。"
+      },
+      {
+        "en": "Do not fix stress with shopping.",
+        "ja": "ストレスを買い物で埋めないで。"
+      },
+      {
+        "en": "Check numbers twice.",
+        "ja": "数字は二度確認。"
+      },
+      {
+        "en": "Keep choices few and safe.",
+        "ja": "選択は少なく安全に。"
+      },
+      {
+        "en": "Avoid lending or borrowing.",
+        "ja": "貸し借りは控えめに。"
+      },
+      {
+        "en": "Eat and rest before deciding.",
+        "ja": "決める前に食事と休息を。"
+      },
+      {
+        "en": "If you feel pressure, step back.",
+        "ja": "急かされたら一歩引いて。"
+      },
+      {
+        "en": "Postpone decisions if possible.",
+        "ja": "可能なら判断を先送り。"
+      },
+      {
+        "en": "Protect your money cushion.",
+        "ja": "余裕資金を守って。"
+      },
+      {
+        "en": "Recovery first; money decisions get better after rest.",
+        "ja": "まず回復。休むと判断も良くなります。"
+      }
+    ]
+  },
+  "health": {
+    "a": [
+      {
+        "en": "A short walk refreshes you.",
+        "ja": "短い散歩でリフレッシュ。"
+      },
+      {
+        "en": "Drink water often. It helps your body.",
+        "ja": "こまめに水分を。体が楽です。"
+      },
+      {
+        "en": "Stretch your neck and shoulders.",
+        "ja": "首と肩を伸ばして。"
+      },
+      {
+        "en": "Warmth helps today. Try a hot drink.",
+        "ja": "温めが効く日。温かい飲み物が◎。"
+      },
+      {
+        "en": "Simple meals feel best.",
+        "ja": "シンプルな食事が合います。"
+      },
+      {
+        "en": "Sleep will be better with a calm night.",
+        "ja": "落ち着いた夜で睡眠が良くなります。"
+      },
+      {
+        "en": "Open a window and change the air.",
+        "ja": "換気で気分が変わります。"
+      },
+      {
+        "en": "Keep good posture. Small fixes help.",
+        "ja": "姿勢を整えると楽になります。"
+      },
+      {
+        "en": "Breathe slowly for one minute.",
+        "ja": "1分ゆっくり呼吸して。"
+      },
+      {
+        "en": "Light movement keeps you steady.",
+        "ja": "軽い運動で安定します。"
+      }
+    ],
+    "b": [
+      {
+        "en": "Do not push too hard today.",
+        "ja": "無理しすぎないで。"
+      },
+      {
+        "en": "Take short breaks often.",
+        "ja": "短い休憩をこまめに。"
+      },
+      {
+        "en": "Watch temperature changes.",
+        "ja": "寒暖差に注意。"
+      },
+      {
+        "en": "Avoid late caffeine.",
+        "ja": "遅い時間のカフェインは控えめに。"
+      },
+      {
+        "en": "Gentle food is better than heavy meals.",
+        "ja": "重い食事よりやさしい食事が吉。"
+      },
+      {
+        "en": "Reduce screen time if you feel restless.",
+        "ja": "そわそわするなら画面から少し離れて。"
+      },
+      {
+        "en": "A regular bedtime helps.",
+        "ja": "寝る時間をそろえると良いです。"
+      },
+      {
+        "en": "Slow walking helps calm your mind.",
+        "ja": "ゆっくり歩くと心も落ち着きます。"
+      },
+      {
+        "en": "Stretch a little before sleep.",
+        "ja": "寝る前に少しストレッチ。"
+      },
+      {
+        "en": "Keep water nearby.",
+        "ja": "水分を近くに置いて。"
+      }
+    ],
+    "c": [
+      {
+        "en": "Rest is the best choice today.",
+        "ja": "今日は休むのが一番。"
+      },
+      {
+        "en": "Keep your schedule light.",
+        "ja": "予定は軽めに。"
+      },
+      {
+        "en": "Avoid intense exercise. Stretch gently.",
+        "ja": "激しい運動は避けて。軽く伸ばして。"
+      },
+      {
+        "en": "If you feel bad, reduce noise and light.",
+        "ja": "つらいなら音と光を落として。"
+      },
+      {
+        "en": "Do not skip meals.",
+        "ja": "食事抜きは避けて。"
+      },
+      {
+        "en": "Warm tea and slow breathing help.",
+        "ja": "温かいお茶とゆっくり呼吸が助けます。"
+      },
+      {
+        "en": "Protect your neck and feet from cold.",
+        "ja": "首と足元の冷えに注意。"
+      },
+      {
+        "en": "Go to bed earlier if possible.",
+        "ja": "可能なら早寝を。"
+      },
+      {
+        "en": "Be kind to yourself.",
+        "ja": "自分にやさしく。"
+      },
+      {
+        "en": "Recovery first; tomorrow will be easier.",
+        "ja": "回復が先。明日が楽になります。"
+      }
+    ]
+  }
+};
+
+// Public bank
+const BANK_ENJA = {
+  jhs: BANK_JHS,
+  adult: BANK_ADULT,
+};
+// For now, use the same bank for hs as adult (v1). You can later tune HS separately.
+BANK_ENJA.hs = BANK_ENJA.adult;

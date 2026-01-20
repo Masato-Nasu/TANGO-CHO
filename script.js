@@ -1434,12 +1434,9 @@ function setupFortune(){
   const birthEl = document.getElementById("fortuneBirth");
   const dateEl = document.getElementById("fortuneDate");
   const levelEl = document.getElementById("fortuneLevel");
-  const styleEl = document.getElementById("fortuneStyle");
   const genBtn = document.getElementById("fortuneGenBtn");
-  const todayBtn = document.getElementById("fortuneTodayBtn");
-  const stateEl = document.getElementById("fortuneState");
   const outEl = document.getElementById("fortuneResults");
-  if (!birthEl || !dateEl || !levelEl || !styleEl || !genBtn || !todayBtn || !stateEl || !outEl) return;
+  if (!birthEl || !dateEl || !levelEl || !genBtn || !outEl) return;
 
   // defaults
   const today = new Date();
@@ -1453,13 +1450,8 @@ function setupFortune(){
       if (s?.birth) birthEl.value = s.birth;
       if (s?.date) dateEl.value = s.date;
       if (s?.level) levelEl.value = s.level;
-      if (s?.tone) styleEl.value = s.tone;
     }
   } catch(_) {}
-
-  todayBtn.addEventListener("click", () => {
-    dateEl.value = toDateInputValue(new Date());
-  });
 
   function persist(){
     try {
@@ -1467,7 +1459,6 @@ function setupFortune(){
         birth: birthEl.value,
         date: dateEl.value,
         level: levelEl.value,
-        tone: styleEl.value,
       }));
     } catch(_) {}
   }
@@ -1475,39 +1466,31 @@ function setupFortune(){
   birthEl.addEventListener("change", persist);
   dateEl.addEventListener("change", persist);
   levelEl.addEventListener("change", persist);
-  styleEl.addEventListener("change", persist);
 
-  genBtn.addEventListener("click", async () => {
+  genBtn.addEventListener("click", () => {
     const birth = birthEl.value;
     const date = dateEl.value;
     if (!birth) {
-      stateEl.textContent = "birth date?";
-      stateEl.style.background = "rgba(255,79,79,.15)";
+      alert("誕生日（Birth date）を入力してください");
       return;
     }
     if (!date) {
-      stateEl.textContent = "target date?";
-      stateEl.style.background = "rgba(255,79,79,.15)";
+      alert("日付（Target date）を入力してください");
       return;
     }
-    stateEl.textContent = "generating…";
-    stateEl.style.background = "rgba(255,255,255,.08)";
 
     try {
       const result = fortuneGenerate({
         birthDate: birth,
         targetDate: date,
         level: levelEl.value,
-        tone: styleEl.value,
+        tone: "clean",
       });
-      renderFortune(result, outEl, stateEl);
+      renderFortune(result, outEl, null);
       persist();
-      stateEl.textContent = "done";
-      stateEl.style.background = "rgba(0,200,150,.18)";
     } catch(e) {
       console.error(e);
-      stateEl.textContent = "error";
-      stateEl.style.background = "rgba(255,79,79,.15)";
+      alert("生成に失敗しました。もう一度お試しください。");
     }
   });
 
@@ -1847,7 +1830,8 @@ function pickFortuneTextV2({rng, seed, cat, band, level, tone}){
   const c = String(cat || "overall");
 
   // If BANK_ENJA exists and has the category, use it.
-  const bankRoot = (typeof BANK_ENJA !== "undefined" && BANK_ENJA) ? BANK_ENJA : null;
+  const bankRootAll = (typeof BANK_ENJA !== "undefined" && BANK_ENJA) ? BANK_ENJA : null;
+  const bankRoot = bankRootAll && (bankRootAll[lvl] || bankRootAll.adult || bankRootAll);
   const byCat = bankRoot && (bankRoot[c] || bankRoot.overall);
   const arr = byCat && (byCat[tier] || byCat.b || byCat.a || byCat.c);
 

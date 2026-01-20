@@ -43,7 +43,6 @@
         <div class="field-row">
           <input id="appToken" type="text" placeholder="未設定なら空でOK" />
           <button id="saveAppTokenBtn" class="secondary-btn" type="button">保存</button>
-        </div>
 
         <p class="note">※ DeepLキーはSpacesのSecrets（DEEPL_KEY）に入れてください。PWAには不要です。</p>
       </details>
@@ -192,18 +191,10 @@
               <option value="adult" selected>大人向き</option>
             </select>
           </div>
-          <div>
-            <label class="field-label" for="fortuneStyle">Tone</label>
-            <select id="fortuneStyle" class="select" disabled>
-              <option value="c" selected>CLEAR &amp; MODERN</option>
-            </select>
-          </div>
         </div>
 
         <div class="field-row" style="margin-top:10px;">
           <button id="fortuneGenBtn" class="primary-btn" type="button">Generate</button>
-          <button id="fortuneTodayBtn" class="ghost-btn" type="button">Today</button>
-          <div class="pill" id="fortuneState">ready</div>
         </div>
 
         <p class="note" style="margin-top:8px;">
