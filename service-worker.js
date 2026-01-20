@@ -1,4 +1,4 @@
-const CACHE_NAME = "tango-cho-cache-v3.7.11-v10-v13";
+const CACHE_NAME = "tango-cho-cache-v3.7.11-v10-v14";
 const ASSETS = [
   "./",
   "./index.html",
