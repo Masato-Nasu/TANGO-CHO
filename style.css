@@ -88,8 +88,8 @@ details summary::-webkit-details-marker{display:none}
 /* --- Fortune --- */
 .fortune-results{display:flex;flex-direction:column;gap:12px}
 .fortune-item{border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:16px;background:#101010}
-.fortune-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.fortune-title{font-weight:800;font-size:16px}
+.fortune-head{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--gap)}
+.fortune-title{font-weight:800;font-size:32px;line-height:1.1}
 .fortune-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .fortune-pill{font-size:12px;padding:4px 8px;border-radius:999px;background:rgba(0,200,150,0.16);border:1px solid rgba(0,200,150,0.32)}
 .fortune-score{font-size:12px;opacity:0.85}
