@@ -1906,12 +1906,6 @@ function renderFortune(model, outEl, stateEl){
 
     const actions = document.createElement("div");
     actions.className = "fortune-actions";
-    const btnToAdd = document.createElement("button");
-    btnToAdd.className = "secondary-btn";
-    btnToAdd.type = "button";
-    btnToAdd.textContent = "Pick words";
-    btnToAdd.title = "Tap a word in the text to send it to Add tab";
-
     const btnTranslate = document.createElement("button");
     btnTranslate.className = "ghost-btn";
     btnTranslate.type = "button";
@@ -1936,8 +1930,6 @@ function renderFortune(model, outEl, stateEl){
       jp.style.display = "block";
       btnTranslate.textContent = "Hide JP";
     });
-
-    actions.appendChild(btnToAdd);
     actions.appendChild(btnTranslate);
 
     wrap.appendChild(head);
