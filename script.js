@@ -1655,6 +1655,8 @@ function setupFortune(){
   });
 
   genBtn.addEventListener("click", () => {
+    // default target date to today only if empty (user can change freely)
+    try { if (!dateEl.value) dateEl.value = toDateInputValue(new Date()); } catch(_) {}
     const birth = birthEl.value;
     const date = dateEl.value;
     if (!birth) {

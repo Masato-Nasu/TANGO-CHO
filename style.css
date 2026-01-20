@@ -23,7 +23,7 @@ body{min-height:100vh;display:flex;flex-direction:column}
   max-width:760px;width:100%;margin:0 auto;box-sizing:border-box;
   padding:10px var(--padX) 0;background:transparent}
 
-.tab-button{width:100%;padding:var(--controlPY) var(--controlPX);font-size:var(--controlFS);border-radius:var(--controlR);border:1px solid var(--border);background:rgba(0,0,0,.4);color:var(--sub);cursor:pointer;min-height:var(--controlH)}
+.tab-button{width:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:var(--controlPY) var(--controlPX);font-size:var(--controlFS);line-height:1;box-sizing:border-box;border-radius:var(--controlR);border:1px solid var(--border);background:rgba(0,0,0,.4);color:var(--sub);cursor:pointer;min-height:var(--controlH)}
 .tab-button.active{background:var(--accentSoft);border-color:var(--accent);color:var(--accent);font-weight:600}
 .main{flex:1;padding:8px var(--padX) 16px;max-width:760px;width:100%;margin:0 auto}
 .section{display:none}
@@ -87,18 +87,18 @@ details summary::-webkit-details-marker{display:none}
 
 /* --- Fortune --- */
 .fortune-results{display:flex;flex-direction:column;gap:12px}
-.fortune-item{border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:12px;background:#101010}
+.fortune-item{border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:16px;background:#101010}
 .fortune-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .fortune-title{font-weight:800;font-size:16px}
 .fortune-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .fortune-pill{font-size:12px;padding:4px 8px;border-radius:999px;background:rgba(0,200,150,0.16);border:1px solid rgba(0,200,150,0.32)}
 .fortune-score{font-size:12px;opacity:0.85}
-.fortune-text{margin-top:10px;line-height:1.65;font-size:15px}
+.fortune-text{margin-top:10px;line-height:1.65;font-size:30px}
 .fortune-text .w{display:inline-block;padding:1px 2px;border-radius:6px;cursor:pointer}
 .fortune-text .w:hover{background:rgba(255,255,255,0.08)}
 .fortune-actions{display:flex;gap:var(--gap);flex-wrap:wrap;margin-top:10px}
 .fortune-actions button{padding:10px 14px;border-radius:var(--controlR);min-height:44px;font-size:.95rem}
-.fortune-jp{margin-top:8px;opacity:0.92;line-height:1.55}
+.fortune-jp{margin-top:8px;opacity:0.92;line-height:1.55font-size:30px}
 .quiz-q{font-size:1.02rem;font-weight:700;margin:0 0 10px}
 .quiz-choices{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 @media (max-width:520px){.quiz-choices{grid-template-columns:1fr}}
