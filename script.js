@@ -1409,9 +1409,573 @@ document.addEventListener("DOMContentLoaded", () => {
   setupExport();
   setupImport();
   setupQuiz();
+  setupFortune();
 
   renderWordList();
   renderQuiz();
 
   document.getElementById("ttsTestBtn")?.addEventListener("click", () => speak("Hello, this is a test."));
 });
+
+// ============================================================================
+// Fortune (EN) × TANGO-CHO  —  100% Horoscope-inspired engine
+// - Uses approximate planetary positions (JPL Keplerian elements, valid 1800-2050)
+// - Geocentric ecliptic longitudes from heliocentric vectors (planet - Earth)
+// - Moon longitude via simplified SunCalc-style formula
+// - Score blends "slow background" and "fast wave" to keep the 100% feel
+// - Text generation is seeded + anti-repetition (per category)
+// - Tap a word => send to Add tab
+// ============================================================================
+
+const FORTUNE_KEY = "tangoChoFortune";
+const FORTUNE_HISTORY_KEY = "tangoChoFortuneHistory";
+
+function setupFortune(){
+  const birthEl = document.getElementById("fortuneBirth");
+  const dateEl = document.getElementById("fortuneDate");
+  const levelEl = document.getElementById("fortuneLevel");
+  const styleEl = document.getElementById("fortuneStyle");
+  const genBtn = document.getElementById("fortuneGenBtn");
+  const todayBtn = document.getElementById("fortuneTodayBtn");
+  const stateEl = document.getElementById("fortuneState");
+  const outEl = document.getElementById("fortuneResults");
+  if (!birthEl || !dateEl || !levelEl || !styleEl || !genBtn || !todayBtn || !stateEl || !outEl) return;
+
+  // defaults
+  const today = new Date();
+  dateEl.value = toDateInputValue(today);
+
+  // restore
+  try {
+    const raw = localStorage.getItem(FORTUNE_KEY);
+    if (raw) {
+      const s = JSON.parse(raw);
+      if (s?.birth) birthEl.value = s.birth;
+      if (s?.date) dateEl.value = s.date;
+      if (s?.level) levelEl.value = s.level;
+      if (s?.tone) styleEl.value = s.tone;
+    }
+  } catch(_) {}
+
+  todayBtn.addEventListener("click", () => {
+    dateEl.value = toDateInputValue(new Date());
+  });
+
+  function persist(){
+    try {
+      localStorage.setItem(FORTUNE_KEY, JSON.stringify({
+        birth: birthEl.value,
+        date: dateEl.value,
+        level: levelEl.value,
+        tone: styleEl.value,
+      }));
+    } catch(_) {}
+  }
+
+  birthEl.addEventListener("change", persist);
+  dateEl.addEventListener("change", persist);
+  levelEl.addEventListener("change", persist);
+  styleEl.addEventListener("change", persist);
+
+  genBtn.addEventListener("click", async () => {
+    const birth = birthEl.value;
+    const date = dateEl.value;
+    if (!birth) {
+      stateEl.textContent = "birth date?";
+      stateEl.style.background = "rgba(255,79,79,.15)";
+      return;
+    }
+    if (!date) {
+      stateEl.textContent = "target date?";
+      stateEl.style.background = "rgba(255,79,79,.15)";
+      return;
+    }
+    stateEl.textContent = "generating…";
+    stateEl.style.background = "rgba(255,255,255,.08)";
+
+    try {
+      const result = fortuneGenerate({
+        birthDate: birth,
+        targetDate: date,
+        level: levelEl.value,
+        tone: styleEl.value,
+      });
+      renderFortune(result, outEl, stateEl);
+      persist();
+      stateEl.textContent = "done";
+      stateEl.style.background = "rgba(0,200,150,.18)";
+    } catch(e) {
+      console.error(e);
+      stateEl.textContent = "error";
+      stateEl.style.background = "rgba(255,79,79,.15)";
+    }
+  });
+
+  // auto-generate once if birth already set
+  if (birthEl.value) genBtn.click();
+}
+
+function toDateInputValue(d){
+  const tz = d.getTimezoneOffset();
+  const local = new Date(d.getTime() - tz*60000);
+  return local.toISOString().slice(0,10);
+}
+
+// -------------------- RNG + hash --------------------
+function fnv1a32(str){
+  let h = 0x811c9dc5;
+  for (let i=0;i<str.length;i++){
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+function mulberry32(seed){
+  let a = seed >>> 0;
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// -------------------- Julian day helpers --------------------
+function dateToJd(date){
+  // date: JS Date in UTC
+  const y = date.getUTCFullYear();
+  const m = date.getUTCMonth() + 1;
+  const d = date.getUTCDate() + (date.getUTCHours() + (date.getUTCMinutes() + date.getUTCSeconds()/60)/60)/24;
+  let A = Math.floor((14 - m)/12);
+  let Y = y + 4800 - A;
+  let M = m + 12*A - 3;
+  let JDN = d + Math.floor((153*M + 2)/5) + 365*Y + Math.floor(Y/4) - Math.floor(Y/100) + Math.floor(Y/400) - 32045;
+  return JDN;
+}
+function isoToUtcDate(iso){
+  const [Y,M,D] = iso.split("-").map(n=>parseInt(n,10));
+  return new Date(Date.UTC(Y, M-1, D, 0,0,0));
+}
+
+// -------------------- Orbital mechanics (JPL elements) --------------------
+// Source: NASA/JPL SSD "Approximate Positions of the Planets" (Table 1, 1800-2050)
+// https://ssd.jpl.nasa.gov/planets/approx_pos.html
+// (we only use a,e,I,L,long.peri,long.node + rates; b,c,s,f terms omitted)
+const JPL_ELEMS = {
+  mercury: {a0:0.38709927, a1:0.00000037, e0:0.20563593, e1:0.00001906, I0:7.00497902, I1:-0.00594749, L0:252.25032350, L1:149472.67411175, wbar0:77.45779628, wbar1:0.16047689, Om0:48.33076593, Om1:-0.12534081},
+  venus:   {a0:0.72333566, a1:0.00000390, e0:0.00677672, e1:-0.00004107, I0:3.39467605, I1:-0.00078890, L0:181.97909950, L1:58517.81538729, wbar0:131.60246718, wbar1:0.00268329, Om0:76.67984255, Om1:-0.27769418},
+  earth:   {a0:1.00000261, a1:0.00000562, e0:0.01671123, e1:-0.00004392, I0:-0.00001531, I1:-0.01294668, L0:100.46457166, L1:35999.37244981, wbar0:102.93768193, wbar1:0.32327364, Om0:0.0, Om1:0.0},
+  mars:    {a0:1.52371034, a1:0.00001847, e0:0.09339410, e1:0.00007882, I0:1.84969142, I1:-0.00813131, L0:-4.55343205, L1:19140.30268499, wbar0:-23.94362959, wbar1:0.44441088, Om0:49.55953891, Om1:-0.29257343},
+  jupiter: {a0:5.20288700, a1:-0.00011607, e0:0.04838624, e1:-0.00013253, I0:1.30439695, I1:-0.00183714, L0:34.39644051, L1:3034.74612775, wbar0:14.72847983, wbar1:0.21252668, Om0:100.47390909, Om1:0.20469106},
+  saturn:  {a0:9.53667594, a1:-0.00125060, e0:0.05386179, e1:-0.00050991, I0:2.48599187, I1:0.00193609, L0:49.95424423, L1:1222.49362201, wbar0:92.59887831, wbar1:-0.41897216, Om0:113.66242448, Om1:-0.28867794},
+};
+
+function degToRad(d){return d*Math.PI/180;}
+function radToDeg(r){return r*180/Math.PI;}
+function normDeg(d){d%=360; if(d<0)d+=360; return d;}
+function wrapSignedDeg(d){d%=360; if(d>180)d-=360; if(d<-180)d+=360; return d;}
+
+function keplerSolveE(M, e){
+  // M in radians
+  let E = M + e*Math.sin(M);
+  for (let i=0;i<7;i++){
+    const f = E - e*Math.sin(E) - M;
+    const fp = 1 - e*Math.cos(E);
+    const dE = f/fp;
+    E -= dE;
+    if (Math.abs(dE) < 1e-10) break;
+  }
+  return E;
+}
+
+function planetHelioEclVec(body, jd){
+  const el = JPL_ELEMS[body];
+  if (!el) throw new Error("unknown body: " + body);
+  const T = (jd - 2451545.0)/36525.0;
+  const a = el.a0 + el.a1*T;
+  const e = el.e0 + el.e1*T;
+  const I = degToRad(el.I0 + el.I1*T);
+  const L = degToRad(el.L0 + el.L1*T);
+  const wbar = degToRad(el.wbar0 + el.wbar1*T);
+  const Om = degToRad(el.Om0 + el.Om1*T);
+  const w = wbar - Om;
+  let M = L - wbar; // radians
+  // normalize to [-pi,pi]
+  M = Math.atan2(Math.sin(M), Math.cos(M));
+  const E = keplerSolveE(M, e);
+  const xprime = a*(Math.cos(E) - e);
+  const yprime = a*Math.sqrt(1 - e*e)*Math.sin(E);
+
+  const cosw = Math.cos(w), sinw = Math.sin(w);
+  const cosO = Math.cos(Om), sinO = Math.sin(Om);
+  const cosI = Math.cos(I), sinI = Math.sin(I);
+
+  // Rotate: Rz(-Om) Rx(-I) Rz(-w) applied to r'  (matching JPL expression)
+  // JPL provides direct matrix with +; we use equivalent formulation for r_ecl.
+  const x = (cosw*cosO - sinw*sinO*cosI)*xprime + (-sinw*cosO - cosw*sinO*cosI)*yprime;
+  const y = (cosw*sinO + sinw*cosO*cosI)*xprime + (-sinw*sinO + cosw*cosO*cosI)*yprime;
+  const z = (sinw*sinI)*xprime + (cosw*sinI)*yprime;
+  return {x,y,z};
+}
+
+function eclLonFromVec(v){
+  return normDeg(radToDeg(Math.atan2(v.y, v.x)));
+}
+
+function geoEclLon(body, jd){
+  if (body === "sun"){
+    // Sun geocentric longitude is opposite of Earth's heliocentric longitude
+    const e = planetHelioEclVec("earth", jd);
+    return normDeg(eclLonFromVec({x:-e.x,y:-e.y,z:-e.z}));
+  }
+  if (body === "moon") return moonGeoLon(jd);
+  const p = planetHelioEclVec(body, jd);
+  const e = planetHelioEclVec("earth", jd);
+  const g = {x:p.x - e.x, y:p.y - e.y, z:p.z - e.z};
+  return eclLonFromVec(g);
+}
+
+// Moon longitude approximation (SunCalc-style)
+function moonGeoLon(jd){
+  const d = jd - 2451545.0; // days since J2000
+  const rad = Math.PI/180;
+  const L = rad*(218.316 + 13.176396*d);
+  const M = rad*(134.963 + 13.064993*d);
+  // longitude (deg): l = L + 6.289 sin M
+  const l = L + rad*6.289*Math.sin(M);
+  return normDeg(radToDeg(l));
+}
+
+// -------------------- Score model --------------------
+const CAT = [
+  {id:"overall", name:"Overall"},
+  {id:"love", name:"Love"},
+  {id:"work", name:"Work"},
+  {id:"money", name:"Money"},
+  {id:"health", name:"Health"},
+];
+
+const PLANETS_BG = ["saturn","jupiter","mars"]; // slow-ish
+const PLANETS_WV = ["moon","sun","venus","mercury"]; // fast-ish
+
+function aspectScore(deltaDeg){
+  const peaks = [
+    {a:0, w:1.00},
+    {a:60, w:0.65},
+    {a:120, w:0.90},
+    {a:90, w:-0.70},
+    {a:180, w:-1.00},
+    {a:270, w:-0.60},
+    {a:240, w:0.55},
+    {a:300, w:0.55},
+  ];
+  const s = 12; // degrees
+  let num = 0;
+  let den = 0;
+  for (const p of peaks){
+    const d = wrapSignedDeg(deltaDeg - p.a);
+    const g = Math.exp(-(d*d)/(2*s*s));
+    num += p.w*g;
+    den += Math.abs(p.w)*g;
+  }
+  if (!den) return 0;
+  return Math.max(-1, Math.min(1, num/den));
+}
+
+function scoreAt(jdTarget, lonBirth){
+  let bg = 0, wv = 0;
+  for (const b of PLANETS_BG){
+    const d = normDeg(geoEclLon(b, jdTarget) - lonBirth[b]);
+    bg += aspectScore(d);
+  }
+  bg /= PLANETS_BG.length;
+
+  for (const p of PLANETS_WV){
+    const d = normDeg(geoEclLon(p, jdTarget) - lonBirth[p]);
+    wv += aspectScore(d);
+  }
+  wv /= PLANETS_WV.length;
+
+  // blend fast wave + slow background
+  return 0.58*wv + 0.42*bg;
+}
+
+function blendedScore(jdTarget, lonBirth){
+  // "100%" feel: a local (±16d) and a seasonal (±90d) component
+  const s0 = scoreAt(jdTarget, lonBirth);
+  const s16 = (scoreAt(jdTarget-16, lonBirth) + s0 + scoreAt(jdTarget+16, lonBirth))/3;
+  const s90 = (scoreAt(jdTarget-90, lonBirth) + s0 + scoreAt(jdTarget+90, lonBirth))/3;
+  const s = 0.70*s16 + 0.30*s90;
+  return Math.max(-1, Math.min(1, s));
+}
+
+function scoreToPercent(s){
+  // tanh mapping => stays away from hard 0/100 unless very strong
+  const p = 50 + 50*Math.tanh(1.35*s);
+  return Math.round(Math.max(0, Math.min(100, p)));
+}
+
+function bandFromPercent(p){
+  if (p >= 85) return "great";
+  if (p >= 65) return "good";
+  if (p >= 45) return "neutral";
+  if (p >= 25) return "low";
+  return "rough";
+}
+
+function fortuneGenerate({birthDate, targetDate, level, tone}){
+  const seed = fnv1a32(`${birthDate}|${targetDate}|${level}|${tone}|fortune-v2`);
+  const rng = mulberry32(seed);
+
+  const jdBirth = dateToJd(isoToUtcDate(birthDate));
+  const jdTarget = dateToJd(isoToUtcDate(targetDate));
+
+  const lonBirth = {
+    sun: geoEclLon("sun", jdBirth),
+    moon: geoEclLon("moon", jdBirth),
+    mercury: geoEclLon("mercury", jdBirth),
+    venus: geoEclLon("venus", jdBirth),
+    mars: geoEclLon("mars", jdBirth),
+    jupiter: geoEclLon("jupiter", jdBirth),
+    saturn: geoEclLon("saturn", jdBirth),
+  };
+
+  // Category weighting: each category leans on different mixes
+  const mixes = {
+    overall: {kWave:0.58, kSlow:0.42, tweak:0.00},
+    love:    {kWave:0.65, kSlow:0.35, tweak:+0.04},
+    work:    {kWave:0.50, kSlow:0.50, tweak:-0.02},
+    money:   {kWave:0.46, kSlow:0.54, tweak:-0.01},
+    health:  {kWave:0.55, kSlow:0.45, tweak:-0.03},
+  };
+
+  const items = [];
+  for (const c of CAT){
+    const m = mixes[c.id] || mixes.overall;
+    const s0 = blendedScore(jdTarget, lonBirth);
+    // small, deterministic category warp
+    const jitter = (rng()-0.5)*0.08;
+    const s = Math.max(-1, Math.min(1, s0 + m.tweak + jitter));
+    const percent = scoreToPercent(s);
+    const band = bandFromPercent(percent);
+    // Use BANK_ENJA paired text when available (no API translation needed)
+    const text = pickFortuneTextV2({rng, seed, cat:c.id, band, level, tone});
+    items.push({
+      id: c.id,
+      title: c.name,
+      percent,
+      band,
+      en: text.en,
+      ja: (text && text.ja) ? text.ja : "",
+      keyWords: text.keyWords,
+    });
+  }
+
+  return {
+    birthDate,
+    targetDate,
+    level,
+    tone,
+    seed,
+    items,
+  };
+}
+
+// -------------------- Text generation (seeded + anti-repeat) --------------------
+// We generate sentences from parts to avoid obvious repetition.
+// Key requirement: prioritize high-frequency TOEIC vocabulary.
+
+const TOEIC_CORE = [
+  "focus","priority","schedule","deadline","commitment","efficient","improve","maintain","balance","strategy","opportunity",
+  "clarify","confirm","adjust","resource","quality","outcome","progress","support","challenge","steady","practical","reliable",
+  "decision","communicate","negotiate","prepare","review","measure","feedback","initiative","confidence","responsibility","flexible",
+  "notice","detail","consistent","estimate","assume","prevent","reduce","avoid","increase","secure","trust","respect",
+];
+
+function pick(arr, rng){ return arr[Math.floor(rng()*arr.length)]; }
+
+function antiRepeatKey(cat){
+  return `${FORTUNE_HISTORY_KEY}:${cat}`;
+}
+
+function loadHistory(cat){
+  try {
+    const raw = localStorage.getItem(antiRepeatKey(cat));
+    const a = raw ? JSON.parse(raw) : [];
+    return Array.isArray(a) ? a : [];
+  } catch { return []; }
+}
+
+function saveHistory(cat, hist){
+  try { localStorage.setItem(antiRepeatKey(cat), JSON.stringify(hist.slice(-40))); } catch(_) {}
+}
+
+function pickNonRepeating(candidates, cat, rng){
+  const hist = loadHistory(cat);
+  const recent = new Set(hist.slice(-10));
+  const filtered = candidates.filter(x => !recent.has(x.id));
+  const pool = filtered.length ? filtered : candidates;
+  const chosen = pool[Math.floor(rng()*pool.length)];
+  hist.push(chosen.id);
+  saveHistory(cat, hist);
+  return chosen;
+}
+
+// -------------------- Text bank (EN+JA) --------------------
+// Prefer BANK_ENJA (loaded via bank_enja.js). This avoids repeated phrasing and
+// provides built-in JP for sentence-level translation.
+function pickFortuneTextV2({rng, seed, cat, band, level, tone}){
+  // Map 5 bands -> a/b/c tiers
+  const tier = (band === "great" || band === "good") ? "a" : (band === "neutral" ? "b" : "c");
+  const lvl = String(level || "adult");
+  const c = String(cat || "overall");
+
+  // If BANK_ENJA exists and has the category, use it.
+  const bankRoot = (typeof BANK_ENJA !== "undefined" && BANK_ENJA) ? BANK_ENJA : null;
+  const byCat = bankRoot && (bankRoot[c] || bankRoot.overall);
+  const arr = byCat && (byCat[tier] || byCat.b || byCat.a || byCat.c);
+
+  if (Array.isArray(arr) && arr.length){
+    const candidates = arr.map((x, i) => {
+      const en = String(x.en || "").trim();
+      const ja = String(x.ja || "").trim();
+      const low = en.toLowerCase();
+      const hits = TOEIC_CORE.filter(w => low.includes(w));
+      const pool = hits.length ? hits : TOEIC_CORE;
+      const k1 = pool[Math.floor(rng()*pool.length)];
+      let k2 = pool[Math.floor(rng()*pool.length)];
+      if (pool.length > 1) {
+        let guard = 0;
+        while (k2 === k1 && guard++ < 8) k2 = pool[Math.floor(rng()*pool.length)];
+      }
+      const id = `${lvl}_${c}_${tier}_${i}_${fnv1a32(en)}`;
+      return { id, en, ja, keyWords: [k1, k2] };
+    });
+    return pickNonRepeating(candidates, `${c}:${lvl}:${tier}`, rng);
+  }
+
+  // Fallback to the procedural generator (older implementation)
+  return pickFortuneText({rng, seed, cat:c, band, level:lvl, tone});
+}
+
+
+
+// -------------------- Render + interactions --------------------
+function renderFortune(model, outEl, stateEl){
+  outEl.innerHTML = "";
+  for (const item of model.items){
+    const wrap = document.createElement("div");
+    wrap.className = "fortune-item";
+
+    const head = document.createElement("div");
+    head.className = "fortune-head";
+
+    const title = document.createElement("div");
+    title.className = "fortune-title";
+    title.textContent = item.title;
+
+    const meta = document.createElement("div");
+    meta.className = "fortune-meta";
+    const pill = document.createElement("div");
+    pill.className = "fortune-pill";
+    pill.textContent = `${item.percent}%`;
+    const score = document.createElement("div");
+    score.className = "fortune-score";
+    score.textContent = `${model.targetDate} / ${model.level}`;
+    meta.appendChild(pill);
+    meta.appendChild(score);
+
+    head.appendChild(title);
+    head.appendChild(meta);
+
+    const text = document.createElement("div");
+    text.className = "fortune-text";
+    text.innerHTML = wrapWords(item.en);
+
+    const actions = document.createElement("div");
+    actions.className = "fortune-actions";
+    const btnToAdd = document.createElement("button");
+    btnToAdd.className = "secondary-btn";
+    btnToAdd.type = "button";
+    btnToAdd.textContent = "Pick words";
+    btnToAdd.title = "Tap a word in the text to send it to Add tab";
+
+    const btnTranslate = document.createElement("button");
+    btnTranslate.className = "ghost-btn";
+    btnTranslate.type = "button";
+    btnTranslate.textContent = "JP";
+
+    const jp = document.createElement("div");
+    jp.className = "fortune-jp";
+    jp.style.display = "none";
+
+    btnTranslate.addEventListener("click", () => {
+      if (jp.style.display !== "none") {
+        jp.style.display = "none";
+        btnTranslate.textContent = "JP";
+        return;
+      }
+      const jptxt = String(item.ja || "").trim();
+      if (!jptxt) {
+        jp.textContent = "（日本語訳は次の拡張で増やします）";
+      } else {
+        jp.textContent = jptxt;
+      }
+      jp.style.display = "block";
+      btnTranslate.textContent = "Hide JP";
+    });
+
+    actions.appendChild(btnToAdd);
+    actions.appendChild(btnTranslate);
+
+    wrap.appendChild(head);
+    wrap.appendChild(text);
+    wrap.appendChild(actions);
+    wrap.appendChild(jp);
+
+    // word tap => send to Add tab
+    wrap.addEventListener("click", (ev) => {
+      const t = ev.target;
+      if (!(t instanceof HTMLElement)) return;
+      if (!t.classList.contains("w")) return;
+      const w = (t.getAttribute("data-w") || "").trim();
+      if (!w) return;
+      sendWordToAdd(w);
+    });
+
+    outEl.appendChild(wrap);
+  }
+}
+
+function wrapWords(text){
+  // Keep punctuation, wrap words only
+  return String(text).replace(/([A-Za-z][A-Za-z\-']*)/g, (m) => {
+    const w = m;
+    return `<span class="w" data-w="${escapeHtml(w)}">${escapeHtml(w)}</span>`;
+  });
+}
+
+function escapeHtml(s){
+  return String(s)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/\"/g,"&quot;")
+    .replace(/'/g,"&#39;");
+}
+
+function sendWordToAdd(word){
+  const w = word.toLowerCase();
+  const input = document.getElementById("word");
+  if (input) input.value = w;
+  // move tab
+  const addBtn = document.querySelector('.tab-button[data-section="addSection"]');
+  if (addBtn) addBtn.click();
+  // show a tiny message
+  const msg = document.getElementById("msg");
+  if (msg) {
+    msg.textContent = `「${w}」を転送しました（翻訳ボタンで日本語化できます）`;
+    msg.classList.add("ok");
+    setTimeout(()=>{ msg.textContent = ""; msg.classList.remove("ok"); }, 2500);
+  }
+}

@@ -70,6 +70,21 @@ details summary::-webkit-details-marker{display:none}
 .list-controls{display:flex;gap:6px;align-items:center}
 
 .quiz-area{margin-top:12px;padding:10px;border-radius:12px;background:#151515;border:1px dashed var(--border);min-height:120px}
+
+/* --- Fortune --- */
+.fortune-results{display:flex;flex-direction:column;gap:12px}
+.fortune-item{border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:12px;background:#101010}
+.fortune-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.fortune-title{font-weight:800;font-size:16px}
+.fortune-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.fortune-pill{font-size:12px;padding:4px 8px;border-radius:999px;background:rgba(0,200,150,0.16);border:1px solid rgba(0,200,150,0.32)}
+.fortune-score{font-size:12px;opacity:0.85}
+.fortune-text{margin-top:10px;line-height:1.65;font-size:15px}
+.fortune-text .w{display:inline-block;padding:1px 2px;border-radius:6px;cursor:pointer}
+.fortune-text .w:hover{background:rgba(255,255,255,0.08)}
+.fortune-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.fortune-actions button{padding:8px 10px;border-radius:12px}
+.fortune-jp{margin-top:8px;opacity:0.92;line-height:1.55}
 .quiz-q{font-size:1.02rem;font-weight:700;margin:0 0 10px}
 .quiz-choices{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 @media (max-width:520px){.quiz-choices{grid-template-columns:1fr}}
@@ -133,3 +148,19 @@ details summary::-webkit-details-marker{display:none}
 
 .choice-btn.correct::after{content:"○";position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:1.5rem;font-weight:900;color:var(--accent)}
 .choice-btn.wrong::after{content:"✕";position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:1.5rem;font-weight:900;color:var(--danger)}
+
+
+/* Fortune (embedded horoscope) */
+.fortune-wrap {
+  width: 100%;
+  height: calc(100vh - 260px);
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+#fortuneFrame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+}

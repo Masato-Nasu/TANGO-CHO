@@ -25,6 +25,7 @@
     <button class="tab-button active" data-section="addSection">追加</button>
     <button class="tab-button" data-section="listSection">単語帳</button>
     <button class="tab-button" data-section="quizSection">クイズ</button>
+    <button class="tab-button" data-section="fortuneSection">Fortune</button>
   </nav>
 
   <main class="main">
@@ -167,6 +168,55 @@
         </div>
       </div>
     </section>
+    <section id="fortuneSection" class="section">
+      <h2>Fortune (EN) × TANGO-CHO</h2>
+
+      <div class="card">
+        <div class="two-col">
+          <div>
+            <label class="field-label" for="fortuneBirth">Birth date</label>
+            <input id="fortuneBirth" type="date" />
+          </div>
+          <div>
+            <label class="field-label" for="fortuneDate">Target date</label>
+            <input id="fortuneDate" type="date" />
+          </div>
+        </div>
+
+        <div class="two-col" style="margin-top:10px;">
+          <div>
+            <label class="field-label" for="fortuneLevel">English level</label>
+            <select id="fortuneLevel" class="select">
+              <option value="jhs">中学生向き</option>
+              <option value="hs">高校生向き</option>
+              <option value="adult" selected>大人向き</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label" for="fortuneStyle">Tone</label>
+            <select id="fortuneStyle" class="select">
+              <option value="c" selected>C (clean / modern)</option>
+              <option value="b">B (warm)</option>
+              <option value="a">A (punchy)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-row" style="margin-top:10px;">
+          <button id="fortuneGenBtn" class="primary-btn" type="button">Generate</button>
+          <button id="fortuneTodayBtn" class="ghost-btn" type="button">Today</button>
+          <div class="pill" id="fortuneState">ready</div>
+        </div>
+
+        <p class="note" style="margin-top:8px;">
+          Tip: 英文中の単語をタップすると、TANGO-CHO の「追加」タブに転送できます。
+        </p>
+      </div>
+
+      <div class="card">
+        <div id="fortuneResults" class="fortune-results"></div>
+      </div>
+    </section>
   </main>
 
   <footer class="app-footer">
@@ -174,6 +224,7 @@
     <span class="footer-text">発音: Web Speech API / 翻訳: HF Spaces → DeepL</span>
   </footer>
 
+  <script src="bank_enja.js"></script>
   <script src="script.js"></script>
   <script>
     if ("serviceWorker" in navigator) {
