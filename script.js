@@ -363,7 +363,6 @@ function setupTabs() {
       document.getElementById(id)?.classList.add("active");
       // When entering list tab, rerender to reflect any changes
       if (id === "listSection") renderWordList();
-      if (id === "addSection") renderVocabSuggest();
     });
   });
 }
@@ -500,6 +499,7 @@ function setupAddForm() {
   const synonymsEl = document.getElementById("synonyms");
   const synFetchBtn = document.getElementById("synFetchBtn");
   const translateBtn = document.getElementById("translateBtn");
+  const randomBtn = document.getElementById("randomBtn");
   const saveBtn = document.getElementById("saveBtn");
   const clearBtn = document.getElementById("clearBtn");
   const ttsBtn = document.getElementById("ttsBtn");
@@ -575,6 +575,75 @@ function setupAddForm() {
     if (editId) return exitEditMode(true);
     clearForm(false);
   });
+
+
+  function pickRandomWord() {
+    const pool = window.VOCAB_POOL;
+    if (!Array.isArray(pool) || pool.length === 0) return null;
+
+    const cap = getDifficultyCap();
+    const subset = pool.slice(0, Math.min(cap, pool.length));
+
+    const registered = new Set(loadWords().map(w => String(w.word || "").toLowerCase()));
+
+    const RAND_COUNTER_KEY = "tangoChoRandCounter";
+    const RAND_HIST_KEY = "tangoChoRandHist";
+    let counter = 0;
+    try {
+      counter = parseInt(localStorage.getItem(RAND_COUNTER_KEY) || "0", 10);
+      counter = Number.isFinite(counter) ? counter + 1 : 1;
+      localStorage.setItem(RAND_COUNTER_KEY, String(counter));
+    } catch (_) { counter = Date.now(); }
+
+    let hist = [];
+    try {
+      hist = JSON.parse(localStorage.getItem(RAND_HIST_KEY) || "[]");
+      if (!Array.isArray(hist)) hist = [];
+    } catch (_) { hist = []; }
+    hist = hist.slice(-40).map(x => String(x || "").toLowerCase());
+    const histSet = new Set(hist);
+
+    const rnd = __mulberry32(__hash32(`rand:${__todayKey()}:${counter}:${cap}:${registered.size}`));
+    let candidate = null;
+
+    for (let guard = 0; guard < 600; guard++) {
+      const w = subset[Math.floor(rnd() * subset.length)];
+      if (!w) continue;
+      const lw = String(w).toLowerCase();
+      if (registered.has(lw)) continue;
+      if (histSet.has(lw)) continue;
+      candidate = lw;
+      break;
+    }
+    if (!candidate) {
+      // fallback: allow repeats if exhausted
+      candidate = String(subset[Math.floor(rnd() * subset.length)] || "").toLowerCase() || null;
+    }
+    if (!candidate) return null;
+
+    try {
+      hist.push(candidate);
+      localStorage.setItem(RAND_HIST_KEY, JSON.stringify(hist.slice(-40)));
+    } catch (_) {}
+
+    return candidate;
+  }
+
+  if (randomBtn) {
+    randomBtn.addEventListener("click", async () => {
+      if (editId) return setMsg("編集中はランダムを使えません（編集を解除してください）。", "err");
+
+      const w = pickRandomWord();
+      if (!w) return setMsg("ランダム候補が見つかりません。", "err");
+
+      wordEl.value = w;
+      setState("未翻訳");
+      setMsg("", "");
+      // Auto-translate to enable quick save
+      try { translateBtn.click(); } catch (_) {}
+    });
+  }
+
 
   translateBtn.addEventListener("click", async () => {
     const w = wordEl.value.trim();
@@ -853,16 +922,8 @@ function renderWordList() {
     // time (default): newest first
     words.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
   }
-  
-  if (filter === "random") {
-    // Shuffle the whole list (stable within a day)
-    __shuffleInPlace(words, `list:${__todayKey()}:${words.length}`);
-  } else if (filter !== "all") {
-    words = words.filter((w) => (w.status || "default") === filter);
-  }
-
-
-  listEl.innerHTML = "";
+  if (filter !== "all") words = words.filter((w) => (w.status || "default") === filter);
+listEl.innerHTML = "";
 
   if (words.length === 0) {
     listEl.innerHTML = `<p style="font-size:0.85rem;color:#888;">該当する単語がありません。</p>`;
@@ -989,58 +1050,6 @@ function setupFilter() {
     localStorage.setItem(FILTER_KEY, sel.value);
     renderWordList();
   });
-}
-
-function renderVocabSuggest(){
-  const box = document.getElementById("vocabSuggest");
-  const input = document.getElementById("word");
-  if (!box || !input) return;
-
-  const q = String(input.value || "").trim();
-  if (q) { box.innerHTML = ""; return; }
-
-  const pool = window.VOCAB_POOL;
-  if (!Array.isArray(pool) || pool.length === 0) { box.innerHTML = ""; return; }
-
-  const cap = getDifficultyCap();
-  const subset = pool.slice(0, Math.min(cap, pool.length));
-
-  const registered = new Set(loadWords().map(w => String(w.word || "").toLowerCase()));
-  const picked = new Set();
-
-  const rnd = __mulberry32(__hash32(`suggest:${__todayKey()}:${cap}:${registered.size}`));
-  const picks = [];
-  let guard = 0;
-  while (picks.length < 14 && guard < 400){
-    guard++;
-    const w = subset[Math.floor(rnd() * subset.length)];
-    if (!w) continue;
-    if (registered.has(w)) continue;
-    if (picked.has(w)) continue;
-    picked.add(w);
-    picks.push(w);
-  }
-
-  box.innerHTML = "";
-  picks.forEach((w) => {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "small-btn";
-    b.textContent = w;
-    b.addEventListener("click", () => {
-      input.value = w;
-      input.focus();
-      box.innerHTML = "";
-    });
-    box.appendChild(b);
-  });
-}
-
-function setupVocabSuggest(){
-  const input = document.getElementById("word");
-  if (!input) return;
-  input.addEventListener("focus", renderVocabSuggest);
-  input.addEventListener("input", renderVocabSuggest);
 }
 
 function setupSort() {
@@ -1563,7 +1572,6 @@ document.addEventListener("DOMContentLoaded", () => {
   setupSettings();
   setupAddForm();
   applyIncomingWordToAddForm();
-  setupVocabSuggest();
   setupFilter();
   setupSort();
   setupExport();
@@ -1573,7 +1581,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   renderWordList();
   renderQuiz();
-  renderVocabSuggest();
 });
 
 // ============================================================================

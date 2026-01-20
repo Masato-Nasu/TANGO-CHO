@@ -104,15 +104,6 @@ details summary::-webkit-details-marker{display:none}
 .quiz-foot{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .quiz-mini{font-size:.82rem;color:var(--sub)}
 
-/* Vocabulary suggestions (minimal, buttonless UX) */
-.vocab-suggest{
-  margin-top:8px;
-  display:flex;
-  flex-wrap:wrap;
-  gap:6px;
-}
-.vocab-suggest:empty{display:none}
-
 .small-btn{
   border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--sub);
   padding:6px 10px;font-size:.82rem;cursor:pointer
