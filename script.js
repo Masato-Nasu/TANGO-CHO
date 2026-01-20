@@ -1821,6 +1821,22 @@ function pickNonRepeating(candidates, cat, rng){
   return chosen;
 }
 
+// Cache a chosen item per deterministic context so repeated "Generate" taps
+// return the exact same result. We still keep anti-repeat across *different*
+// contexts/days by updating history only when a new context appears.
+function cacheKeyForContext(ctx){
+  return `${FORTUNE_HISTORY_KEY}:cache:${ctx}`;
+}
+function loadCachedChoice(ctx){
+  try {
+    const raw = localStorage.getItem(cacheKeyForContext(ctx));
+    return raw ? String(raw) : "";
+  } catch { return ""; }
+}
+function saveCachedChoice(ctx, id){
+  try { localStorage.setItem(cacheKeyForContext(ctx), String(id || "")); } catch(_) {}
+}
+
 // -------------------- Text bank (EN+JA) --------------------
 // Prefer BANK_ENJA (loaded via bank_enja.js). This avoids repeated phrasing and
 // provides built-in JP for sentence-level translation.
@@ -1851,7 +1867,19 @@ function pickFortuneTextV2({rng, seed, cat, band, level, tone}){
       const id = `${lvl}_${c}_${tier}_${i}_${fnv1a32(en)}`;
       return { id, en, ja, keyWords: [k1, k2] };
     });
-    return pickNonRepeating(candidates, `${c}:${lvl}:${tier}`, rng);
+
+    // Make output stable: if the same context (same seed) is requested again,
+    // return the exact same sentence.
+    const ctx = `${seed}:${c}:${lvl}:${tier}`;
+    const cachedId = loadCachedChoice(ctx);
+    if (cachedId) {
+      const hit = candidates.find(x => x.id === cachedId);
+      if (hit) return hit;
+    }
+
+    const chosen = pickNonRepeating(candidates, `${c}:${lvl}:${tier}`, rng);
+    saveCachedChoice(ctx, chosen.id);
+    return chosen;
   }
 
   // Fallback to the procedural generator (older implementation)
