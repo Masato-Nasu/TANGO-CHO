@@ -61,6 +61,7 @@ select:disabled{opacity:0.75;cursor:not-allowed}
 .msg.ok{color:var(--accent)}
 .msg.err{color:var(--danger)}
 .summary{cursor:pointer;color:var(--accent);font-weight:700;list-style:none}
+details.card[open] > summary.summary{margin-bottom:var(--gap)}
 details summary{user-select:none}
 details summary::-webkit-details-marker{display:none}
 
