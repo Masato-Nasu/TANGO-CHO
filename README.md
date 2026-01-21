@@ -26,9 +26,6 @@
 - **GitHub Pages（PWA）**  
   https://masato-nasu.github.io/TANGO-CHO/
 
-- **Hugging Face Spaces（API / DeepL中継）**  
-  - 稼働確認（Health）：`https://mazzgogo-tango-cho.hf.space/health`
-
 ---
 
 ## できること / Features
