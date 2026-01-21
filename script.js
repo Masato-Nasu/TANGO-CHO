@@ -1,5 +1,5 @@
 const STORAGE_KEY = "tangoChoWords";
-const APP_VERSION = "v33";
+const APP_VERSION = "v34";
 
 const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
@@ -612,17 +612,6 @@ saveAppTokenBtn?.addEventListener("click", () => {
 
   importJsonBtn?.addEventListener("click", () => {
     try { importJsonInput?.click(); } catch (_) {}
-  });
-
-      if (choice === null) return;
-      const c = String(choice).trim();
-      if (c === "2") {
-        await ();
-        return;
-      }
-      // default: JSON file
-      importJsonInput?.click();
-    } catch (_) {}
   });
 importJsonInput?.addEventListener("change", async () => {
     const file = importJsonInput.files && importJsonInput.files[0];
