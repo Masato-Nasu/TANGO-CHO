@@ -67,28 +67,6 @@
 
 ---
 
-## AndroidでWeb上の英単語をアプリへ送る方法
-
-AndroidはiPhoneほど共有連携が強くないため、現実的には次が最短です。
-
-### 方法1：コピー → 追加（Add）に貼り付け（最短）
-1. Webで英単語をコピー
-2. TANGO-CHO を開く → 追加（Add）に貼り付け
-3. 翻訳 → 保存
-
-### 方法2：URLパラメータで起動（慣れると速い）
-1. 単語をコピー
-2. Chromeのアドレスバーに以下を貼り付けて開く  
-   `https://masato-nasu.github.io/TANGO-CHO/index.html?word=（ここに貼り付け）`
-3. 追加欄に入った状態で起動 → 翻訳 → 保存
-
-（例）  
-`https://masato-nasu.github.io/TANGO-CHO/index.html?word=subscription`
-
-※ `word` の代わりに `text` / `q` / `t` でも受け取れます（用途により）
-
----
-
 ## よくあるトラブル（更新が反映されない）
 
 PWAはキャッシュの影響で古い版が残ることがあります。
