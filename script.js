@@ -1,6 +1,8 @@
 const STORAGE_KEY = "tangoChoWords";
 const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
+const DEFAULT_HF_BASE = "https://mazzgogo-tango-cho.hf.space";
+
 const FILTER_KEY = "tangoChoFilter";
 const SORT_KEY = "tangoChoSort";
 const DIFF_CAP_KEY = "tangoChoDifficultyCap";
@@ -316,28 +318,11 @@ async function postJsonWithFallback(base, endpoints, payload, token) {
 }
 
 function getHfBase() {
-  // 1) primary key
-  let v = (localStorage.getItem(HF_BASE_KEY) || "").trim();
-
-  // 2) legacy keys migration (older versions)
-  if (!v) {
-    const legacyKeys = ["tangoChoApiBase", "tangoChoApiBaseUrl", "tangoChoSpaceBase", "tangoChoServerBase"];
-    for (const k of legacyKeys) {
-      const t = (localStorage.getItem(k) || "").trim();
-      if (t) {
-        v = t;
-        localStorage.setItem(HF_BASE_KEY, v);
-        break;
-      }
-    }
-  }
-
-  // 3) fallback: current input value (if user typed but didn't press save)
-  if (!v) {
-    const el = document.getElementById("hfBase");
-    if (el && el.value && el.value.trim()) v = el.value.trim();
-  }
-  return normalizeHfBase(v);
+  // Fixed HF Spaces base (hidden from UI)
+  const v = DEFAULT_HF_BASE;
+  // Keep storage in sync for backward compatibility (safe no-op if blocked)
+  try { localStorage.setItem(HF_BASE_KEY, v); } catch (_) {}
+  return v;
 }
 
 function getAppToken() {
@@ -518,40 +503,37 @@ function setupSettings() {
   appToken.value = getAppToken();
 
   function updateConnBadge() {
-    const v = (hfBase.value || '').trim();
-    if (!connStatus) return;
-    connStatus.textContent = v ? '✅ 接続先設定済み' : '⚠️ 未設定';
-  }
+  if (!connStatus) return;
+  const kw = (appToken?.value || localStorage.getItem(HF_TOKEN_KEY) || '').trim();
+  connStatus.textContent = kw ? '✅ キーワード設定済み' : '⚠️ キーワード未設定';
+}
   updateConnBadge();
 
   saveHfBaseBtn?.addEventListener("click", () => {
-    const n = normalizeHfBase(hfBase.value);
-    hfBase.value = n;
-    localStorage.setItem(HF_BASE_KEY, n);
-    updateConnBadge();
-    setMsg("HF Spaces API Base を保存しました。", "ok");
+    // no-op (HF base is fixed)
+    setMsg("接続先はアプリ内で固定されています。", "ok");
   });
-  saveAppTokenBtn?.addEventListener("click", () => {
+
+saveAppTokenBtn?.addEventListener("click", () => {
     localStorage.setItem(HF_TOKEN_KEY, appToken.value.trim());
-    setMsg("APP_TOKEN を保存しました。", "ok");
+    setMsg("キーワードを保存しました。", "ok");
   });
 
 
   // Auto-save (user may forget pressing "保存")
-  hfBase.addEventListener("blur", () => {
-    const n = normalizeHfBase(hfBase.value);
-    hfBase.value = n;
-    localStorage.setItem(HF_BASE_KEY, n);
-    updateConnBadge();
-  });
-  hfBase.addEventListener("change", () => {
-    const n = normalizeHfBase(hfBase.value);
-    hfBase.value = n;
-    localStorage.setItem(HF_BASE_KEY, n);
+  hfBase?.addEventListener("blur", () => {
+    try { hfBase.value = DEFAULT_HF_BASE; } catch (_) {}
+    try { localStorage.setItem(HF_BASE_KEY, DEFAULT_HF_BASE); } catch (_) {}
     updateConnBadge();
   });
 
-  appToken.addEventListener("blur", () => {
+hfBase?.addEventListener("change", () => {
+    try { hfBase.value = DEFAULT_HF_BASE; } catch (_) {}
+    try { localStorage.setItem(HF_BASE_KEY, DEFAULT_HF_BASE); } catch (_) {}
+    updateConnBadge();
+  });
+
+appToken.addEventListener("blur", () => {
     localStorage.setItem(HF_TOKEN_KEY, appToken.value.trim());
   });
   appToken.addEventListener("change", () => {
