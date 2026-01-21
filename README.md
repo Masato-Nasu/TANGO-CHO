@@ -17,6 +17,7 @@
 
 - **Hugging Face Spaces（API / DeepL中継）**  
   ※「接続設定（HF Spaces）」から設定します  
+  - 稼働確認：`https://mazzgogo-tango-cho.hf.space/health`
 
 ---
 
@@ -52,8 +53,8 @@
 
 1. アプリ内の **接続設定（HF Spaces）** を開く
 2. 以下を設定
-   - **API Base**：https://masato-nasu.github.io/TANGO-CHO/
-   - **App Token**：必要な方はご連絡ください。
+   - **API Base**：https://mazzgogo-tango-cho.hf.space
+   - **App Token**：Space 側の `APP_TOKEN` と同じ値（/health が `token_required: true` の場合に必須）
 
 ---
 
@@ -64,6 +65,31 @@
 3. 必要なら **類義語取得（手動）**
 4. **保存**
 5. 単語帳 → クイズで回す
+
+---
+
+## AndroidでWeb上の単語を持ってくる（共有でOK）
+
+Android では、Webページ上の単語を **共有（Share）** から TANGO-CHO に渡せます。
+
+### 方法：共有 → TANGO-CHO
+1. Chrome 等で英単語を選択（長押しで選択）
+2. メニューから **共有** を選ぶ
+3. 共有先に **TANGO-CHO**（またはブラウザでTANGO-CHOを開く動線）が出る場合はそれを選択
+4. 追加（Add）タブで翻訳 → 保存
+
+※端末・OS・ブラウザにより共有メニューの表示が異なる場合があります。  
+共有で出ない場合は「コピー → 追加（Add）に貼り付け」が確実です。
+
+---
+
+## こまめなバックアップ（JSON保存のすすめ）
+
+単語帳データは端末内（ローカル）に保存されます。  
+機種変更やトラブルに備えて、**JSONでこまめにエクスポート（保存）**する運用をおすすめします。
+
+- 目安：単語を多めに追加した日／週1回など
+- 保存した JSON を Google Drive などに置いておくと復旧が容易です
 
 ---
 
