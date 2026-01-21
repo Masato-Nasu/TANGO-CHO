@@ -53,9 +53,7 @@
 1. アプリ内の **接続設定（HF Spaces）** を開く
 2. 以下を設定
    - **API Base**：`https://<your-space>.hf.space`
-   - **App Token**：Space側で `APP_TOKEN` を設定している場合のみ（/health が `token_required: true` のとき必須）
-3. 動作確認（任意）
-   - `https://<your-space>.hf.space/health` を開いて JSON が返ること
+   - **App Token**：必要な方はご連絡ください。
 
 ---
 
