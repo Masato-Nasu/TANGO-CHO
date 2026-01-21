@@ -1,4 +1,10 @@
 const STORAGE_KEY = "tangoChoWords";
+const BACKUP_SNAP_KEY = "tangoChoAutoSnapshots";
+const BACKUP_LAST_TS_KEY = "tangoChoAutoSnapshotLastTs";
+const BACKUP_MAX = 30;
+const BACKUP_THROTTLE_MS = 1200;
+const APP_VERSION = "v26";
+
 const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
 const DEFAULT_HF_BASE = "https://mazzgogo-tango-cho.hf.space";
@@ -178,8 +184,131 @@ function loadWords() {
   }
 }
 
-function saveWords(words) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
+function saveWords(words, reason) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
+  } catch (_) {}
+  pushAutoSnapshot(words, reason || "save");
+}
+
+function pushAutoSnapshot(words, reason) {
+  try {
+    const now = Date.now();
+    const last = Number(localStorage.getItem(BACKUP_LAST_TS_KEY) || "0");
+    if (now - last < BACKUP_THROTTLE_MS) return;
+    localStorage.setItem(BACKUP_LAST_TS_KEY, String(now));
+
+    const snapRaw = localStorage.getItem(BACKUP_SNAP_KEY);
+    const snaps = snapRaw ? (JSON.parse(snapRaw) || []) : [];
+    const safeWords = Array.isArray(words) ? words : [];
+    snaps.push({
+      ts: new Date(now).toISOString(),
+      reason: String(reason || "auto"),
+      words: safeWords,
+    });
+    while (snaps.length > BACKUP_MAX) snaps.shift();
+    localStorage.setItem(BACKUP_SNAP_KEY, JSON.stringify(snaps));
+  } catch (_) {}
+}
+
+function buildBackupPayload() {
+  return {
+    app: "TANGO-CHO",
+    version: APP_VERSION,
+    exportedAt: nowIso(),
+    words: loadWords(),
+  };
+}
+
+function downloadJson(filename, obj) {
+  const data = JSON.stringify(obj, null, 2);
+  const blob = new Blob([data], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => { try { URL.revokeObjectURL(url); } catch (_) {} }, 1200);
+}
+
+function sanitizeImportedWords(arr) {
+  if (!Array.isArray(arr)) return [];
+  const out = [];
+  for (const x of arr) {
+    if (!x || typeof x !== "object") continue;
+    const w = String(x.word || "").trim();
+    const m = String(x.meaning || "").trim();
+    if (!w) continue;
+    out.push({
+      id: x.id ? String(x.id) : (crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()),
+      word: w,
+      meaning: m,
+      status: (x.status === "learned" || x.status === "unknown" || x.status === "default") ? x.status : "default",
+      example: x.example ? String(x.example) : "",
+      memo: x.memo ? String(x.memo) : "",
+      tags: x.tags ? String(x.tags) : "",
+      synonyms: x.synonyms ? String(x.synonyms) : "",
+      source: x.source ? String(x.source) : "import",
+      createdAt: x.createdAt ? String(x.createdAt) : nowIso(),
+      updatedAt: x.updatedAt ? String(x.updatedAt) : undefined,
+    });
+  }
+
+function getAutoSnapshots() {
+  try {
+    const raw = localStorage.getItem(BACKUP_SNAP_KEY);
+    const snaps = raw ? (JSON.parse(raw) || []) : [];
+    return Array.isArray(snaps) ? snaps : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function formatSnapLabel(s, idx) {
+  const ts = s && s.ts ? String(s.ts) : "";
+  const reason = s && s.reason ? String(s.reason) : "auto";
+  const n = s && Array.isArray(s.words) ? s.words.length : 0;
+  return `${idx}: ${ts} / ${reason} / ${n} words`;
+}
+
+async function restoreFromSnapshotInteractive() {
+  const snaps = getAutoSnapshots();
+  if (!snaps.length) {
+    setMsg("スナップショットがありません。", "ng");
+    return;
+  }
+
+  // Show latest first
+  const list = [...snaps].reverse();
+  const lines = list.slice(0, 12).map((s, i) => formatSnapLabel(s, i)).join("\n");
+  const input = prompt(
+    "スナップショットから復元します。\n\n直近の候補（0が最新）:\n" + lines + "\n\n復元したい番号（0〜）を入力してください。\n（キャンセルで中止）",
+    "0"
+  );
+  if (input === null) return;
+  const k = Number(input);
+  if (!Number.isFinite(k) || k < 0 || k >= list.length) {
+    setMsg("番号が不正です。", "ng");
+    return;
+  }
+  const chosen = list[k];
+  const words = chosen && Array.isArray(chosen.words) ? chosen.words : [];
+  if (!words.length) {
+    setMsg("このスナップショットは空です。", "ng");
+    return;
+  }
+
+  const ok = confirm(`スナップショットを復元します。\n現在の単語帳（${loadWords().length}件）を上書きして、${words.length}件に置き換えます。\nよろしいですか？`);
+  if (!ok) return;
+
+  saveWords(words, "restore-snapshot");
+  setMsg(`スナップショットを復元しました（${words.length}件）。`, "ok");
+  try { renderWordList(); } catch (_) {}
+}
+
+  return out;
 }
 
 // --- TTS: ensure English voice on iPhone/iOS ---
@@ -489,6 +618,9 @@ function setupSettings() {
   const saveHfBaseBtn = document.getElementById("saveHfBaseBtn");
   const appToken = document.getElementById("appToken");
   const saveAppTokenBtn = document.getElementById("saveAppTokenBtn");
+  const exportJsonBtn = document.getElementById("exportJsonBtn");
+  const importJsonBtn = document.getElementById("importJsonBtn");
+  const importJsonInput = document.getElementById("importJsonInput");
 
   // restore current settings
   try {
@@ -520,7 +652,59 @@ saveAppTokenBtn?.addEventListener("click", () => {
   });
 
 
-  // Auto-save (user may forget pressing "保存")
+  
+
+  exportJsonBtn?.addEventListener("click", () => {
+    try {
+      const ymd = new Date().toISOString().slice(0,10).replaceAll("-", "");
+      downloadJson(`tangocho-backup-${ymd}.json`, buildBackupPayload());
+      setMsg("JSONを保存しました。", "ok");
+    } catch (e) {
+      setMsg("JSON保存に失敗しました。", "ng");
+    }
+  });
+
+  
+  importJsonBtn?.addEventListener("click", async () => {
+    try {
+      const choice = prompt(
+        "読込（復元）メニュー\n\n1: JSONファイルを読込\n2: 自動スナップショットから復元\n\n番号を入力してください（キャンセルで中止）",
+        "1"
+      );
+      if (choice === null) return;
+      const c = String(choice).trim();
+      if (c === "2") {
+        await restoreFromSnapshotInteractive();
+        return;
+      }
+      // default: JSON file
+      importJsonInput?.click();
+    } catch (_) {}
+  });
+importJsonInput?.addEventListener("change", async () => {
+    const file = importJsonInput.files && importJsonInput.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const obj = JSON.parse(text);
+      const arr = Array.isArray(obj) ? obj : (Array.isArray(obj.words) ? obj.words : null);
+      if (!arr) throw new Error("invalid");
+      const imported = sanitizeImportedWords(arr);
+      if (imported.length === 0) throw new Error("empty");
+
+      const ok = confirm(`JSONを読み込みます。現在の単語帳（${loadWords().length}件）を上書きして、${imported.length}件に置き換えます。よろしいですか？`);
+      if (!ok) return;
+
+      saveWords(imported, "import");
+      setMsg(`JSONを読み込みました（${imported.length}件）。`, "ok");
+      try { renderWordList(); } catch (_) {}
+    } catch (e) {
+      setMsg("JSON読込に失敗しました。ファイル形式を確認してください。", "ng");
+    } finally {
+      try { importJsonInput.value = ""; } catch (_) {}
+    }
+  });
+// Auto-save (user may forget pressing "保存")
   hfBase?.addEventListener("blur", () => {
     try { hfBase.value = DEFAULT_HF_BASE; } catch (_) {}
     try { localStorage.setItem(HF_BASE_KEY, DEFAULT_HF_BASE); } catch (_) {}
