@@ -418,6 +418,27 @@ function extractFirstEnglishToken(s) {
   return m[0].replace(/\u2019/g, "'").toLowerCase();
 }
 
+// Normalize user input or candidate into a clean English token (lowercase).
+function normalizeWordInput(s){
+  const t = extractFirstEnglishToken(String(s||''));
+  if (!t) return '';
+  // trim leading/trailing hyphen/apostrophe
+  return t.replace(/^[-']+/, '').replace(/[-']+$/, '');
+}
+function isGoodRandomCandidate(token){
+  const w = String(token||'').trim().toLowerCase();
+  if (!w) return false;
+  if (w.length < 2 || w.length > 18) return false;
+  if (!/^[a-z][a-z\-']+$/.test(w)) return false;
+  // avoid strange forms
+  if (/--|''/.test(w)) return false;
+  if (/[-']$/.test(w) || /^[-']/.test(w)) return false;
+  return true;
+}
+
+// Track whether the current word came from Random button (used for graceful fallback).
+let __lastWordFromRandom = false;
+
 function consumeSharePayloadText() {
   try {
     const raw = localStorage.getItem(SHARE_PAYLOAD_KEY);
@@ -540,6 +561,10 @@ function setupSettings() {
 
 function setupAddForm() {
   const wordEl = document.getElementById("word");
+
+  if (wordEl) {
+    wordEl.addEventListener('input', () => { __lastWordFromRandom = false; });
+  }
   const meaningEl = document.getElementById("meaning");
   const statusEl = document.getElementById("status");
   const exampleEl = document.getElementById("example");
@@ -627,7 +652,14 @@ function setupAddForm() {
 
 
   function pickRandomWord() {
-    const pool = window.VOCAB_POOL;
+    const toeic = window.TOEIC_POOL;
+    const full = window.VOCAB_POOL;
+
+    // TOEIC-biased sampling (no extra UI): 90% TOEIC pool, 10% general pool.
+    const TOEIC_BIAS = 0.90;
+    const useToeic = Array.isArray(toeic) && toeic.length > 0 && (rnd() < TOEIC_BIAS);
+
+    const pool = useToeic ? toeic : full;
     if (!Array.isArray(pool) || pool.length === 0) return null;
 
     const cap = getDifficultyCap();
@@ -659,7 +691,8 @@ function setupAddForm() {
     for (let guard = 0; guard < 600; guard++) {
       const w = subset[Math.floor(rnd() * subset.length)];
       if (!w) continue;
-      const lw = String(w).toLowerCase();
+      const lw = normalizeWordInput(w);
+      if (!isGoodRandomCandidate(lw)) continue;
       if (registered.has(lw)) continue;
       if (histSet.has(lw)) continue;
       candidate = lw;
@@ -667,7 +700,7 @@ function setupAddForm() {
     }
     if (!candidate) {
       // fallback: allow repeats if exhausted
-      candidate = String(subset[Math.floor(rnd() * subset.length)] || "").toLowerCase() || null;
+      candidate = normalizeWordInput(subset[Math.floor(rnd() * subset.length)] || "") || null;
     }
     if (!candidate) return null;
 
@@ -693,22 +726,50 @@ function setupAddForm() {
       if (!picked) return setMsg("ランダム候補が見つかりません。", "err");
 
       wordEl.value = picked;
+      __lastWordFromRandom = true;
       wordEl.focus();
     });
   }
 
 
   translateBtn.addEventListener("click", async () => {
-    const w = wordEl.value.trim();
-    if (!w) return setMsg("英単語を入力してください。", "err");
+    const raw = wordEl.value;
+    const w = normalizeWordInput(raw);
+    if (!w) return setMsg("英単語（アルファベット）を入力してください。", "err");
+
+    // If user pasted a sentence, keep only the first English token (quietly).
+    if (String(raw||"").trim().toLowerCase() !== w) {
+      wordEl.value = w;
+    }
 
     setMsg("翻訳中...", "");
     setState("翻訳中");
     try {
       const ja = await translateToJaViaSpace(w);
-      meaningEl.value = ja;
+
+      const jaTrim = String(ja||"").trim();
+      // If translation is empty or unchanged, treat as not suitable for learning.
+      if (!jaTrim || jaTrim.toLowerCase() === w.toLowerCase()) {
+        meaningEl.value = "";
+        setState("未翻訳");
+        if (__lastWordFromRandom) {
+          __lastWordFromRandom = false;
+          // Show another candidate (no extra buttons, just recover gracefully)
+          const picked = pickRandomWord();
+          if (picked) {
+            wordEl.value = picked;
+            setMsg("この単語は翻訳できない可能性があるため、別の候補に切り替えました。", "ok");
+            wordEl.focus();
+            return;
+          }
+        }
+        return setMsg("翻訳できない単語の可能性があります。別の単語を試してください。", "err");
+      }
+
+      meaningEl.value = jaTrim;
       setMsg("翻訳しました（編集できます）。", "ok");
       setState("翻訳済み");
+      __lastWordFromRandom = false;
     } catch (e) {
       setMsg(String(e.message || e), "err");
       setState("失敗");
@@ -731,8 +792,10 @@ function setupAddForm() {
 
   if (synFetchBtn) {
     synFetchBtn.addEventListener("click", async () => {
-      const w = wordEl.value.trim();
-      if (!w) return setMsg("英単語を入力してください。", "err");
+      const raw = wordEl.value;
+      const w = normalizeWordInput(raw);
+      if (!w) return setMsg("英単語（アルファベット）を入力してください。", "err");
+      if (String(raw||"").trim().toLowerCase() !== w) wordEl.value = w;
       try {
         const syns = await getSynonymsSmart(w, 8);
         synonymsEl.value = syns.slice(0, 8).join(", ");
@@ -907,8 +970,8 @@ function __shuffleInPlace(arr, seedStr){
 function getDifficultyCap(){
   const max = (window.VOCAB_POOL && Array.isArray(window.VOCAB_POOL)) ? window.VOCAB_POOL.length : 12000;
   const minCap = 800;
-  let v = parseInt(localStorage.getItem(DIFF_CAP_KEY) || "1200", 10);
-  if (!Number.isFinite(v)) v = 1200;
+  let v = parseInt(localStorage.getItem(DIFF_CAP_KEY) || "1600", 10);
+  if (!Number.isFinite(v)) v = 1600;
   v = Math.max(minCap, Math.min(max, v));
   return v;
 }
@@ -2207,7 +2270,8 @@ function escapeHtml(s){
 }
 
 function sendWordToAdd(word){
-  const w = word.toLowerCase();
+  const w = normalizeWordInput(word);
+  if (!w) return;
   const input = document.getElementById("word");
   if (input) input.value = w;
   // move tab
