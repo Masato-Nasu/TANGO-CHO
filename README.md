@@ -17,7 +17,6 @@
 
 - **Hugging Face Spaces（API / DeepL中継）**  
   ※「接続設定（HF Spaces）」から設定します  
-  `GET /health` で稼働確認できます（例：`https://<your-space>.hf.space/health`）
 
 ---
 
