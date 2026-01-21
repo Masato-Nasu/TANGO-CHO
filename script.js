@@ -1,9 +1,9 @@
 const STORAGE_KEY = "tangoChoWords";
 const BACKUP_SNAP_KEY = "tangoChoAutoSnapshots";
 const BACKUP_LAST_TS_KEY = "tangoChoAutoSnapshotLastTs";
-const BACKUP_MAX = 30;
+const BACKUP_MAX = 12;
 const BACKUP_THROTTLE_MS = 1200;
-const APP_VERSION = "v28";
+const APP_VERSION = "v31";
 
 const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
@@ -185,11 +185,29 @@ function loadWords() {
 }
 
 function saveWords(words, reason) {
+  // Words are the source of truth. Snapshots are best-effort.
+  let saved = false;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
-  } catch (_) {}
-  pushAutoSnapshot(words, reason || "save");
+    saved = true;
+  } catch (e1) {
+    // If storage is full, free snapshot space and retry once.
+    try { localStorage.removeItem(BACKUP_SNAP_KEY); } catch (_) {}
+    try { localStorage.removeItem(BACKUP_LAST_TS_KEY); } catch (_) {}
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
+      saved = true;
+      try { setMsg("保存容量の都合でスナップショットを整理しました。", "ok"); } catch (_) {}
+    } catch (e2) {
+      saved = false;
+      try { setMsg("保存に失敗しました（容量不足の可能性）。先にJSON保存で退避してください。", "ng"); } catch (_) {}
+    }
+  }
+
+  // Snapshot is best-effort; do not block main flow if it fails.
+  if (saved) pushAutoSnapshot(words, reason || "save");
 }
+
 
 function pushAutoSnapshot(words, reason) {
   try {
@@ -206,10 +224,24 @@ function pushAutoSnapshot(words, reason) {
       reason: String(reason || "auto"),
       words: safeWords,
     });
+
+    // Keep within limit (oldest-first)
     while (snaps.length > BACKUP_MAX) snaps.shift();
-    localStorage.setItem(BACKUP_SNAP_KEY, JSON.stringify(snaps));
+
+    // Try to persist; if quota exceeded, prune older snapshots until it fits
+    for (let attempt = 0; attempt < 8; attempt++) {
+      try {
+        localStorage.setItem(BACKUP_SNAP_KEY, JSON.stringify(snaps));
+        return;
+      } catch (e) {
+        if (snaps.length <= 1) break;
+        snaps.shift(); // drop oldest and retry
+      }
+    }
+    // If still failing, give up silently (words data is more important)
   } catch (_) {}
 }
+
 
 function buildBackupPayload() {
   return {
@@ -276,7 +308,7 @@ function formatSnapLabel(s, idx) {
 async function restoreFromSnapshotInteractive() {
   const snaps = getAutoSnapshots();
   if (!snaps.length) {
-    setMsg("スナップショットがありません。", "ng");
+    setMsg("履歴がありません。", "ng");
     return;
   }
 
@@ -284,7 +316,7 @@ async function restoreFromSnapshotInteractive() {
   const list = [...snaps].reverse();
   const lines = list.slice(0, 12).map((s, i) => formatSnapLabel(s, i)).join("\n");
   const input = prompt(
-    "スナップショットから復元します。\n\n直近の候補（0が最新）:\n" + lines + "\n\n復元したい番号（0〜）を入力してください。\n（キャンセルで中止）",
+    "履歴から復元します。\n\n直近の履歴（0が最新）:\n" + lines + "\n\n復元したい番号（0〜）を入力してください。\n（キャンセルで中止）",
     "0"
   );
   if (input === null) return;
@@ -296,15 +328,15 @@ async function restoreFromSnapshotInteractive() {
   const chosen = list[k];
   const words = chosen && Array.isArray(chosen.words) ? chosen.words : [];
   if (!words.length) {
-    setMsg("このスナップショットは空です。", "ng");
+    setMsg("この履歴は空です。", "ng");
     return;
   }
 
-  const ok = confirm(`スナップショットを復元します。\n現在の単語帳（${loadWords().length}件）を上書きして、${words.length}件に置き換えます。\nよろしいですか？`);
+  const ok = confirm(`履歴を復元します。\n現在の単語帳（${loadWords().length}件）を上書きして、${words.length}件に置き換えます。\nよろしいですか？`);
   if (!ok) return;
 
   saveWords(words, "restore-snapshot");
-  setMsg(`スナップショットを復元しました（${words.length}件）。`, "ok");
+  setMsg(`履歴を復元しました（${words.length}件）。`, "ok");
   try { renderWordList(); } catch (_) {}
 }
 
@@ -658,9 +690,9 @@ saveAppTokenBtn?.addEventListener("click", () => {
     try {
       const ymd = new Date().toISOString().slice(0,10).replaceAll("-", "");
       downloadJson(`tangocho-backup-${ymd}.json`, buildBackupPayload());
-      setMsg("JSONを保存しました。", "ok");
+      setMsg("単語を保存しました。", "ok");
     } catch (e) {
-      setMsg("JSON保存に失敗しました。", "ng");
+      setMsg("単語の保存に失敗しました。", "ng");
     }
   });
 
@@ -668,7 +700,7 @@ saveAppTokenBtn?.addEventListener("click", () => {
   importJsonBtn?.addEventListener("click", async () => {
     try {
       const choice = prompt(
-        "読込（復元）メニュー\n\n1: JSONファイルを読込\n2: 自動スナップショットから復元\n\n番号を入力してください（キャンセルで中止）",
+        "単語復元メニュー\n\n1: ファイルから復元\n2: 履歴から復元（端末内）\n\n番号を入力してください（キャンセルで中止）",
         "1"
       );
       if (choice === null) return;
@@ -692,14 +724,14 @@ importJsonInput?.addEventListener("change", async () => {
       const imported = sanitizeImportedWords(arr);
       if (imported.length === 0) throw new Error("empty");
 
-      const ok = confirm(`JSONを読み込みます。現在の単語帳（${loadWords().length}件）を上書きして、${imported.length}件に置き換えます。よろしいですか？`);
+      const ok = confirm(`単語を復元します。現在の単語帳（${loadWords().length}件）を上書きして、${imported.length}件に置き換えます。よろしいですか？`);
       if (!ok) return;
 
       saveWords(imported, "import");
-      setMsg(`JSONを読み込みました（${imported.length}件）。`, "ok");
+      setMsg(`単語を復元しました（${imported.length}件）。`, "ok");
       try { renderWordList(); } catch (_) {}
     } catch (e) {
-      setMsg("JSON読込に失敗しました。ファイル形式を確認してください。", "ng");
+      setMsg("単語の復元に失敗しました。ファイル形式を確認してください。", "ng");
     } finally {
       try { importJsonInput.value = ""; } catch (_) {}
     }

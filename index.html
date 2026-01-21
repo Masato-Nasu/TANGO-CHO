@@ -13,8 +13,8 @@
   <link rel="icon" sizes="512x512" href="./icons/icon-512-v26.png" />
 
   <meta name="theme-color" content="#00c896" />
-  <link rel="manifest" href="manifest.json?v=28" />
-  <link rel="stylesheet" href="style.css?v=28" />
+  <link rel="manifest" href="manifest.json?v=31" />
+  <link rel="stylesheet" href="style.css?v=31" />
 </head>
 <body>
   <header class="app-header">
@@ -44,8 +44,8 @@
 
         <label class="field-label">バックアップ（JSON）</label>
         <div class="field-row">
-          <button id="exportJsonBtn" class="secondary-btn" type="button">JSON保存</button>
-          <button id="importJsonBtn" class="secondary-btn" type="button">JSON読込</button>
+          <button id="exportJsonBtn" class="secondary-btn" type="button">単語保存</button>
+          <button id="importJsonBtn" class="secondary-btn" type="button">単語復元</button>
           <input id="importJsonInput" type="file" accept="application/json,.json" style="display:none;" />
         </div>
 </details>
@@ -209,13 +209,13 @@
   <footer class="app-footer">
 </footer>
 
-  <script src="bank_enja.js?v=28"></script>
-  <script src="vocab_pool.js?v=28"></script>
-  <script src="script.js?v=28"></script>
+  <script src="bank_enja.js?v=31"></script>
+  <script src="vocab_pool.js?v=31"></script>
+  <script src="script.js?v=31"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./service-worker.js?v=28").catch(console.error);
+        navigator.serviceWorker.register("./service-worker.js?v=31").catch(console.error);
       });
     }
   </script>
