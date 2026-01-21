@@ -246,6 +246,75 @@ function setListMsg(text, kind) {
 }
 
 
+function normalizeHfBase(raw) {
+  let v = (raw || "").trim();
+  if (!v) return "";
+
+  // Convert Hugging Face UI URL -> hf.space (best-effort)
+  // https://huggingface.co/spaces/<owner>/<space>  ->  https://<owner>-<space>.hf.space
+  const m = v.match(/^https?:\/\/huggingface\.co\/spaces\/([^\/]+)\/([^\/?#]+)/i);
+  if (m) v = `https://${m[1]}-${m[2]}.hf.space`;
+
+  try {
+    const u = new URL(v);
+    // Always use origin as API base; users sometimes paste /translate, /synonyms, /docs, etc.
+    return u.origin.replace(/\/+$/, "");
+  } catch (_) {
+    return v.replace(/\/+$/, "");
+  }
+}
+
+async function postJsonWithFallback(base, endpoints, payload, token) {
+  const b = base.replace(/\/+$/, "");
+  const headers = {
+    "Content-Type": "application/json",
+    ...(token ? { "X-App-Token": token } : {}),
+  };
+
+  let lastText = "";
+  let lastStatus = 0;
+
+  for (const ep of endpoints) {
+    const url = `${b}${ep.startsWith("/") ? ep : `/${ep}`}`;
+    let res;
+    try {
+      res = await fetch(url, { method: "POST", headers, body: JSON.stringify(payload) });
+    } catch (e) {
+      lastText = String(e?.message || e);
+      lastStatus = 0;
+      continue;
+    }
+
+    const text = await res.text().catch(() => "");
+    lastText = text;
+    lastStatus = res.status;
+
+    // If endpoint is missing, try the next candidate
+    if (res.status === 404) continue;
+
+    // Parse JSON when possible
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch (_) {}
+
+    if (!res.ok) {
+      const detail = (data && (data.detail || data.message)) ? (data.detail || data.message) : text;
+      // DeepL legacy auth deprecation hint
+      if (res.status === 502 && /Legacy authentication method/i.test(detail || "")) {
+        throw new Error("DeepL認証方式が更新されました。Spaces側をヘッダ認証（Authorization: DeepL-Auth-Key）に更新してください。");
+      }
+      throw new Error(`Spaces error: ${res.status} ${detail || ""}`.trim());
+    }
+
+    return data || {};
+  }
+
+  // All endpoints 404 (or network failed)
+  if (lastStatus === 404) {
+    throw new Error("Spaces APIが見つかりません（HF Spaces API Base は https://xxxxx.hf.space の“ルート”にしてください。末尾に /translate や /synonyms を付けないでください）。");
+  }
+  throw new Error(`Spaces error: ${lastStatus || ""} ${lastText || ""}`.trim());
+}
+
 function getHfBase() {
   // 1) primary key
   let v = (localStorage.getItem(HF_BASE_KEY) || "").trim();
@@ -268,7 +337,7 @@ function getHfBase() {
     const el = document.getElementById("hfBase");
     if (el && el.value && el.value.trim()) v = el.value.trim();
   }
-  return v;
+  return normalizeHfBase(v);
 }
 
 function getAppToken() {
@@ -298,20 +367,7 @@ async function translateToJaViaSpace(word) {
   if (!base) throw new Error("HF Spaces API Base が未設定です（⚙️接続設定）。");
   const token = getAppToken();
 
-  const res = await fetch(`${base.replace(/\/$/, "")}/translate`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { "X-App-Token": token } : {}),
-    },
-    body: JSON.stringify({ text: word, target_lang: "JA" }),
-  });
-
-  if (!res.ok) {
-    const msg = await res.text().catch(() => "");
-    throw new Error(`Spaces error: ${res.status} ${msg}`);
-  }
-  const data = await res.json();
+  const data = await postJsonWithFallback(base, ["/translate", "/api/translate"], { text: word, target_lang: "JA" }, token);
   return data.translated || "";
 }
 
@@ -320,28 +376,7 @@ async function fetchSynonymsViaSpace(word, max = 8) {
   if (!base) throw new Error("HF Spaces API Base が未設定です（⚙️接続設定）。");
   const token = getAppToken();
 
-  const res = await fetch(`${base.replace(/\/$/, "")}/synonyms`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { "X-App-Token": token } : {}),
-    },
-    body: JSON.stringify({ text: word, max }),
-  });
-
-  if (!res.ok) {
-    let detail = "";
-    try {
-      const j = await res.json();
-      detail = j?.detail ? ` (${j.detail})` : "";
-    } catch (_) {}
-    if (res.status === 404) {
-      throw new Error("Spaces側に /synonyms がありません。Spaces を v3.2 に更新してください。");
-    }
-    throw new Error(`類義語取得に失敗: ${res.status}${detail}`);
-  }
-
-  const data = await res.json();
+  const data = await postJsonWithFallback(base, ["/synonyms", "/api/synonyms"], { text: word, max }, token);
   const arr = data?.synonyms || [];
   return Array.isArray(arr) ? arr : [];
 }
@@ -448,6 +483,14 @@ function setupSettings() {
   const saveHfBaseBtn = document.getElementById("saveHfBaseBtn");
   const appToken = document.getElementById("appToken");
   const saveAppTokenBtn = document.getElementById("saveAppTokenBtn");
+
+  // restore current settings
+  try {
+    const b = normalizeHfBase(localStorage.getItem(HF_BASE_KEY) || "");
+    if (hfBase) hfBase.value = b;
+    if (appToken) appToken.value = (localStorage.getItem(HF_TOKEN_KEY) || "").trim();
+  } catch (_) {}
+
   const connStatus = document.getElementById("connStatus");
 
   hfBase.value = getHfBase();
@@ -461,7 +504,9 @@ function setupSettings() {
   updateConnBadge();
 
   saveHfBaseBtn?.addEventListener("click", () => {
-    localStorage.setItem(HF_BASE_KEY, hfBase.value.trim());
+    const n = normalizeHfBase(hfBase.value);
+    hfBase.value = n;
+    localStorage.setItem(HF_BASE_KEY, n);
     updateConnBadge();
     setMsg("HF Spaces API Base を保存しました。", "ok");
   });
@@ -473,11 +518,15 @@ function setupSettings() {
 
   // Auto-save (user may forget pressing "保存")
   hfBase.addEventListener("blur", () => {
-    localStorage.setItem(HF_BASE_KEY, hfBase.value.trim());
+    const n = normalizeHfBase(hfBase.value);
+    hfBase.value = n;
+    localStorage.setItem(HF_BASE_KEY, n);
     updateConnBadge();
   });
   hfBase.addEventListener("change", () => {
-    localStorage.setItem(HF_BASE_KEY, hfBase.value.trim());
+    const n = normalizeHfBase(hfBase.value);
+    hfBase.value = n;
+    localStorage.setItem(HF_BASE_KEY, n);
     updateConnBadge();
   });
 

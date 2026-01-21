@@ -13,8 +13,8 @@
   <link rel="icon" sizes="512x512" href="./icons/icon-512-v26.png" />
 
   <meta name="theme-color" content="#00c896" />
-  <link rel="manifest" href="manifest.json?v=19" />
-  <link rel="stylesheet" href="style.css?v=19" />
+  <link rel="manifest" href="manifest.json?v=20" />
+  <link rel="stylesheet" href="style.css?v=20" />
 </head>
 <body>
   <header class="app-header">
@@ -30,7 +30,7 @@
 
   <main class="main">
     <section id="addSection" class="section active">
-      <details id="connSettingsCard" class="card" id="settingsCard">
+      <details id="connSettingsCard" class="card">
         <summary class="summary">⚙️ 接続設定（HF Spaces） <span id="connStatus" class="conn-status"></span></summary>
 
         <label class="field-label" for="hfBase">HF Spaces API Base（例：https://xxxxx.hf.space）</label>
@@ -43,6 +43,7 @@
         <div class="field-row">
           <input id="appToken" type="text" placeholder="未設定なら空でOK" />
           <button id="saveAppTokenBtn" class="secondary-btn" type="button">保存</button>
+        </div>
 
         <p class="note">※ DeepLキーはSpacesのSecrets（DEEPL_KEY）に入れてください。PWAには不要です。</p>
       </details>
@@ -209,13 +210,13 @@
   <footer class="app-footer">
 </footer>
 
-  <script src="bank_enja.js?v=19"></script>
-  <script src="vocab_pool.js?v=19"></script>
-  <script src="script.js?v=19"></script>
+  <script src="bank_enja.js?v=20"></script>
+  <script src="vocab_pool.js?v=20"></script>
+  <script src="script.js?v=20"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./service-worker.js?v=19").catch(console.error);
+        navigator.serviceWorker.register("./service-worker.js?v=20").catch(console.error);
       });
     }
   </script>
