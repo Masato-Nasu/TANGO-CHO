@@ -52,7 +52,7 @@
 
 1. アプリ内の **接続設定（HF Spaces）** を開く
 2. 以下を設定
-   - **API Base**：`https://<your-space>.hf.space`
+   - **API Base**：https://masato-nasu.github.io/TANGO-CHO/
    - **App Token**：必要な方はご連絡ください。
 
 ---
