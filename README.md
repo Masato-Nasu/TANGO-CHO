@@ -23,8 +23,8 @@
 
 ## Links
 
-- **GitHub Pages（PWA）**  実行画面
-- https://masato-nasu.github.io/TANGO-CHO/
+- **実行画面 GitHub Pages（PWA）**  
+https://masato-nasu.github.io/TANGO-CHO/
 
 ---
 
