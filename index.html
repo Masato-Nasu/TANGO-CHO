@@ -13,8 +13,8 @@
   <link rel="icon" sizes="512x512" href="./icons/icon-512-v26.png" />
 
   <meta name="theme-color" content="#00c896" />
-  <link rel="manifest" href="manifest.json?v=26" />
-  <link rel="stylesheet" href="style.css?v=26" />
+  <link rel="manifest" href="manifest.json?v=28" />
+  <link rel="stylesheet" href="style.css?v=28" />
 </head>
 <body>
   <header class="app-header">
@@ -36,7 +36,7 @@
         <!-- HF Spaces API Base is fixed in the app (not shown). -->
         <input id="hfBase" type="hidden" value="https://mazzgogo-tango-cho.hf.space" />
 
-        <label class="field-label" for="appToken">キーワード（例：tangocho）</label>
+        <label class="field-label" for="appToken">キーワード</label>
         <div class="field-row">
           <input id="appToken" type="text" placeholder="キーワードを入力" autocomplete="off" />
           <button id="saveAppTokenBtn" class="secondary-btn" type="button">保存</button>
@@ -48,10 +48,7 @@
           <button id="importJsonBtn" class="secondary-btn" type="button">JSON読込</button>
           <input id="importJsonInput" type="file" accept="application/json,.json" style="display:none;" />
         </div>
-
-
-        <p class="note">※ DeepLキーはSpacesのSecrets（DEEPL_KEY）に入れてください。PWAには不要です。</p>
-      </details>
+</details>
 
       <div class="card">
         <div class="field-row">
@@ -127,10 +124,7 @@
               <option value="time">時系列</option>
               <option value="alpha">ABC</option>
             </select>
-            <button id="importBtn" class="ghost-btn">Import</button>
-            <input id="importFile" type="file" accept="application/json" style="display:none" />
-            <button id="exportBtn" class="ghost-btn">JSON</button>
-          </div>
+</div>
         </div>
 
         <div id="listMsg" class="msg"></div>
@@ -215,13 +209,13 @@
   <footer class="app-footer">
 </footer>
 
-  <script src="bank_enja.js?v=26"></script>
-  <script src="vocab_pool.js?v=26"></script>
-  <script src="script.js?v=26"></script>
+  <script src="bank_enja.js?v=28"></script>
+  <script src="vocab_pool.js?v=28"></script>
+  <script src="script.js?v=28"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./service-worker.js?v=26").catch(console.error);
+        navigator.serviceWorker.register("./service-worker.js?v=28").catch(console.error);
       });
     }
   </script>

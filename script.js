@@ -3,7 +3,7 @@ const BACKUP_SNAP_KEY = "tangoChoAutoSnapshots";
 const BACKUP_LAST_TS_KEY = "tangoChoAutoSnapshotLastTs";
 const BACKUP_MAX = 30;
 const BACKUP_THROTTLE_MS = 1200;
-const APP_VERSION = "v26";
+const APP_VERSION = "v28";
 
 const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
