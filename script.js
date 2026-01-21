@@ -657,7 +657,7 @@ function setupAddForm() {
 
     // TOEIC-biased sampling (no extra UI): 90% TOEIC pool, 10% general pool.
     const TOEIC_BIAS = 0.90;
-    const useToeic = Array.isArray(toeic) && toeic.length > 0 && (rnd() < TOEIC_BIAS);
+    const useToeic = Array.isArray(toeic) && toeic.length > 0 && (Math.random() < TOEIC_BIAS);
 
     const pool = useToeic ? toeic : full;
     if (!Array.isArray(pool) || pool.length === 0) return null;
