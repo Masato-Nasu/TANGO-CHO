@@ -1,5 +1,5 @@
 const STORAGE_KEY = "tangoChoWords";
-const APP_VERSION = "v34";
+const APP_VERSION = "v35";
 
 const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
@@ -7,6 +7,7 @@ const DEFAULT_HF_BASE = "https://mazzgogo-tango-cho.hf.space";
 
 const FILTER_KEY = "tangoChoFilter";
 const SORT_KEY = "tangoChoSort";
+const TAG_FILTER_KEY = "tangoChoTagFilter";
 const DIFF_CAP_KEY = "tangoChoDifficultyCap";
 const STUDY_HIST_KEY = "tangoChoStudyHist";
 const FORTUNE_MANUAL_KEY = "tangoChoFortuneLevelManual";
@@ -1128,8 +1129,12 @@ function renderWordList() {
   const listEl = document.getElementById("wordList");
   const countEl = document.getElementById("wordCount");
   const filter = (localStorage.getItem(FILTER_KEY) || "all").trim();
+  const tagFilter = (localStorage.getItem(TAG_FILTER_KEY) || "all").trim();
   const sortOrder = (localStorage.getItem(SORT_KEY) || "time").trim();
   const all = loadWords();
+
+  // Tag filter options depend on current words
+  try { syncTagFilterOptions(all); } catch (_) {}
 
   if (countEl) countEl.textContent = String(all.length);
   if (!listEl) return;
@@ -1137,11 +1142,23 @@ function renderWordList() {
   let words = [...all];
   if (sortOrder === "alpha") {
     words.sort((a, b) => String(a.word || "").toLowerCase().localeCompare(String(b.word || "").toLowerCase()));
+  } else if (sortOrder === "tag") {
+    words.sort((a, b) => {
+      const at = (parseTags(a.tags)[0] || "");
+      const bt = (parseTags(b.tags)[0] || "");
+      const c = at.toLowerCase().localeCompare(bt.toLowerCase());
+      if (c !== 0) return c;
+      return String(a.word || "").toLowerCase().localeCompare(String(b.word || "").toLowerCase());
+    });
   } else {
     // time (default): newest first
     words.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
   }
   if (filter !== "all") words = words.filter((w) => (w.status || "default") === filter);
+  if (tagFilter !== "all") {
+    const tf = String(tagFilter || "").toLowerCase();
+    words = words.filter((w) => parseTags(w.tags).some((t) => t.toLowerCase() === tf));
+  }
 listEl.innerHTML = "";
 
   if (words.length === 0) {
@@ -1280,6 +1297,58 @@ function setupSort() {
     renderWordList();
   });
 }
+
+function parseTags(raw) {
+  const s = String(raw || "")
+    .replace(/、/g, ",")
+    .replace(/，/g, ",")
+    .trim();
+  if (!s) return [];
+  return s
+    .split(",")
+    .map((x) => x.trim())
+    .filter((x) => x.length > 0);
+}
+
+function collectTagOptions(words) {
+  const map = new Map(); // norm -> display
+  for (const w of words || []) {
+    const tags = parseTags(w.tags);
+    for (const t of tags) {
+      const norm = t.toLowerCase();
+      if (!map.has(norm)) map.set(norm, t);
+    }
+  }
+  const arr = Array.from(map.entries()).map(([norm, display]) => ({ norm, display }));
+  arr.sort((a, b) => a.display.toLowerCase().localeCompare(b.display.toLowerCase()));
+  return arr;
+}
+
+function syncTagFilterOptions(allWords) {
+  const sel = document.getElementById("tagFilter");
+  if (!sel) return;
+  const opts = collectTagOptions(allWords);
+  const keep = (localStorage.getItem(TAG_FILTER_KEY) || sel.value || "all").trim() || "all";
+  sel.innerHTML = `<option value="all">タグ: 全て</option>` + opts.map(o => `<option value="${o.norm}">${o.display}</option>`).join("");
+  if (sel.querySelector(`option[value="${keep}"]`)) {
+    sel.value = keep;
+  } else {
+    sel.value = "all";
+    localStorage.setItem(TAG_FILTER_KEY, "all");
+  }
+}
+
+function setupTagFilter() {
+  const sel = document.getElementById("tagFilter");
+  if (!sel) return;
+  sel.value = (localStorage.getItem(TAG_FILTER_KEY) || "all").trim();
+  sel.addEventListener("change", () => {
+    localStorage.setItem(TAG_FILTER_KEY, sel.value);
+    renderWordList();
+  });
+}
+
+
 
 function setupExport() {
   const btn = document.getElementById("exportBtn");
@@ -1793,6 +1862,7 @@ document.addEventListener("DOMContentLoaded", () => {
   applyIncomingWordToAddForm();
   setupFilter();
   setupSort();
+  setupTagFilter();
   setupExport();
   setupImport();
   setupQuiz();

@@ -13,8 +13,8 @@
   <link rel="icon" sizes="512x512" href="./icons/icon-512-v26.png" />
 
   <meta name="theme-color" content="#00c896" />
-  <link rel="manifest" href="manifest.json?v=34" />
-  <link rel="stylesheet" href="style.css?v=34" />
+  <link rel="manifest" href="manifest.json?v=35" />
+  <link rel="stylesheet" href="style.css?v=35" />
 </head>
 <body>
   <header class="app-header">
@@ -120,9 +120,13 @@
               <option value="default">デフォルト</option>
               <option value="learned">覚えた</option>
             </select>
+            <select id="tagFilter" class="select small" title="タグ">
+              <option value="all">タグ: 全て</option>
+            </select>
             <select id="sortOrder" class="select small" title="並び順">
               <option value="time">時系列</option>
               <option value="alpha">ABC</option>
+              <option value="tag">タグ</option>
             </select>
 </div>
         </div>
@@ -209,13 +213,13 @@
   <footer class="app-footer">
 </footer>
 
-  <script src="bank_enja.js?v=34"></script>
-  <script src="vocab_pool.js?v=34"></script>
-  <script src="script.js?v=34"></script>
+  <script src="bank_enja.js?v=35"></script>
+  <script src="vocab_pool.js?v=35"></script>
+  <script src="script.js?v=35"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./service-worker.js?v=34").catch(console.error);
+        navigator.serviceWorker.register("./service-worker.js?v=35").catch(console.error);
       });
     }
   </script>
