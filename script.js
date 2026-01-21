@@ -1,9 +1,5 @@
 const STORAGE_KEY = "tangoChoWords";
-const BACKUP_SNAP_KEY = "tangoChoAutoSnapshots";
-const BACKUP_LAST_TS_KEY = "tangoChoAutoSnapshotLastTs";
-const BACKUP_MAX = 12;
-const BACKUP_THROTTLE_MS = 1200;
-const APP_VERSION = "v31";
+const APP_VERSION = "v33";
 
 const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
@@ -184,63 +180,24 @@ function loadWords() {
   }
 }
 
-function saveWords(words, reason) {
-  // Words are the source of truth. Snapshots are best-effort.
-  let saved = false;
+function saveWords(words) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
-    saved = true;
+    return true;
   } catch (e1) {
-    // If storage is full, free snapshot space and retry once.
-    try { localStorage.removeItem(BACKUP_SNAP_KEY); } catch (_) {}
-    try { localStorage.removeItem(BACKUP_LAST_TS_KEY); } catch (_) {}
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
-      saved = true;
-      try { setMsg("保存容量の都合でスナップショットを整理しました。", "ok"); } catch (_) {}
-    } catch (e2) {
-      saved = false;
-      try { setMsg("保存に失敗しました（容量不足の可能性）。先にJSON保存で退避してください。", "ng"); } catch (_) {}
-    }
+    try { setMsg("保存に失敗しました（容量不足の可能性）。先に単語保存で退避してください。", "ng"); } catch (_) {}
+    return false;
   }
-
-  // Snapshot is best-effort; do not block main flow if it fails.
-  if (saved) pushAutoSnapshot(words, reason || "save");
 }
 
 
-function pushAutoSnapshot(words, reason) {
-  try {
-    const now = Date.now();
-    const last = Number(localStorage.getItem(BACKUP_LAST_TS_KEY) || "0");
-    if (now - last < BACKUP_THROTTLE_MS) return;
-    localStorage.setItem(BACKUP_LAST_TS_KEY, String(now));
 
-    const snapRaw = localStorage.getItem(BACKUP_SNAP_KEY);
-    const snaps = snapRaw ? (JSON.parse(snapRaw) || []) : [];
-    const safeWords = Array.isArray(words) ? words : [];
-    snaps.push({
-      ts: new Date(now).toISOString(),
-      reason: String(reason || "auto"),
-      words: safeWords,
-    });
 
-    // Keep within limit (oldest-first)
-    while (snaps.length > BACKUP_MAX) snaps.shift();
 
-    // Try to persist; if quota exceeded, prune older snapshots until it fits
-    for (let attempt = 0; attempt < 8; attempt++) {
-      try {
-        localStorage.setItem(BACKUP_SNAP_KEY, JSON.stringify(snaps));
-        return;
-      } catch (e) {
-        if (snaps.length <= 1) break;
-        snaps.shift(); // drop oldest and retry
-      }
-    }
-    // If still failing, give up silently (words data is more important)
-  } catch (_) {}
-}
+
+
+
+
 
 
 function buildBackupPayload() {
@@ -288,57 +245,14 @@ function sanitizeImportedWords(arr) {
     });
   }
 
-function getAutoSnapshots() {
-  try {
-    const raw = localStorage.getItem(BACKUP_SNAP_KEY);
-    const snaps = raw ? (JSON.parse(raw) || []) : [];
-    return Array.isArray(snaps) ? snaps : [];
-  } catch (_) {
-    return [];
-  }
-}
 
-function formatSnapLabel(s, idx) {
-  const ts = s && s.ts ? String(s.ts) : "";
-  const reason = s && s.reason ? String(s.reason) : "auto";
-  const n = s && Array.isArray(s.words) ? s.words.length : 0;
-  return `${idx}: ${ts} / ${reason} / ${n} words`;
-}
 
-async function restoreFromSnapshotInteractive() {
-  const snaps = getAutoSnapshots();
-  if (!snaps.length) {
-    setMsg("履歴がありません。", "ng");
-    return;
-  }
 
-  // Show latest first
-  const list = [...snaps].reverse();
-  const lines = list.slice(0, 12).map((s, i) => formatSnapLabel(s, i)).join("\n");
-  const input = prompt(
-    "履歴から復元します。\n\n直近の履歴（0が最新）:\n" + lines + "\n\n復元したい番号（0〜）を入力してください。\n（キャンセルで中止）",
-    "0"
-  );
-  if (input === null) return;
-  const k = Number(input);
-  if (!Number.isFinite(k) || k < 0 || k >= list.length) {
-    setMsg("番号が不正です。", "ng");
-    return;
-  }
-  const chosen = list[k];
-  const words = chosen && Array.isArray(chosen.words) ? chosen.words : [];
-  if (!words.length) {
-    setMsg("この履歴は空です。", "ng");
-    return;
-  }
 
-  const ok = confirm(`履歴を復元します。\n現在の単語帳（${loadWords().length}件）を上書きして、${words.length}件に置き換えます。\nよろしいですか？`);
-  if (!ok) return;
 
-  saveWords(words, "restore-snapshot");
-  setMsg(`履歴を復元しました（${words.length}件）。`, "ok");
-  try { renderWordList(); } catch (_) {}
-}
+
+
+
 
   return out;
 }
@@ -696,17 +610,14 @@ saveAppTokenBtn?.addEventListener("click", () => {
     }
   });
 
-  
-  importJsonBtn?.addEventListener("click", async () => {
-    try {
-      const choice = prompt(
-        "単語復元メニュー\n\n1: ファイルから復元\n2: 履歴から復元（端末内）\n\n番号を入力してください（キャンセルで中止）",
-        "1"
-      );
+  importJsonBtn?.addEventListener("click", () => {
+    try { importJsonInput?.click(); } catch (_) {}
+  });
+
       if (choice === null) return;
       const c = String(choice).trim();
       if (c === "2") {
-        await restoreFromSnapshotInteractive();
+        await ();
         return;
       }
       // default: JSON file
@@ -727,7 +638,7 @@ importJsonInput?.addEventListener("change", async () => {
       const ok = confirm(`単語を復元します。現在の単語帳（${loadWords().length}件）を上書きして、${imported.length}件に置き換えます。よろしいですか？`);
       if (!ok) return;
 
-      saveWords(imported, "import");
+      saveWords(imported);
       setMsg(`単語を復元しました（${imported.length}件）。`, "ok");
       try { renderWordList(); } catch (_) {}
     } catch (e) {
@@ -1118,7 +1029,7 @@ function setupAddForm() {
 
     if (editId) {
       exitEditMode(false);
-      setMsg(`更新しました（入力をクリアしました）。${synAdded ? ` 類似語カード +${synAdded}` : ""}${synFailNote}`.trim(), "ok");
+      setMsg(`更新しました（入力をクリアしました）。${synAdded ? ` 類似語カード +${synAdded}` : ""}${synFailNote}`.trim());
     } else {
       clearForm(true);
       setMsg(`保存しました（入力をクリアしました）。${synAdded ? ` 類似語カード +${synAdded}` : ""}${synFailNote}`.trim(), "ok");
@@ -1863,7 +1774,7 @@ function setupImport() {
       // ✅ Always persist immediately after upload/import
       saveWords(current);
       renderWordList();
-      setListMsg(`Import完了：${added}件 追加しました（重複はスキップ）。`, "ok");
+      setListMsg(`Import完了：${added}件 追加しました（重複はスキップ）。`);
     } catch (e) {
       setListMsg(String(e.message || e), "err");
     }
