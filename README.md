@@ -53,7 +53,7 @@
 1. アプリ内の **接続設定（HF Spaces）** を開く
 2. 以下を設定
    - **API Base**：https://mazzgogo-tango-cho.hf.space
-   - **App Token**：Space 側の `APP_TOKEN` と同じ値（/health が `token_required: true` の場合に必須）
+   - **App Token**：必要な方はご連絡ください。
 
 ---
 
