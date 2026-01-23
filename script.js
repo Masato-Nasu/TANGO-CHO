@@ -588,6 +588,10 @@ function setupSettings() {
 }
   updateConnBadge();
 
+// Keep badge responsive while typing (even before saving)
+try { appToken?.addEventListener("input", updateConnBadge); } catch(_) {}
+
+
   saveHfBaseBtn?.addEventListener("click", () => {
     // no-op (HF base is fixed)
     setMsg("接続先はアプリ内で固定されています。", "ok");
@@ -596,6 +600,7 @@ function setupSettings() {
 saveAppTokenBtn?.addEventListener("click", () => {
     localStorage.setItem(HF_TOKEN_KEY, appToken.value.trim());
     setMsg("キーワードを保存しました。", "ok");
+    updateConnBadge();
   });
 
 

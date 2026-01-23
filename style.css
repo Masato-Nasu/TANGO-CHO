@@ -19,7 +19,7 @@ body{min-height:100vh;display:flex;flex-direction:column}
 .app-header{padding:16px var(--padX) 8px;text-align:center;max-width:760px;width:100%;margin:0 auto;box-sizing:border-box}
 .app-header h1{margin:0;font-size:2.0rem;letter-spacing:.04em}
 .app-subtitle{margin:6px 0 0;font-size:1.0rem;color:var(--sub)}
-.tab-bar{display:flex;flex-direction:column;gap:var(--gap);position:sticky;top:0;z-index:10;
+.tab-bar{display:flex;flex-direction:column;gap:var(--gap);position:static;
   max-width:760px;width:100%;margin:0 auto;box-sizing:border-box;
   padding:10px var(--padX) 0;background:transparent}
 
