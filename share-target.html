@@ -4,8 +4,20 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>TANGO-CHO Share</title>
+  <style>
+    body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;margin:0;padding:16px;line-height:1.5}
+    .box{max-width:680px;margin:0 auto}
+    .hint{opacity:.75;font-size:14px}
+    button{font-size:16px;padding:10px 14px;border-radius:10px;border:1px solid #ccc;background:#fff}
+  </style>
 </head>
 <body>
+<div class="box">
+  <div class="hint">共有データを受け取りました。TANGO-CHO を開きます…</div>
+  <div style="height:10px"></div>
+  <button id="openBtn" type="button">TANGO-CHOを開く</button>
+</div>
+
 <script>
 (() => {
   const p = new URLSearchParams(location.search);
@@ -14,11 +26,18 @@
   const url = (p.get("url") || "").trim();
 
   const payload = { text: text || title || url, title, url, ts: Date.now() };
-  try {
-    localStorage.setItem("tangoChoSharePayload", JSON.stringify(payload));
-  } catch (e) {}
+  try { localStorage.setItem("tangoChoSharePayload", JSON.stringify(payload)); } catch (e) {}
 
-  location.replace("./index.html?from=share&v=3.7.11");
+  const target = "./index.html?from=share&v=3.7.12";
+
+  // iOS では共有元アプリ（例: TikTok）へ戻ってしまうことがあるため、
+  // 直ちに replace せず、短い遅延＋ボタンフォールバックにします。
+  function go(){ try { location.href = target; } catch(e) { location.assign(target); } }
+
+  const btn = document.getElementById("openBtn");
+  if (btn) btn.addEventListener("click", go);
+
+  setTimeout(go, 250);
 })();
 </script>
 </body>
