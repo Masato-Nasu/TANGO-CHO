@@ -588,10 +588,6 @@ function setupSettings() {
 }
   updateConnBadge();
 
-// Keep badge responsive while typing (even before saving)
-try { appToken?.addEventListener("input", updateConnBadge); } catch(_) {}
-
-
   saveHfBaseBtn?.addEventListener("click", () => {
     // no-op (HF base is fixed)
     setMsg("接続先はアプリ内で固定されています。", "ok");
@@ -600,13 +596,15 @@ try { appToken?.addEventListener("input", updateConnBadge); } catch(_) {}
 saveAppTokenBtn?.addEventListener("click", () => {
     localStorage.setItem(HF_TOKEN_KEY, appToken.value.trim());
     setMsg("キーワードを保存しました。", "ok");
-    updateConnBadge();
+    try { updateConnBadge(); } catch(_) {}
   });
 
-
-  
-
-  exportJsonBtn?.addEventListener("click", () => {
+  // Keep the connection badge in sync while editing.
+  try{
+    appToken?.addEventListener("input", () => { try { updateConnBadge(); } catch(_) {} });
+    appToken?.addEventListener("change", () => { try { updateConnBadge(); } catch(_) {} });
+  }catch(_){}
+exportJsonBtn?.addEventListener("click", () => {
     try {
       const ymd = new Date().toISOString().slice(0,10).replaceAll("-", "");
       downloadJson(`tangocho-backup-${ymd}.json`, buildBackupPayload());
@@ -1913,11 +1911,6 @@ function setupFortune(){
     }
   } catch(_) {}
 
-
-// Back-date prevention: ignore previously saved target date on startup; always start from "today".
-// (The user can still change the date manually; changes are persisted via the change listener.)
-try { dateEl.value = toDateInputValue(new Date()); } catch(_) {}
-
   function persist(){
     try {
       localStorage.setItem(FORTUNE_KEY, JSON.stringify({
@@ -1937,17 +1930,8 @@ try { dateEl.value = toDateInputValue(new Date()); } catch(_) {}
     }
   }catch(_){}
 
-  // Persist on edits and auto-generate so changes (especially birth date) immediately reflect in results.
-function persistAndMaybeGen(){
-  persist();
-  try{
-    if (birthEl.value && dateEl.value) genBtn.click();
-  }catch(_){}
-}
-birthEl.addEventListener("change", persistAndMaybeGen);
-birthEl.addEventListener("input", persist);
-dateEl.addEventListener("change", persistAndMaybeGen);
-dateEl.addEventListener("input", persist);
+  birthEl.addEventListener("change", persist);
+  dateEl.addEventListener("change", persist);
   levelEl.addEventListener("change", () => {
     try{ localStorage.setItem(FORTUNE_MANUAL_KEY, "1"); }catch(_){}
     persist();
