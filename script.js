@@ -1932,8 +1932,17 @@ try { dateEl.value = toDateInputValue(new Date()); } catch(_) {}
     }
   }catch(_){}
 
-  birthEl.addEventListener("change", persist);
-  dateEl.addEventListener("change", persist);
+  // Persist on edits and auto-generate so changes (especially birth date) immediately reflect in results.
+function persistAndMaybeGen(){
+  persist();
+  try{
+    if (birthEl.value && dateEl.value) genBtn.click();
+  }catch(_){}
+}
+birthEl.addEventListener("change", persistAndMaybeGen);
+birthEl.addEventListener("input", persist);
+dateEl.addEventListener("change", persistAndMaybeGen);
+dateEl.addEventListener("input", persist);
   levelEl.addEventListener("change", () => {
     try{ localStorage.setItem(FORTUNE_MANUAL_KEY, "1"); }catch(_){}
     persist();
