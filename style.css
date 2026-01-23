@@ -36,8 +36,43 @@ body{min-height:100vh;display:flex;flex-direction:column}
 #fortuneControlsCard{margin-bottom:calc(var(--gap) * 1.8)}
 #connSettingsCard{margin-bottom:calc(var(--gap) * 1.6)}
 .field-row{display:flex;gap:var(--gap);align-items:center}
+.field-row>*{min-width:0}
+
+.action-row{flex-wrap:wrap}
+.action-row #translateBtn{flex:2 1 180px}
+.action-row #randomBtn{flex:1 1 120px}
+.action-row #clearBtn{flex:1 1 120px}
+.action-row #translateState{flex:0 0 auto}
+@media (max-width: 430px){
+  .action-row #translateBtn{flex:1 1 100%}
+  .action-row #randomBtn,.action-row #clearBtn,.action-row #translateState{flex:1 1 120px}
+}
+
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap)}
 @media (max-width:640px){.two-col{grid-template-columns:1fr}}
+
+/* iPhone/Safari: date input indicator can cause a broken right-side block.
+   On small screens we hide the native indicator to keep the control visually consistent. */
+@media (max-width:640px){
+  input[type="date"]{
+    -webkit-appearance:none;
+    appearance:none;
+    background-image:none;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator{
+    opacity:0;
+    display:none;
+  }
+  input[type="date"]::-webkit-clear-button,
+  input[type="date"]::-webkit-inner-spin-button{
+    display:none;
+  }
+  input[type="date"]::-webkit-datetime-edit{
+    text-align:center;
+  }
+}
+
+
 input[type="text"],input[type="date"],textarea,select{
   width:100%;padding:14px 18px;border-radius:16px;border:1px solid var(--border);
   background:#151515;color:var(--text);font-size:1.05rem;min-height:52px
@@ -59,12 +94,11 @@ select:disabled{opacity:0.75;cursor:not-allowed}
 .note{margin:8px 0 0;color:var(--sub);font-size:.82rem;line-height:1.4}
 .pill{
   padding:10px 14px;border-radius:14px;border:1px solid var(--border);
-  background:#141414;color:var(--sub);font-size:0.95rem
-}
+  background:#141414;color:var(--sub);font-size:0.95rem;min-width:88px;text-align:center;white-space:nowrap}
 .msg{margin-top:10px;font-size:.9rem}
 .msg.ok{color:var(--accent)}
 .msg.err{color:var(--danger)}
-.summary{cursor:pointer;color:var(--accent);font-weight:700;list-style:none}
+.summary{cursor:pointer;color:var(--accent);font-weight:700;list-style:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 details.card[open] > summary.summary{margin-bottom:var(--gap)}
 details summary{user-select:none}
 details summary::-webkit-details-marker{display:none}
@@ -142,7 +176,7 @@ details summary::-webkit-details-marker{display:none}
 }
 .row > input[type="text"]{flex:1}
 
-.conn-status{font-size:0.9rem;color: var(--sub);margin-left: 8px;}
+.conn-status{font-size:0.9rem;color: var(--sub);margin-left:0;;}
 
 .edit-banner{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px 14px;border:1px solid var(--border);background:#0f1412;border-radius:16px;margin:10px 0 12px;}
 .edit-title{font-weight:800;font-size:1.05rem;color:var(--text)}

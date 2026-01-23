@@ -1,5 +1,5 @@
 const STORAGE_KEY = "tangoChoWords";
-const APP_VERSION = "v35";
+const APP_VERSION = "v37";
 
 const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
@@ -1907,6 +1907,11 @@ function setupFortune(){
       if (s?.level) levelEl.value = s.level;
     }
   } catch(_) {}
+
+
+// Back-date prevention: ignore previously saved target date on startup; always start from "today".
+// (The user can still change the date manually; changes are persisted via the change listener.)
+try { dateEl.value = toDateInputValue(new Date()); } catch(_) {}
 
   function persist(){
     try {

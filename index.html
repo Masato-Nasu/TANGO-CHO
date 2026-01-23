@@ -13,8 +13,8 @@
   <link rel="icon" sizes="512x512" href="./icons/icon-512-v26.png" />
 
   <meta name="theme-color" content="#00c896" />
-  <link rel="manifest" href="manifest.json?v=35" />
-  <link rel="stylesheet" href="style.css?v=35" />
+  <link rel="manifest" href="manifest.json?v=37" />
+  <link rel="stylesheet" href="style.css?v=37" />
 </head>
 <body>
   <header class="app-header">
@@ -58,7 +58,7 @@
           </div>
           <button id="ttsBtn" class="ghost-btn" title="発音">🔊</button>
         </div>
-<div class="field-row" style="margin-top:10px;">
+<div class="field-row action-row" style="margin-top:10px;">
           <button id="translateBtn" class="primary-btn">翻訳（DeepL）</button>
           <button id="randomBtn" class="ghost-btn">ランダム</button>
           <button id="clearBtn" class="ghost-btn">クリア</button>
@@ -160,7 +160,7 @@
           </div>
         </div>
 
-        <div class="field-row" style="margin-top:10px;">
+        <div class="field-row action-row" style="margin-top:10px;">
           <button id="startQuizBtn" class="primary-btn">出題</button>
           <button id="nextQuizBtn" class="ghost-btn" style="display:none" disabled>次へ</button>
           <div class="pill" id="scorePill">0 / 0</div>
@@ -197,7 +197,7 @@
           </div>
         </div>
 
-        <div class="field-row" style="margin-top:10px;">
+        <div class="field-row action-row" style="margin-top:10px;">
           <button id="fortuneGenBtn" class="primary-btn" type="button">Generate</button>
         </div>
 
@@ -213,13 +213,13 @@
   <footer class="app-footer">
 </footer>
 
-  <script src="bank_enja.js?v=35"></script>
-  <script src="vocab_pool.js?v=35"></script>
-  <script src="script.js?v=35"></script>
+  <script src="bank_enja.js?v=37"></script>
+  <script src="vocab_pool.js?v=37"></script>
+  <script src="script.js?v=37"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./service-worker.js?v=35").catch(console.error);
+        navigator.serviceWorker.register("./service-worker.js?v=37").catch(console.error);
       });
     }
   </script>
