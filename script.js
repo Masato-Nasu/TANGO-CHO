@@ -730,6 +730,24 @@ function setupAddForm() {
     if (showMsg) setMsg("編集を終了しました。", "ok");
   }
 
+
+
+// Accept incoming words from Fortune taps (or other sources) without risking overwriting an edit-in-progress.
+// This resets the Add form to a clean "new entry" state, then fills the word field.
+document.addEventListener("tangocho:incomingword", (ev) => {
+  try{
+    const w = (ev && ev.detail && ev.detail.word) ? String(ev.detail.word) : "";
+    const token = normalizeWordInput(w);
+    if (!token) return;
+    // If user was editing an existing card, exit edit mode so Save won't overwrite it.
+    if (editId) exitEditMode(false);
+    else clearForm(false);
+    wordEl.value = token;
+    try { wordEl.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
+    try { wordEl.focus(); } catch (_) {}
+    setState("未翻訳");
+  }catch(_){}
+});
   // expose for list tab
   window.startEdit = (id) => {
     const all = loadWords();
@@ -2443,11 +2461,19 @@ function escapeHtml(s){
 function sendWordToAdd(word){
   const w = normalizeWordInput(word);
   if (!w) return;
-  const input = document.getElementById("word");
-  if (input) input.value = w;
-  // move tab
-  const addBtn = document.querySelector('.tab-button[data-section="addSection"]');
-  if (addBtn) addBtn.click();
+
+  // Move tab first
+  try { switchToAddTab(); } catch(_) {}
+
+  // Notify the Add form to reset safely (avoid overwriting edit mode), then fill
+  try{
+    document.dispatchEvent(new CustomEvent("tangocho:incomingword", { detail: { word: w, source: "fortune" } }));
+  }catch(_){
+    // Fallback: direct set
+    const input = document.getElementById("word");
+    if (input) input.value = w;
+  }
+
   // show a tiny message
   const msg = document.getElementById("msg");
   if (msg) {
