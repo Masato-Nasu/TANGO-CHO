@@ -1909,6 +1909,17 @@ const FORTUNE_HISTORY_KEY = "tangoChoFortuneHistory";
 function setupFortune(){
   const birthEl = document.getElementById("fortuneBirth");
   const dateEl = document.getElementById("fortuneDate");
+
+
+function weekdayLabelFromDateInput(ymd){
+  try{
+    const m = String(ymd||"").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if(!m) return "";
+    const d = new Date(Number(m[1]), Number(m[2])-1, Number(m[3]));
+    const w = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()];
+    return w;
+  }catch(_){ return ""; }
+}
   const levelEl = document.getElementById("fortuneLevel");
   const genBtn = document.getElementById("fortuneGenBtn");
   const outEl = document.getElementById("fortuneResults");
@@ -1950,6 +1961,27 @@ function setupFortune(){
 
   birthEl.addEventListener("change", persist);
   dateEl.addEventListener("change", persist);
+
+
+// On returning to Fortune tab, default the target date to "today".
+// Important: this should NOT affect generation when the user explicitly sets a different date and presses Generate.
+try{
+  const fortuneTabBtn = document.querySelector('.tab-button[data-section="fortuneSection"]');
+  if (fortuneTabBtn && !fortuneTabBtn.__tangochoReturnTodayHooked) {
+    fortuneTabBtn.__tangochoReturnTodayHooked = true;
+    fortuneTabBtn.addEventListener("click", () => {
+      try{
+        dateEl.value = toDateInputValue(new Date());
+        persist(); // keep settings consistent; does not auto-generate
+        // Update weekday label immediately if the UI shows it
+        try{
+          const wd = document.getElementById("fortuneWeekday");
+          if (wd) wd.textContent = weekdayLabelFromDateInput(dateEl.value);
+        }catch(_){}
+      }catch(_){}
+    });
+  }
+}catch(_){}
   levelEl.addEventListener("change", () => {
     try{ localStorage.setItem(FORTUNE_MANUAL_KEY, "1"); }catch(_){}
     persist();
