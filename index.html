@@ -13,8 +13,8 @@
   <link rel="icon" sizes="512x512" href="./icons/icon-512-v26.png" />
 
   <meta name="theme-color" content="#00c896" />
-  <link rel="manifest" href="manifest.json?v=37" />
-  <link rel="stylesheet" href="style.css?v=37" />
+  <link rel="manifest" href="manifest.json?v=38" />
+  <link rel="stylesheet" href="style.css?v=38" />
 </head>
 <body>
   <header class="app-header">
@@ -213,13 +213,14 @@
   <footer class="app-footer">
 </footer>
 
-  <script src="bank_enja.js?v=37"></script>
-  <script src="vocab_pool.js?v=37"></script>
-  <script src="script.js?v=37"></script>
+  <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
+  <script src="bank_enja.js?v=38"></script>
+  <script src="vocab_pool.js?v=38"></script>
+  <script src="script.js?v=38"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./service-worker.js?v=37").catch(console.error);
+        navigator.serviceWorker.register("./service-worker.js?v=38").catch(console.error);
       });
     }
   </script>

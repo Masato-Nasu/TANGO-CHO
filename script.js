@@ -2206,19 +2206,17 @@ function scoreAt(jdTarget, lonBirth){
 }
 
 function blendedScore(jdTarget, lonBirth){
-  // Match "100% 星占い" distribution: keep day-specific character (no heavy seasonal smoothing)
-  // and preserve enough variance for lows (e.g., 30%) and highs.
+  // "100%" feel: a local (±16d) and a seasonal (±90d) component
   const s0 = scoreAt(jdTarget, lonBirth);
   const s16 = (scoreAt(jdTarget-16, lonBirth) + s0 + scoreAt(jdTarget+16, lonBirth))/3;
-  const s = 0.85*s0 + 0.15*s16;
+  const s90 = (scoreAt(jdTarget-90, lonBirth) + s0 + scoreAt(jdTarget+90, lonBirth))/3;
+  const s = 0.70*s16 + 0.30*s90;
   return Math.max(-1, Math.min(1, s));
 }
 
 function scoreToPercent(s){
-  // Match "100% 星占い" style: linear mapping with a small gain to widen the spread.
-  const gain = 2.2;
-  const x = Math.max(-1, Math.min(1, gain*s));
-  const p = 50 + 50*x;
+  // tanh mapping => stays away from hard 0/100 unless very strong
+  const p = 50 + 50*Math.tanh(1.35*s);
   return Math.round(Math.max(0, Math.min(100, p)));
 }
 
@@ -2230,43 +2228,370 @@ function bandFromPercent(p){
   return "rough";
 }
 
-function fortuneGenerate({birthDate, targetDate, level, tone}){
-  const seed = fnv1a32(`${birthDate}|${targetDate}|${level}|${tone}|fortune-v2`);
-  const rng = mulberry32(seed);
 
-  const jdBirth = dateToJd(isoToUtcDate(birthDate));
-  const jdTarget = dateToJd(isoToUtcDate(targetDate));
+// -------------------- Fortune % algorithm (100%星占いと完全同一) --------------------
+// This block mirrors the 100% Horoscope app's percent pipeline:
+// 1) planetary-aspect raw norms (fast+background)  2) ±90d global positioning
+// 3) ±16d local z-score  4) mix(global,local)  5) day-jitter  6) map to percent
 
-  const lonBirth = {
-    sun: geoEclLon("sun", jdBirth),
-    moon: geoEclLon("moon", jdBirth),
-    mercury: geoEclLon("mercury", jdBirth),
-    venus: geoEclLon("venus", jdBirth),
-    mars: geoEclLon("mars", jdBirth),
-    jupiter: geoEclLon("jupiter", jdBirth),
-    saturn: geoEclLon("saturn", jdBirth),
+function stableSeed100(str){
+  let h = (1779033703 ^ str.length) >>> 0;
+  for (let i=0;i<str.length;i++){
+    h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+    h = ((h << 13) | (h >>> 19)) >>> 0;
+  }
+  h = (h ^ (h >>> 16)) >>> 0;
+  return h >>> 0;
+}
+function makeRng100(seed){
+  let a = seed >>> 0;
+  return function(){
+    a |= 0;
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return (((t ^ (t >>> 14)) >>> 0) / 4294967296);
   };
+}
+function clampNorm100(x){
+  if (x < -1) return -1;
+  if (x >  1) return  1;
+  return x;
+}
+function softenBackground100(n, center, amount){
+  // keep background influence subtle (same as 100%星占い)
+  // n: -1..1, center: 0.4, amount: 0.4
+  const a = amount;
+  const c = center;
+  // scale down amplitude around 0, preserve sign
+  const s = (n >= 0) ? 1 : -1;
+  const v = Math.abs(n);
+  const v2 = (v < c) ? (v * (1 - a)) : (c*(1-a) + (v - c));
+  return clampNorm100(s * v2);
+}
+function aspectScore100(d){
+  // d in degrees (0..360). Favor conjunction/trine/sextile, penalize square/opposition.
+  // Mirrors the aspectScore() behavior from 100%星占い.
+  const x = ((d % 360) + 360) % 360;
+  const a = (x > 180) ? 360 - x : x; // 0..180
+  const w = (deg, width) => Math.exp(-0.5 * Math.pow((a - deg)/width, 2));
+  const good =
+    1.00*w(0,   10) +
+    0.85*w(60,  10) +
+    0.95*w(120, 10);
+  const bad =
+    0.90*w(90,  10) +
+    1.00*w(180, 12);
+  const s = good - bad;
+  return clampNorm100(s);
+}
+function applyDayJitter100(n, category, date, strength){
+  if (!date || !(date instanceof Date) || isNaN(date.getTime())) return n;
+  const key = category + "|" + date.getFullYear() + "-" + (date.getMonth()+1) + "-" + date.getDate();
+  const rng = makeRng100(stableSeed100("dayJ|" + key));
+  const jitter = (rng() - 0.5) * 2 * strength;
+  return clampNorm100(n + jitter);
+}
+function mapNormToPercent100(n, minP, maxP){
+  if (n < -1) n = -1;
+  if (n >  1) n =  1;
+  const z = (n < 0) ? -Math.sqrt(-n) : Math.sqrt(n);
+  const mid = (minP + maxP) / 2;
+  const amp = (maxP - minP) / 2;
+  let p = mid + amp * z;
+  if (n > 0.88){
+    p = 100;
+  }
+  if (p < minP) p = minP;
+  if (p > 100) p = 100;
+  return Math.round(p);
+}
+function parseDateInput100(str){
+  if (!str) return null;
+  const m = String(str).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const y  = parseInt(m[1],10);
+  const mo = parseInt(m[2],10);
+  const d  = parseInt(m[3],10);
+  if (!y || !mo || !d) return null;
+  return new Date(y, mo-1, d, 12, 0, 0); // noon
+}
+function eclLon100(body, date){
+  const time = new Astronomy.AstroTime(date);
+  const vec  = Astronomy.GeoVector(body, time, true);
+  const ecl  = Astronomy.Ecliptic(vec);
+  return ecl.elon;
+}
+function buildNatal100(birthDateObj){
+  const Sun  = Astronomy.Body.Sun;
+  const Moon = Astronomy.Body.Moon;
+  const Merc = Astronomy.Body.Mercury;
+  const Ven  = Astronomy.Body.Venus;
+  const Mars = Astronomy.Body.Mars;
+  const Jup  = Astronomy.Body.Jupiter;
+  const Sat  = Astronomy.Body.Saturn;
+  const bodies = [Sun, Moon, Merc, Ven, Mars, Jup, Sat];
+  const nat = {};
+  for (let i=0;i<bodies.length;i++){
+    const b = bodies[i];
+    nat[b] = eclLon100(b, birthDateObj);
+  }
+  return { nat, bodies, Sun, Moon, Merc, Ven, Mars, Jup, Sat };
+}
+function computeNormsForDate100_withNat(ctx, dateObj){
+  const { nat, bodies, Sun, Moon, Merc, Ven, Mars, Jup, Sat } = ctx;
+  const cur = {};
+  for (let i=0;i<bodies.length;i++){
+    const b = bodies[i];
+    cur[b] = eclLon100(b, dateObj);
+  }
+  function diffLonLocal(body){
+    let d = cur[body] - nat[body];
+    d = d % 360;
+    if (d < 0) d += 360;
+    return d;
+  }
+  function ALocal(body){
+    return aspectScore100(diffLonLocal(body));
+  }
 
-  // Category weighting: each category leans on different mixes
-  const mixes = {
-    overall: {kWave:0.58, kSlow:0.42, tweak:0.00},
-    love:    {kWave:0.65, kSlow:0.35, tweak:+0.04},
-    work:    {kWave:0.50, kSlow:0.50, tweak:-0.02},
-    money:   {kWave:0.46, kSlow:0.54, tweak:-0.01},
-    health:  {kWave:0.55, kSlow:0.45, tweak:-0.03},
+  const rawBgTotal =
+    0.25 * ALocal(Jup) +
+    0.20 * ALocal(Sat) +
+    0.20 * ALocal(Sun);
+  const rawFastTotal =
+    1.5 * ALocal(Moon) +
+    1.1 * ALocal(Merc) +
+    1.1 * ALocal(Ven)  +
+    1.2 * ALocal(Mars);
+
+  let nBgTotal   = clampNorm100(rawBgTotal   * 0.40);
+  let nFastTotal = clampNorm100(rawFastTotal * 0.45);
+  nBgTotal = softenBackground100(nBgTotal, 0.4, 0.4);
+  const nTotalPlanet = clampNorm100(nFastTotal * 0.95 + nBgTotal * 0.05);
+
+  const rawBgLove =
+    0.35 * ALocal(Jup);
+  const rawFastLove =
+    1.6 * ALocal(Ven) +
+    1.4 * ALocal(Moon) +
+    0.9 * ALocal(Merc);
+
+  let nBgLove   = clampNorm100(rawBgLove   * 0.45);
+  let nFastLove = clampNorm100(rawFastLove * 0.45);
+  nBgLove = softenBackground100(nBgLove, 0.4, 0.4);
+  const nLovePlanet = clampNorm100(nFastLove * 0.95 + nBgLove * 0.05);
+
+  const rawBgMoney =
+    0.45 * ALocal(Jup) +
+    0.30 * ALocal(Sat);
+  const rawFastMoney =
+    1.0 * ALocal(Ven) +
+    0.8 * ALocal(Mars) +
+    0.6 * ALocal(Merc);
+
+  let nBgMoney   = clampNorm100(rawBgMoney   * 0.35);
+  let nFastMoney = clampNorm100(rawFastMoney * 0.45);
+  nBgMoney = softenBackground100(nBgMoney, 0.4, 0.4);
+  const nMoneyPlanet = clampNorm100(nFastMoney * 0.95 + nBgMoney * 0.05);
+
+  const rawBgWork =
+    0.50 * ALocal(Sat);
+  const rawFastWork =
+    1.1 * ALocal(Mars) +
+    0.9 * ALocal(Merc) +
+    0.5 * ALocal(Moon) +
+    0.4 * ALocal(Sun);
+
+  let nBgWork   = clampNorm100(rawBgWork   * 0.45);
+  let nFastWork = clampNorm100(rawFastWork * 0.45);
+  nBgWork = softenBackground100(nBgWork, 0.4, 0.4);
+  const nWorkPlanet = clampNorm100(nFastWork * 0.95 + nBgWork * 0.05);
+
+  const rawBgHealth =
+    0.30 * ALocal(Jup);
+  const rawFastHealth =
+    1.3 * ALocal(Moon) +
+    0.7 * ALocal(Sun) +
+    0.4 * ALocal(Ven);
+
+  let nBgHealth   = clampNorm100(rawBgHealth   * 0.45);
+  let nFastHealth = clampNorm100(rawFastHealth * 0.45);
+  nBgHealth = softenBackground100(nBgHealth, 0.4, 0.4);
+  const nHealthPlanet = clampNorm100(nFastHealth * 0.95 + nBgHealth * 0.05);
+
+  return {
+    total:  nTotalPlanet,
+    love:   nLovePlanet,
+    money:  nMoneyPlanet,
+    work:   nWorkPlanet,
+    health: nHealthPlanet
+  };
+}
+
+
+function fortuneGenerate({birthDate, targetDate, level, tone}){
+  // 重要：％（運勢）は「100%星占い」と完全に同一の計算パイプライン。
+  // そのため、同じ誕生日＋同じターゲット日なら、中学生/高校生/大人でも％は同一になります。
+  // 文章（表現）だけ level/tone に応じて変化します。
+
+  const birthStr = birthDate;
+  const birthDateObj = parseDateInput100(birthStr);
+
+  let targetDateObj = parseDateInput100(targetDate);
+  if (!targetDateObj){
+    const now = new Date();
+    targetDateObj = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0);
+  }
+
+  let pTotal = 55, pLove = 55, pMoney = 55, pWork = 55, pHealth = 55;
+  let seed = fnv1a32(`${birthDate}|${targetDate}|${level}|${tone}|fortune-v3`);
+
+  try{
+    if (birthDateObj && typeof Astronomy !== "undefined"){
+      const ctx = buildNatal100(birthDateObj);
+
+      const todayNorms = computeNormsForDate100_withNat(ctx, targetDateObj);
+
+      // --- 年内（±90日）での位置づけ（100%星占いと同じ） ---
+      const yearStats = {
+        total:  { sum:0, min:  9999, max:-9999, count:0 },
+        love:   { sum:0, min:  9999, max:-9999, count:0 },
+        money:  { sum:0, min:  9999, max:-9999, count:0 },
+        work:   { sum:0, min:  9999, max:-9999, count:0 },
+        health: { sum:0, min:  9999, max:-9999, count:0 },
+      };
+
+      for (let oy=-90; oy<=90; oy+=3){
+        const dYear = new Date(targetDateObj.getFullYear(), targetDateObj.getMonth(), targetDateObj.getDate());
+        dYear.setDate(dYear.getDate() + oy);
+        const ny = computeNormsForDate100_withNat(ctx, dYear);
+
+        yearStats.total.sum   += ny.total;
+        yearStats.total.min    = Math.min(yearStats.total.min, ny.total);
+        yearStats.total.max    = Math.max(yearStats.total.max, ny.total);
+        yearStats.total.count += 1;
+
+        yearStats.love.sum   += ny.love;
+        yearStats.love.min    = Math.min(yearStats.love.min, ny.love);
+        yearStats.love.max    = Math.max(yearStats.love.max, ny.love);
+        yearStats.love.count += 1;
+
+        yearStats.money.sum   += ny.money;
+        yearStats.money.min    = Math.min(yearStats.money.min, ny.money);
+        yearStats.money.max    = Math.max(yearStats.money.max, ny.money);
+        yearStats.money.count += 1;
+
+        yearStats.work.sum   += ny.work;
+        yearStats.work.min    = Math.min(yearStats.work.min, ny.work);
+        yearStats.work.max    = Math.max(yearStats.work.max, ny.work);
+        yearStats.work.count += 1;
+
+        yearStats.health.sum   += ny.health;
+        yearStats.health.min    = Math.min(yearStats.health.min, ny.health);
+        yearStats.health.max    = Math.max(yearStats.health.max, ny.health);
+        yearStats.health.count += 1;
+      }
+
+      function yearNorm(valueToday, stat){
+        if (!stat || stat.count <= 1) return 0;
+        const mean = stat.sum / stat.count;
+        const halfRange = (stat.max - stat.min) / 2;
+        if (halfRange < 0.05) return 0;
+        const n = (valueToday - mean) / halfRange;
+        return clampNorm100(n);
+      }
+
+      const nTotalGlobal  = yearNorm(todayNorms.total,  yearStats.total);
+      const nLoveGlobal   = yearNorm(todayNorms.love,   yearStats.love);
+      const nMoneyGlobal  = yearNorm(todayNorms.money,  yearStats.money);
+      const nWorkGlobal   = yearNorm(todayNorms.work,   yearStats.work);
+      const nHealthGlobal = yearNorm(todayNorms.health, yearStats.health);
+
+      // --- 近傍（±16日）のローカル比較（100%星占いと同じ） ---
+      const windowDays = 16;
+      const sum  = { total:0, love:0, money:0, work:0, health:0 };
+      const sum2 = { total:0, love:0, money:0, work:0, health:0 };
+      let count = 0;
+
+      for (let offset=-windowDays; offset<=windowDays; offset++){
+        const d = new Date(targetDateObj.getFullYear(), targetDateObj.getMonth(), targetDateObj.getDate());
+        d.setDate(d.getDate() + offset);
+        const n = computeNormsForDate100_withNat(ctx, d);
+        sum.total  += n.total;   sum2.total  += n.total  * n.total;
+        sum.love   += n.love;    sum2.love   += n.love   * n.love;
+        sum.money  += n.money;   sum2.money  += n.money  * n.money;
+        sum.work   += n.work;    sum2.work   += n.work   * n.work;
+        sum.health += n.health;  sum2.health += n.health * n.health;
+        count++;
+      }
+
+      function localFromWindow(valueToday, s, s2){
+        if (count <= 1) return 0;
+        const mean = s / count;
+        const variance = s2 / count - mean * mean;
+        if (variance < 1e-6) return 0;
+        const std = Math.sqrt(variance);
+        if (std < 0.05) return 0;
+        const z = (valueToday - mean) / (2 * std);
+        return clampNorm100(z);
+      }
+
+      const nTotalLocal  = localFromWindow(todayNorms.total,  sum.total,  sum2.total);
+      const nLoveLocal   = localFromWindow(todayNorms.love,   sum.love,   sum2.love);
+      const nMoneyLocal  = localFromWindow(todayNorms.money,  sum.money,  sum2.money);
+      const nWorkLocal   = localFromWindow(todayNorms.work,   sum.work,   sum2.work);
+      const nHealthLocal = localFromWindow(todayNorms.health, sum.health, sum2.health);
+
+      function mix(global, local){
+        if (local === 0){
+          return clampNorm100(global);
+        }
+        const g = 0.25 * global + 0.75 * local;
+        return clampNorm100(g);
+      }
+
+      let nTotal  = mix(nTotalGlobal,  nTotalLocal);
+      let nLove   = mix(nLoveGlobal,   nLoveLocal);
+      let nMoney  = mix(nMoneyGlobal,  nMoneyLocal);
+      let nWork   = mix(nWorkGlobal,   nWorkLocal);
+      let nHealth = mix(nHealthGlobal, nHealthLocal);
+
+      nTotal  = applyDayJitter100(nTotal,  "total",  targetDateObj, 0.18);
+      nLove   = applyDayJitter100(nLove,   "love",   targetDateObj, 0.18);
+      nMoney  = applyDayJitter100(nMoney,  "money",  targetDateObj, 0.18);
+      nWork   = applyDayJitter100(nWork,   "work",   targetDateObj, 0.18);
+      nHealth = applyDayJitter100(nHealth, "health", targetDateObj, 0.18);
+
+      pTotal  = mapNormToPercent100(nTotal,  15, 95);
+      pLove   = mapNormToPercent100(nLove,   15, 95);
+      pMoney  = mapNormToPercent100(nMoney,  15, 95);
+      pWork   = mapNormToPercent100(nWork,   15, 95);
+      pHealth = mapNormToPercent100(nHealth, 15, 95);
+    } else {
+      console.warn("Astronomy Engine not loaded or invalid birth date; fallback percent will be used.");
+    }
+  } catch(e){
+    console.warn("fortune % calc failed; fallback percent will be used.", e);
+  }
+
+  // Text RNG is allowed to vary by level/tone (only affects wording, not percent)
+  const seedText = fnv1a32(`${birthDate}|${targetDate}|${level}|${tone}|fortune-text-v4`);
+  const rng = mulberry32(seedText);
+
+  const percentByCat = {
+    overall: pTotal,
+    love: pLove,
+    money: pMoney,
+    work: pWork,
+    health: pHealth,
   };
 
   const items = [];
   for (const c of CAT){
-    const m = mixes[c.id] || mixes.overall;
-    const s0 = blendedScore(jdTarget, lonBirth);
-    // small, deterministic category warp
-    const jitter = (rng()-0.5)*0.08;
-    const s = Math.max(-1, Math.min(1, s0 + m.tweak + jitter));
-    const percent = scoreToPercent(s);
+    const percent = percentByCat[c.id] ?? pTotal;
     const band = bandFromPercent(percent);
-    // Use BANK_ENJA paired text when available (no API translation needed)
-    const text = pickFortuneTextV2({rng, seed, cat:c.id, band, level, tone});
+    const text = pickFortuneTextV2({rng, seed: seedText, cat: c.id, band, level, tone});
     items.push({
       id: c.id,
       title: c.name,
@@ -2287,6 +2612,7 @@ function fortuneGenerate({birthDate, targetDate, level, tone}){
     items,
   };
 }
+
 
 // -------------------- Text generation (seeded + anti-repeat) --------------------
 // We generate sentences from parts to avoid obvious repetition.
