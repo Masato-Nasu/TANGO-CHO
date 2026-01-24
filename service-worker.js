@@ -1,6 +1,7 @@
-// TANGO-CHO Service Worker (stable updates)
-// Build: v17
-const CACHE_NAME = "tango-cho-cache-v38.1.0";
+/* TANGO-CHO Service Worker (stable updates)
+ * Build: v40
+ */
+const CACHE_NAME = "tango-cho-cache-v40.0.0";
 
 const CORE_ASSETS = [
   "./",
@@ -14,11 +15,11 @@ const CORE_ASSETS = [
   "./icons/icon-192-v26.png",
   "./icons/icon-512-v26.png",
   "./icons/apple-touch-icon-v26.png",
-
-
-const EXTERNAL_ASSETS = [
-  "https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"
 ];
+
+// Allowlist a small set of cross-origin static assets (offline support).
+const EXTERNAL_ASSETS = [
+  "https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js",
 ];
 
 self.addEventListener("install", (event) => {
@@ -28,14 +29,9 @@ self.addEventListener("install", (event) => {
 
     // Cache critical cross-origin libraries for offline reliability (best-effort).
     for (const url of EXTERNAL_ASSETS) {
-      try {
-        await cache.add(url);
-      } catch (e) {
-        // Ignore failures (offline/blocked). The SW should still install.
-      }
+      try { await cache.add(url); } catch (_) {}
     }
 
-    // Always advance quickly to avoid being stuck on broken cached JS.
     await self.skipWaiting();
   })());
 });
@@ -53,7 +49,6 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(event.request.url);
 
-  // Allowlist a small set of cross-origin static assets (offline support).
   const isExternalAllowed = EXTERNAL_ASSETS.includes(url.href);
   if (url.origin !== self.location.origin && !isExternalAllowed) return;
 
@@ -63,53 +58,40 @@ self.addEventListener("fetch", (event) => {
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME);
 
+    // External allowlisted assets: cache-first.
     if (isExternalAllowed) {
       const cached = await cache.match(event.request);
       if (cached) return cached;
       try {
         const fresh = await fetch(event.request);
-        if (fresh && fresh.ok) {
-          try { await cache.put(event.request, fresh.clone()); } catch (_) {}
-        }
+        if (fresh && fresh.ok) cache.put(event.request, fresh.clone());
         return fresh;
-      } catch (err) {
+      } catch (_) {
         return cached || Response.error();
       }
     }
 
+    // HTML navigation: network-first (so updates apply), fallback to cache.
     if (isNav) {
-      // Network-first for HTML to prevent stale index.html from pinning old JS.
       try {
-        const fresh = await fetch(new Request(event.request.url, { cache: "no-store" }));
-        if (fresh && fresh.ok) {
-          // Normalize to index.html for reliable fallback.
-          await cache.put("./index.html", fresh.clone());
-        }
+        const fresh = await fetch(event.request);
+        if (fresh && fresh.ok) cache.put("./index.html", fresh.clone());
         return fresh;
-      } catch (err) {
-        const cached = await cache.match("./index.html");
-        return cached || Response.error();
+      } catch (_) {
+        return (await cache.match("./index.html")) || Response.error();
       }
     }
 
-    // Cache-first for other same-origin assets (ignore query for versioned URLs).
-    const normalizedKey = url.pathname;
-    const cached = (await cache.match(normalizedKey, { ignoreSearch: true })) || (await cache.match(event.request, { ignoreSearch: true }));
+    // Static assets: cache-first, fallback to network.
+    const cached = await cache.match(event.request);
     if (cached) return cached;
 
     try {
       const fresh = await fetch(event.request);
-      if (fresh && fresh.ok) {
-        try {
-          await cache.put(normalizedKey, fresh.clone());
-        } catch (_) {
-          // Fallback (some browsers require Request objects)
-          await cache.put(event.request, fresh.clone());
-        }
-      }
+      if (fresh && fresh.ok) cache.put(event.request, fresh.clone());
       return fresh;
-    } catch (err) {
-      return cached || Response.error();
+    } catch (_) {
+      return Response.error();
     }
   })());
 });

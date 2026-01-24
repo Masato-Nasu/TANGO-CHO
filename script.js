@@ -1,5 +1,5 @@
 const STORAGE_KEY = "tangoChoWords";
-const APP_VERSION = "v37";
+const APP_VERSION = "v40";
 
 const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
@@ -346,17 +346,47 @@ async function postJsonWithFallback(base, endpoints, payload, token) {
   const b = base.replace(/\/+$/, "");
   const headers = {
     "Content-Type": "application/json",
+    "Accept": "application/json",
     ...(token ? { "X-App-Token": token } : {}),
   };
 
   let lastText = "";
   let lastStatus = 0;
 
+  // Small timeout to avoid iOS Safari sometimes hanging on failed connections.
+  const timeoutMs = 15000;
+
   for (const ep of endpoints) {
     const url = `${b}${ep.startsWith("/") ? ep : `/${ep}`}`;
+
     let res;
     try {
-      res = await fetch(url, { method: "POST", headers, body: JSON.stringify(payload) });
+      if (typeof AbortController !== "undefined") {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), timeoutMs);
+        try {
+          res = await fetch(url, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(payload),
+            mode: "cors",
+            credentials: "omit",
+            cache: "no-store",
+            signal: ctrl.signal,
+          });
+        } finally {
+          clearTimeout(t);
+        }
+      } else {
+        res = await fetch(url, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(payload),
+          mode: "cors",
+          credentials: "omit",
+          cache: "no-store",
+        });
+      }
     } catch (e) {
       lastText = String(e?.message || e);
       lastStatus = 0;
@@ -376,10 +406,12 @@ async function postJsonWithFallback(base, endpoints, payload, token) {
 
     if (!res.ok) {
       const detail = (data && (data.detail || data.message)) ? (data.detail || data.message) : text;
+
       // DeepL legacy auth deprecation hint
       if (res.status === 502 && /Legacy authentication method/i.test(detail || "")) {
         throw new Error("DeepL認証方式が更新されました。Spaces側をヘッダ認証（Authorization: DeepL-Auth-Key）に更新してください。");
       }
+
       throw new Error(`Spaces error: ${res.status} ${detail || ""}`.trim());
     }
 
@@ -390,6 +422,15 @@ async function postJsonWithFallback(base, endpoints, payload, token) {
   if (lastStatus === 404) {
     throw new Error("Spaces APIが見つかりません（HF Spaces API Base は https://xxxxx.hf.space の“ルート”にしてください。末尾に /translate や /synonyms を付けないでください）。");
   }
+
+  // iOS Safari often reports only a generic network error; provide a clearer hint.
+  if (!lastStatus) {
+    const msg = (lastText || "").toLowerCase();
+    if (msg.includes("failed to fetch") || msg.includes("load failed") || msg.includes("network") || msg.includes("abort")) {
+      throw new Error("通信に失敗しました。iPhoneの場合、回線/キャッシュの影響でSpacesへの接続が失敗することがあります。①⚙️接続設定のキーワードを再保存 ②強制リロード（またはPWA再追加）をお試しください。");
+    }
+  }
+
   throw new Error(`Spaces error: ${lastStatus || ""} ${lastText || ""}`.trim());
 }
 
@@ -428,7 +469,7 @@ async function translateToJaViaSpace(word) {
   if (!base) throw new Error("HF Spaces API Base が未設定です（⚙️接続設定）。");
   const token = getAppToken();
 
-  const data = await postJsonWithFallback(base, ["/translate", "/api/translate"], { text: word, target_lang: "JA" }, token);
+  const data = await postJsonWithFallback(base, ["/translate", "/translate/", "/api/translate", "/api/translate/"], { text: word, target_lang: "JA" }, token);
   return data.translated || "";
 }
 
@@ -437,7 +478,7 @@ async function fetchSynonymsViaSpace(word, max = 8) {
   if (!base) throw new Error("HF Spaces API Base が未設定です（⚙️接続設定）。");
   const token = getAppToken();
 
-  const data = await postJsonWithFallback(base, ["/synonyms", "/api/synonyms"], { text: word, max }, token);
+  const data = await postJsonWithFallback(base, ["/synonyms", "/synonyms/", "/api/synonyms", "/api/synonyms/"], { text: word, max }, token);
   const arr = data?.synonyms || [];
   return Array.isArray(arr) ? arr : [];
 }
