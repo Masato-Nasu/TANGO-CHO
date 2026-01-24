@@ -2206,17 +2206,19 @@ function scoreAt(jdTarget, lonBirth){
 }
 
 function blendedScore(jdTarget, lonBirth){
-  // "100%" feel: a local (±16d) and a seasonal (±90d) component
+  // Match "100% 星占い" distribution: keep day-specific character (no heavy seasonal smoothing)
+  // and preserve enough variance for lows (e.g., 30%) and highs.
   const s0 = scoreAt(jdTarget, lonBirth);
   const s16 = (scoreAt(jdTarget-16, lonBirth) + s0 + scoreAt(jdTarget+16, lonBirth))/3;
-  const s90 = (scoreAt(jdTarget-90, lonBirth) + s0 + scoreAt(jdTarget+90, lonBirth))/3;
-  const s = 0.70*s16 + 0.30*s90;
+  const s = 0.85*s0 + 0.15*s16;
   return Math.max(-1, Math.min(1, s));
 }
 
 function scoreToPercent(s){
-  // tanh mapping => stays away from hard 0/100 unless very strong
-  const p = 50 + 50*Math.tanh(1.35*s);
+  // Match "100% 星占い" style: linear mapping with a small gain to widen the spread.
+  const gain = 2.2;
+  const x = Math.max(-1, Math.min(1, gain*s));
+  const p = 50 + 50*x;
   return Math.round(Math.max(0, Math.min(100, p)));
 }
 
