@@ -2445,7 +2445,24 @@ function fortuneGenerate({birthDate, targetDate, level, tone}){
   }
 
   let pTotal = 55, pLove = 55, pMoney = 55, pWork = 55, pHealth = 55;
-  let seed = fnv1a32(`${birthDate}|${targetDate}|${level}|${tone}|fortune-v3`);
+  let computed = false;
+  const seed = fnv1a32(`${birthDate}|${targetDate}|fortune-pct-v39`);
+
+  // Robust fallback: if astronomy calculations are unavailable for any reason,
+  // generate a deterministic (birth+date dependent) percent that does NOT depend on level/tone.
+  function fallbackPercent100(catId){
+    const d = (targetDateObj && !isNaN(targetDateObj.getTime()))
+      ? `${targetDateObj.getFullYear()}-${targetDateObj.getMonth()+1}-${targetDateObj.getDate()}`
+      : String(targetDate || "");
+    const s = fnv1a32(`${birthDate}|${d}|${catId}|pct-fallback-v1`);
+    const rng = mulberry32(s);
+    // Approximate bell-ish distribution around 0 (rarely hits extremes).
+    let n = ((rng()+rng()+rng()+rng()+rng())/5) * 2 - 1; // [-1,1] approx
+    n = Math.tanh(n * 1.2);
+    n = applyDayJitter100(n, catId, targetDateObj, 0.18);
+    return mapNormToPercent100(n, 15, 95);
+  }
+
 
   try{
     if (birthDateObj && typeof Astronomy !== "undefined"){
@@ -2568,11 +2585,21 @@ function fortuneGenerate({birthDate, targetDate, level, tone}){
       pMoney  = mapNormToPercent100(nMoney,  15, 95);
       pWork   = mapNormToPercent100(nWork,   15, 95);
       pHealth = mapNormToPercent100(nHealth, 15, 95);
+      computed = true;
     } else {
       console.warn("Astronomy Engine not loaded or invalid birth date; fallback percent will be used.");
     }
   } catch(e){
     console.warn("fortune % calc failed; fallback percent will be used.", e);
+  }
+
+  if (!computed){
+    // Deterministic fallback (still varies by birth+date, but never by level/tone)
+    pTotal  = fallbackPercent100("total");
+    pLove   = fallbackPercent100("love");
+    pMoney  = fallbackPercent100("money");
+    pWork   = fallbackPercent100("work");
+    pHealth = fallbackPercent100("health");
   }
 
   // Text RNG is allowed to vary by level/tone (only affects wording, not percent)
