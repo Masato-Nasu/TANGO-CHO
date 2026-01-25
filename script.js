@@ -491,15 +491,34 @@ async function getSynonymsSmart(word, max = 8) {
 function setupTabs() {
   const btns = document.querySelectorAll(".tab-button");
   const secs = document.querySelectorAll(".section");
+  let currentId = null;
+
+  // Initialize currentId from the active button if present
+  try{
+    const activeBtn = document.querySelector('.tab-button.active');
+    if (activeBtn) currentId = activeBtn.getAttribute("data-section");
+  }catch(_){}
+
   btns.forEach((b) => {
     b.addEventListener("click", () => {
       const id = b.getAttribute("data-section");
+
+      // If leaving Fortune tab, clear results so stale output never survives tab changes.
+      try{
+        if (currentId === "fortuneSection" && id !== "fortuneSection") {
+          clearFortuneResults();
+        }
+      }catch(_){}
+
       btns.forEach((x) => x.classList.remove("active"));
       secs.forEach((s) => s.classList.remove("active"));
       b.classList.add("active");
       document.getElementById(id)?.classList.add("active");
+
       // When entering list tab, rerender to reflect any changes
       if (id === "listSection") renderWordList();
+
+      currentId = id;
     });
   });
 }
@@ -1966,6 +1985,11 @@ function weekdayLabelFromDateInput(ymd){
   const outEl = document.getElementById("fortuneResults");
   if (!birthEl || !dateEl || !levelEl || !genBtn || !outEl) return;
 
+function clearDisplay(){
+  try{ outEl.innerHTML = ""; }catch(_){}
+}
+
+
   // defaults
   const today = new Date();
   dateEl.value = toDateInputValue(today);
@@ -2000,8 +2024,8 @@ function weekdayLabelFromDateInput(ymd){
     }
   }catch(_){}
 
-  birthEl.addEventListener("change", persist);
-  dateEl.addEventListener("change", persist);
+  birthEl.addEventListener("change", () => { persist(); clearDisplay(); });
+  dateEl.addEventListener("change", () => { persist(); clearDisplay(); });
 
 
 // On returning to Fortune tab, default the target date to "today".
@@ -2014,6 +2038,7 @@ try{
       try{
         dateEl.value = toDateInputValue(new Date());
         persist(); // keep settings consistent; does not auto-generate
+        clearDisplay();
         // Update weekday label immediately if the UI shows it
         try{
           const wd = document.getElementById("fortuneWeekday");
@@ -2026,6 +2051,7 @@ try{
   levelEl.addEventListener("change", () => {
     try{ localStorage.setItem(FORTUNE_MANUAL_KEY, "1"); }catch(_){}
     persist();
+  clearDisplay();
   });
 
   genBtn.addEventListener("click", () => {
@@ -2057,8 +2083,8 @@ try{
     }
   });
 
-  // auto-generate once if birth already set
-  if (birthEl.value) genBtn.click();
+  // Do not auto-generate on load. Avoid showing stale results when dates change.
+  clearDisplay();
 }
 
 function toDateInputValue(d){
@@ -2793,6 +2819,14 @@ function pickFortuneTextV2({rng, seed, cat, band, level, tone}){
 
 
 // -------------------- Render + interactions --------------------
+
+// Clear Fortune results from the UI.
+// We intentionally do NOT persist generated results, to avoid stale output when dates change.
+function clearFortuneResults(){
+  const outEl = document.getElementById("fortuneResults");
+  if (outEl) outEl.innerHTML = "";
+}
+
 function renderFortune(model, outEl, stateEl){
   outEl.innerHTML = "";
   for (const item of model.items){
