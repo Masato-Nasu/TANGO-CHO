@@ -2299,32 +2299,34 @@ function clampNorm100(x){
   if (x >  1) return  1;
   return x;
 }
-function softenBackground100(n, center, amount){
-  // keep background influence subtle (same as 100%星占い)
-  // n: -1..1, center: 0.4, amount: 0.4
-  const a = amount;
-  const c = center;
-  // scale down amplitude around 0, preserve sign
-  const s = (n >= 0) ? 1 : -1;
-  const v = Math.abs(n);
-  const v2 = (v < c) ? (v * (1 - a)) : (c*(1-a) + (v - c));
-  return clampNorm100(s * v2);
+function softenBackground100(bg, negScale, posScale){
+  // Exactly matches 100%星占い: simply scales background influence.
+  if (bg < 0) return bg * negScale;
+  if (bg > 0) return bg * posScale;
+  return bg;
 }
-function aspectScore100(d){
-  // d in degrees (0..360). Favor conjunction/trine/sextile, penalize square/opposition.
-  // Mirrors the aspectScore() behavior from 100%星占い.
-  const x = ((d % 360) + 360) % 360;
-  const a = (x > 180) ? 360 - x : x; // 0..180
-  const w = (deg, width) => Math.exp(-0.5 * Math.pow((a - deg)/width, 2));
-  const good =
-    1.00*w(0,   10) +
-    0.85*w(60,  10) +
-    0.95*w(120, 10);
-  const bad =
-    0.90*w(90,  10) +
-    1.00*w(180, 12);
-  const s = good - bad;
-  return clampNorm100(s);
+function aspectScore100(diff){
+  // Exactly matches 100%星占い:
+  // Gaussian-weighted aspects with a small bias offset.
+  const aspects = [
+    { angle: 0,   sign:  1.0 },
+    { angle: 60,  sign:  0.6 },
+    { angle: 120, sign:  1.0 },
+    { angle: 90,  sign: -0.8 },
+    { angle: 180, sign: -0.8 },
+  ];
+  const sigma = 35;
+  const rad2  = 2 * sigma * sigma;
+  let score = 0;
+  for (let i=0;i<aspects.length;i++){
+    const a = aspects[i];
+    let d = Math.abs(diff - a.angle);
+    if (d > 180) d = 360 - d;
+    const w = Math.exp(-(d*d)/rad2);
+    score += a.sign * w;
+  }
+  score -= 0.2435;
+  return score;
 }
 function applyDayJitter100(n, category, date, strength){
   if (!date || !(date instanceof Date) || isNaN(date.getTime())) return n;
