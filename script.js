@@ -2827,6 +2827,13 @@ function clearFortuneResults(){
   if (outEl) outEl.innerHTML = "";
 }
 
+
+function clampPercent(p){
+  const n = Number(p);
+  if (!isFinite(n)) return 0;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
 function renderFortune(model, outEl, stateEl){
   outEl.innerHTML = "";
   for (const item of model.items){
@@ -2842,14 +2849,27 @@ function renderFortune(model, outEl, stateEl){
 
     const meta = document.createElement("div");
     meta.className = "fortune-meta";
-    const pill = document.createElement("div");
+        const pill = document.createElement("div");
     pill.className = "fortune-pill";
-    pill.textContent = `${item.percent}%`;
+    const p = clampPercent(item.percent);
+    pill.textContent = `${p}%`;
+
+    const bar = document.createElement("div");
+    bar.className = "fortune-bar";
+    bar.setAttribute("aria-hidden","true");
+    const fill = document.createElement("div");
+    fill.className = "fortune-bar-fill";
+    fill.style.width = "0%";
+    bar.appendChild(fill);
+
     const score = document.createElement("div");
     score.className = "fortune-score";
+
     score.textContent = `${model.targetDate} / ${model.level}`;
     meta.appendChild(pill);
+    meta.appendChild(bar);
     meta.appendChild(score);
+    try{ requestAnimationFrame(() => { fill.style.width = `${p}%`; }); }catch(_){ fill.style.width = `${p}%`; }
 
     head.appendChild(title);
     head.appendChild(meta);
