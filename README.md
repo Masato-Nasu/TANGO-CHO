@@ -16,13 +16,21 @@
 
 ## Screenshots
 
-  Add                       List
-  ------------------------- --------------------------
-  ![Add](screenshot1.png)   ![List](screenshot2.png)
-
-  Quiz                       Fortune(EN)
-  -------------------------- ---------------------------------
-  ![Quiz](screenshot3.png)   ![Fortune(EN)](screenshot4.png)
+  Add                       
+  ------------------------- 
+  ![Add](screenshot1.png)   
+　
+  List
+  --------------------------
+  ![List](screenshot2.png)
+ 
+  Quiz                       
+  -------------------------- 
+  ![Quiz](screenshot3.png)   
+　
+  Fortune(EN)
+　---------------------------------
+  ![Fortune(EN)](screenshot4.png)
 
 ------------------------------------------------------------------------
 
