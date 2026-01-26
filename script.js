@@ -1212,7 +1212,6 @@ function renderListCounts(baseWords, tagFilterValue){
   if (!el) return;
 
   const tf = String(tagFilterValue || "all").trim();
-  const tagLabel = (tf === "all") ? "タグ: 全て" : `タグ: ${tf}`;
 
   const total = (baseWords || []).length;
   let forgot = 0, def = 0, learned = 0;
@@ -1223,9 +1222,13 @@ function renderListCounts(baseWords, tagFilterValue){
     else def++;
   }
 
+  // Avoid repeating "全て" three times (header + tag label + pill).
+  // - When tag is "all": show only the breakdown.
+  // - When a specific tag is selected: show the tag count + breakdown.
+  const tagPill = (tf === "all") ? "" : `<span class="count-pill">タグ: ${tf} <b>${total}</b></span>`;
+
   el.innerHTML = `
-    <span class="count-pill">${tagLabel} <b>${total}</b></span>
-    <span class="count-pill">全て <b>${total}</b></span>
+    ${tagPill}
     <span class="count-pill">覚えた <b>${learned}</b></span>
     <span class="count-pill">デフォルト <b>${def}</b></span>
     <span class="count-pill">覚えてない <b>${forgot}</b></span>
