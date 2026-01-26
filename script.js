@@ -1206,21 +1206,60 @@ function capToFortuneLevel(cap){
 }
 
 
+
+function renderListCounts(baseWords, tagFilterValue){
+  const el = document.getElementById("listCounts");
+  if (!el) return;
+
+  const tf = String(tagFilterValue || "all").trim();
+  const tagLabel = (tf === "all") ? "タグ: 全て" : `タグ: ${tf}`;
+
+  const total = (baseWords || []).length;
+  let forgot = 0, def = 0, learned = 0;
+  for (const w of (baseWords || [])) {
+    const st = (w && w.status) ? String(w.status) : "default";
+    if (st === "learned") learned++;
+    else if (st === "forgot") forgot++;
+    else def++;
+  }
+
+  el.innerHTML = `
+    <span class="count-pill">${tagLabel} <b>${total}</b></span>
+    <span class="count-pill">全て <b>${total}</b></span>
+    <span class="count-pill">覚えた <b>${learned}</b></span>
+    <span class="count-pill">デフォルト <b>${def}</b></span>
+    <span class="count-pill">覚えてない <b>${forgot}</b></span>
+  `;
+}
+
 function renderWordList() {
   const listEl = document.getElementById("wordList");
   const countEl = document.getElementById("wordCount");
   const filter = (localStorage.getItem(FILTER_KEY) || "all").trim();
   const tagFilter = (localStorage.getItem(TAG_FILTER_KEY) || "all").trim();
   const sortOrder = (localStorage.getItem(SORT_KEY) || "time").trim();
-  const all = loadWords();
+const all = loadWords();
 
-  // Tag filter options depend on current words
-  try { syncTagFilterOptions(all); } catch (_) {}
+// Tag filter options depend on current words
+try { syncTagFilterOptions(all); } catch (_) {}
 
-  if (countEl) countEl.textContent = String(all.length);
-  if (!listEl) return;
+if (!listEl) return;
 
-  let words = [...all];
+// Base set for counts: apply TAG filter only (status filter is for view only)
+const tfRaw = (localStorage.getItem(TAG_FILTER_KEY) || "all").trim();
+let baseWords = [...all];
+if (tfRaw !== "all") {
+  const tf = String(tfRaw || "").toLowerCase();
+  baseWords = baseWords.filter((w) => parseTags(w.tags).some((t) => t.toLowerCase() === tf));
+}
+
+// Update counts (linked to tag switching)
+renderListCounts(baseWords, tfRaw);
+
+// Header count shows current base set size
+if (countEl) countEl.textContent = String(baseWords.length);
+
+let words = [...baseWords];
   if (sortOrder === "alpha") {
     words.sort((a, b) => String(a.word || "").toLowerCase().localeCompare(String(b.word || "").toLowerCase()));
   } else if (sortOrder === "tag") {
@@ -1236,10 +1275,6 @@ function renderWordList() {
     words.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
   }
   if (filter !== "all") words = words.filter((w) => (w.status || "default") === filter);
-  if (tagFilter !== "all") {
-    const tf = String(tagFilter || "").toLowerCase();
-    words = words.filter((w) => parseTags(w.tags).some((t) => t.toLowerCase() === tf));
-  }
 listEl.innerHTML = "";
 
   if (words.length === 0) {
