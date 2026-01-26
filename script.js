@@ -175,7 +175,34 @@ function loadWords() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? arr : [];
+    if (!Array.isArray(arr)) return [];
+
+    let changed = false;
+    const out = [];
+    for (const x of arr) {
+      if (!x || typeof x !== "object") continue;
+      const w = String(x.word || "").trim();
+      if (!w) continue;
+      const m = String(x.meaning || "").trim();
+
+      const st0 = x.status;
+      const st = normalizeStatus(st0);
+      if (st !== st0) changed = true;
+
+      // Keep other fields as-is; only normalize essentials.
+      out.push({
+        ...x,
+        word: w,
+        meaning: m,
+        status: st,
+      });
+    }
+
+    // One-time migration: rewrite normalized statuses so UI and counts are consistent.
+    if (changed) {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(out)); } catch(_) {}
+    }
+    return out;
   } catch {
     return [];
   }
@@ -223,6 +250,35 @@ function downloadJson(filename, obj) {
   setTimeout(() => { try { URL.revokeObjectURL(url); } catch (_) {} }, 1200);
 }
 
+
+function normalizeStatus(st){
+  // Normalize status values across versions / imports.
+  // Current canonical values:
+  // - "forgot"   : 覚えてない
+  // - "default"  : デフォルト
+  // - "learned"  : 覚えた
+  if (typeof st === "number") {
+    if (st === 0) return "forgot";
+    if (st === 2) return "learned";
+    return "default"; // 1 or other
+  }
+  const v = String(st ?? "").trim().toLowerCase();
+  if (!v) return "default";
+
+  // Learned
+  if (v === "learned" || v === "learn" || v === "known" || v === "mastered" || v === "覚えた" || v === "2") return "learned";
+
+  // Forgot / Unknown (legacy)
+  if (v === "forgot" || v === "unknown" || v === "unlearned" || v === "not_learned" || v === "not learned" ||
+      v === "unremembered" || v === "覚えてない" || v === "覚えていない" || v === "0") return "forgot";
+
+  // Default
+  if (v === "default" || v === "normal" || v === "デフォルト" || v === "1") return "default";
+
+  // Fall back
+  return "default";
+}
+
 function sanitizeImportedWords(arr) {
   if (!Array.isArray(arr)) return [];
   const out = [];
@@ -235,7 +291,7 @@ function sanitizeImportedWords(arr) {
       id: x.id ? String(x.id) : (crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()),
       word: w,
       meaning: m,
-      status: (x.status === "learned" || x.status === "unknown" || x.status === "default") ? x.status : "default",
+      status: normalizeStatus(x.status),
       example: x.example ? String(x.example) : "",
       memo: x.memo ? String(x.memo) : "",
       tags: x.tags ? String(x.tags) : "",
