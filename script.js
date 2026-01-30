@@ -1,5 +1,5 @@
 const STORAGE_KEY = "tangoChoWords";
-const APP_VERSION = "v40";
+const APP_VERSION = "v42";
 
 const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
@@ -16,6 +16,7 @@ let editId = null;
 
 const STATUS_LABEL = {
   forgot: "覚えてない",
+  fuzzy: "うろ覚え",
   default: "デフォルト",
   learned: "覚えた",
 };
@@ -255,11 +256,13 @@ function normalizeStatus(st){
   // Normalize status values across versions / imports.
   // Current canonical values:
   // - "forgot"   : 覚えてない
+  // - "fuzzy"   : うろ覚え
   // - "default"  : デフォルト
   // - "learned"  : 覚えた
   if (typeof st === "number") {
     if (st === 0) return "forgot";
     if (st === 2) return "learned";
+    if (st === 3) return "fuzzy";
     return "default"; // 1 or other
   }
   const v = String(st ?? "").trim().toLowerCase();
@@ -271,6 +274,10 @@ function normalizeStatus(st){
   // Forgot / Unknown (legacy)
   if (v === "forgot" || v === "unknown" || v === "unlearned" || v === "not_learned" || v === "not learned" ||
       v === "unremembered" || v === "覚えてない" || v === "覚えていない" || v === "0") return "forgot";
+
+  // Fuzzy / Unstable (new)
+  if (v === "fuzzy" || v === "uncertain" || v === "unsure" || v === "wobbly" || v === "partial" ||
+      v === "うろ覚え" || v === "あやふや" || v === "3") return "fuzzy";
 
   // Default
   if (v === "default" || v === "normal" || v === "デフォルト" || v === "1") return "default";
@@ -1270,11 +1277,12 @@ function renderListCounts(baseWords, tagFilterValue){
   const tf = String(tagFilterValue || "all").trim();
 
   const total = (baseWords || []).length;
-  let forgot = 0, def = 0, learned = 0;
+  let forgot = 0, fuzzy = 0, def = 0, learned = 0;
   for (const w of (baseWords || [])) {
     const st = (w && w.status) ? String(w.status) : "default";
     if (st === "learned") learned++;
     else if (st === "forgot") forgot++;
+    else if (st === "fuzzy") fuzzy++;
     else def++;
   }
 
@@ -1287,6 +1295,7 @@ function renderListCounts(baseWords, tagFilterValue){
     ${tagPill}
     <span class="count-pill">覚えた <b>${learned}</b></span>
     <span class="count-pill">デフォルト <b>${def}</b></span>
+    <span class="count-pill">うろ覚え <b>${fuzzy}</b></span>
     <span class="count-pill">覚えてない <b>${forgot}</b></span>
   `;
 }
@@ -1565,7 +1574,7 @@ let quizDeckState = {
 };
 
 // Ratio used only when pool="all" (bigger = earlier/more frequent in the early phase)
-const QUIZ_ALL_RATIO = { forgot: 5, default: 3, learned: 1 };
+const QUIZ_ALL_RATIO = { forgot: 5, fuzzy: 4, default: 3, learned: 1 };
 
 function _buildQuizDeckOrder(poolWords, pool) {
   const ids = poolWords.map(w => w.id);
@@ -1573,20 +1582,22 @@ function _buildQuizDeckOrder(poolWords, pool) {
     return choiceShuffle(ids);
   }
 
-  const groups = { forgot: [], default: [], learned: [] };
+  const groups = { forgot: [], fuzzy: [], default: [], learned: [] };
   for (const w of poolWords) {
     const st = (w && w.status) ? String(w.status) : "default";
-    if (st === "forgot" || st === "default" || st === "learned") groups[st].push(w.id);
+    if (st === "forgot" || st === "fuzzy" || st === "default" || st === "learned") groups[st].push(w.id);
     else groups.default.push(w.id);
   }
 
   groups.forgot = choiceShuffle(groups.forgot);
+  groups.fuzzy = choiceShuffle(groups.fuzzy);
   groups.default = choiceShuffle(groups.default);
   groups.learned = choiceShuffle(groups.learned);
 
   const order = [];
   const steps = [
     ["forgot", QUIZ_ALL_RATIO.forgot],
+    ["fuzzy", QUIZ_ALL_RATIO.fuzzy],
     ["default", QUIZ_ALL_RATIO.default],
     ["learned", QUIZ_ALL_RATIO.learned],
   ];
@@ -1655,7 +1666,8 @@ function getPoolWords(pool) {
 }
 
 function statusWeight(st) {
-  if (st === "forgot") return 3;
+  if (st === "forgot") return 4;
+  if (st === "fuzzy") return 3;
   if (st === "default") return 2;
   if (st === "learned") return 1;
   return 2;
@@ -1877,6 +1889,11 @@ function onAnswer(selected) {
     markForgot.textContent = "覚えてないへ";
     markForgot.addEventListener("click", () => updateWordStatus(q.target.id, "forgot"));
 
+    const markFuzzy = document.createElement("button");
+    markFuzzy.className = "small-btn";
+    markFuzzy.textContent = "うろ覚えへ";
+    markFuzzy.addEventListener("click", () => updateWordStatus(q.target.id, "fuzzy"));
+
     const markLearned = document.createElement("button");
     markLearned.className = "small-btn accent";
     markLearned.textContent = "覚えたへ";
@@ -1884,6 +1901,7 @@ function onAnswer(selected) {
 
     actions.appendChild(speakBtn);
     actions.appendChild(markForgot);
+    actions.appendChild(markFuzzy);
     actions.appendChild(markLearned);
     footEl.appendChild(actions);
   }
