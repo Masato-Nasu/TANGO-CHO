@@ -132,6 +132,9 @@ details summary::-webkit-details-marker{display:none}
   font-size:var(--fs-base);padding:4px 10px;cursor:pointer}
 .tts-btn{border-radius:999px;border:1px solid var(--border);padding:6px 10px;font-size:var(--fs-xs);background:#111;color:var(--sub);cursor:pointer}
 
+.quiz-term{display:inline-block}
+.quiz-tts{margin-left:8px;padding:4px 10px;vertical-align:middle;}
+
 .list-header{display:flex;justify-content:space-between;align-items:center;font-size:var(--fs-xs);margin-bottom:6px}
 .list-controls{display:flex;gap:6px;align-items:center}
 

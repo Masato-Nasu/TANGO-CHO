@@ -1740,10 +1740,11 @@ function renderQuiz() {
 
   const modeLabel = q.mode === "en2ja" ? "英 → 日" : "日 → 英";
   const promptLabel = q.mode === "en2ja" ? "この英単語の意味は？" : "この日本語に対応する英単語は？";
+  const speakPromptHtml = q.mode === "en2ja" ? ` <button id="quizSpeakPrompt" class="tts-btn quiz-tts" type="button" title="発音">🔊</button>` : "";
 
   area.innerHTML = `
     <p class="quiz-mini">${modeLabel}</p>
-    <p class="quiz-q">${promptLabel}<br><span style="font-size:1.25rem;">${escapeHtml(q.prompt)}</span></p>
+    <p class="quiz-q">${promptLabel}<br><span class="quiz-term" style="font-size:1.25rem;">${escapeHtml(q.prompt)}</span>${speakPromptHtml}</p>
     <div id="quizResult" class="quiz-result" aria-live="polite"></div>
     <div id="quizReveal" class="quiz-reveal" aria-live="polite"></div>
     <div class="quiz-choices" id="choices"></div>
@@ -1755,6 +1756,8 @@ function renderQuiz() {
   const footEl = document.getElementById("quizFoot");
   const resultEl = document.getElementById("quizResult");
   const revealEl = document.getElementById("quizReveal");
+  const speakPromptBtn = document.getElementById("quizSpeakPrompt");
+  if (speakPromptBtn) speakPromptBtn.addEventListener("click", () => q.prompt && speak(q.prompt));
   if (resultEl) { resultEl.className = "quiz-result"; resultEl.textContent = ""; }
   if (revealEl) revealEl.innerHTML = "";
 
