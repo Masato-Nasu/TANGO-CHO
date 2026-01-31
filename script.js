@@ -1376,6 +1376,7 @@ listEl.innerHTML = "";
     status.className = "select small";
     status.innerHTML = `
       <option value="forgot">覚えてない</option>
+      <option value="fuzzy">うろ覚え</option>
       <option value="default">デフォルト</option>
       <option value="learned">覚えた</option>
     `;
