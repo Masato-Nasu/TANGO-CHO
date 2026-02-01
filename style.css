@@ -54,6 +54,16 @@ body{min-height:100vh;display:flex;flex-direction:column}
 .field-row{display:flex;gap:var(--gap);align-items:center}
 .field-row>*{min-width:0}
 
+/* Field label spacing (fix "gap 0" between rows / improve readability) */
+.field-label{
+  display:block;
+  margin:12px 0 6px;
+  font-size:var(--fs-xs);
+  color:var(--sub);
+  line-height:var(--lh-ui);
+}
+.two-col > div > .field-label{ margin-top:0; }
+
 .action-row{flex-wrap:wrap;margin-bottom:var(--gap)}
 .action-row #translateBtn{flex:2 1 180px}
 .action-row #randomBtn{flex:1 1 120px}
@@ -136,7 +146,18 @@ details summary::-webkit-details-marker{display:none}
 .quiz-tts{margin-left:8px;padding:4px 10px;vertical-align:middle;}
 
 .list-header{display:flex;justify-content:space-between;align-items:center;font-size:var(--fs-xs);margin-bottom:6px}
-.list-controls{display:flex;gap:6px;align-items:center}
+.list-controls{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:8px;
+  row-gap:8px;
+  column-gap:8px;
+}
+.list-controls > *{min-width:0;max-width:100%;}
+@supports not (gap: 1rem){
+  .list-controls > *{ margin:0 8px 8px 0; }
+}
 
 .list-counts{
   display:flex;
