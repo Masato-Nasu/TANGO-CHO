@@ -577,7 +577,7 @@ select option{
 #addSection .two-col{
   margin-top: var(--gap); /* ブロック間の縦リズムを統一 */
 }
-#addSection .two-col label.field-label{
+#addSection .two-col label.two-col .field-label{
   margin-top: 0;          /* two-col内はブロック側で余白を持つ（過剰余白防止） */
 }
 
