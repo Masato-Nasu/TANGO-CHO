@@ -954,7 +954,28 @@ function setupAddForm() {
     }catch(_){ }
   }
 
-  function setState(text) {
+  
+  // Small toast at bottom (works even when message area is off-screen)
+  function showToast(text, kind="ok"){
+    try{
+      let t = document.getElementById("toast");
+      if(!t){
+        t = document.createElement("div");
+        t.id = "toast";
+        t.className = "toast";
+        document.body.appendChild(t);
+      }
+      t.className = "toast";
+      if(kind==="ok") t.classList.add("ok");
+      if(kind==="err") t.classList.add("err");
+      t.textContent = text || "";
+      t.classList.add("show");
+      window.clearTimeout(showToast.__t);
+      showToast.__t = window.setTimeout(()=>{ t.classList.remove("show"); }, 1400);
+    }catch(_){}
+  }
+
+function setState(text) {
     if (!statePill) return;
     statePill.textContent = text;
   }

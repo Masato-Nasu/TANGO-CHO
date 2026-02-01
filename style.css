@@ -415,3 +415,87 @@ html{
   }
 }
 
+
+
+/* ===== v47.1.0 hotfix: prevent right-clip + improve select readability + visible save feedback ===== */
+
+/* Allow header to wrap instead of clipping */
+.list-header{
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Controls: keep row on Android, but allow wrapping/shrinking to avoid clipping */
+.list-controls{
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 100%;
+}
+.list-controls > *{
+  min-width: 0;
+}
+
+/* iOS (Safari/PWA): stack controls vertically (3段) */
+@supports (-webkit-touch-callout: none){
+  @media (hover: none) and (pointer: coarse){
+    .list-controls{
+      width: 100%;
+      flex-direction: column;
+      align-items: stretch;
+      flex-wrap: nowrap;
+    }
+    .list-controls > *{
+      width: 100%;
+      flex: 0 0 auto;
+    }
+  }
+}
+
+/* Select readability across platforms: ensure closed select is dark, opened options are readable */
+select,
+.select,
+.list-controls select{
+  background-color: #151515 !important;
+  background: #151515 !important;
+  color: #f2f2f2 !important;
+  -webkit-text-fill-color: #f2f2f2 !important;
+  border-color: rgba(255,255,255,0.18) !important;
+  color-scheme: dark;
+}
+select option{
+  color: #111 !important;
+  background: #fff !important;
+}
+
+/* Save button flash: make it unmistakable */
+.btn-flash{
+  box-shadow: 0 0 0 2px rgba(0,255,180,0.55), 0 10px 30px rgba(0,255,180,0.12);
+  transform: translateY(-1px);
+}
+
+/* Toast (fixed) */
+.toast{
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(0,0,0,0.78);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.2;
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease;
+  max-width: calc(100vw - 24px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.toast.show{ opacity: 1; }
+.toast.ok{ border-color: rgba(0,255,180,0.45); }
+.toast.err{ border-color: rgba(255,80,80,0.55); }
+
