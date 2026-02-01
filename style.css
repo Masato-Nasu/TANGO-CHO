@@ -54,7 +54,7 @@ body{min-height:100vh;display:flex;flex-direction:column}
 .field-row{display:flex;gap:var(--gap);align-items:center}
 .field-row>*{min-width:0}
 
-.action-row{flex-wrap:wrap}
+.action-row{flex-wrap:wrap;margin-bottom:var(--gap)}
 .action-row #translateBtn{flex:2 1 180px}
 .action-row #randomBtn{flex:1 1 120px}
 .action-row #clearBtn{flex:1 1 120px}
