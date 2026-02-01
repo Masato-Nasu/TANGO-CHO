@@ -30,6 +30,11 @@ const __POS_FILES = {
   adj: "./data/pos_adj.txt",
   adv: "./data/pos_adv.txt",
 };
+const POS_JA = { n: "名", v: "動", adj: "形", adv: "副" };
+function __formatPosJa(arr){
+  return arr.map((p) => POS_JA[p] || p).join("/");
+}
+
 let __posSets = null;
 let __posLoadPromise = null;
 
@@ -1546,7 +1551,7 @@ listEl.innerHTML = "";
     meta.className = "word-meta";
     const created = w.createdAt ? new Date(w.createdAt).toLocaleString() : "";
     const tags = w.tags ? ` / タグ: ${w.tags}` : "";
-    const pos = (Array.isArray(w.posCandidates) && w.posCandidates.length) ? ` / POS: ${w.posCandidates.join(" ")}` : "";
+    const pos = (Array.isArray(w.posCandidates) && w.posCandidates.length) ? ` / 品詞: ${__formatPosJa(w.posCandidates)}` : "";
     const st = ` / ${STATUS_LABEL[w.status || "default"]}`;
     meta.textContent = `登録: ${created}${tags}${pos}${st}`;
 
