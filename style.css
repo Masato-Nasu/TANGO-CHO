@@ -50,7 +50,7 @@ body{min-height:100vh;display:flex;flex-direction:column}
 
 
 #fortuneControlsCard{margin-bottom:calc(var(--gap) * 1.8)}
-#connSettingsCard{margin-bottom:calc(var(--gap) * 1.8)}
+#connSettingsCard{margin-bottom:calc(var(--gap) * 1.6)}
 .field-row{display:flex;gap:var(--gap);align-items:center}
 .field-row>*{min-width:0}
 
@@ -122,9 +122,16 @@ details summary{user-select:none}
 details summary::-webkit-details-marker{display:none}
 
 .word-list{max-height:60vh;overflow-y:auto;padding-right:4px;margin-top:8px}
-.word-item{border-radius:12px;border:1px solid var(--border);padding:8px 10px;margin-bottom:8px;background:#151515}
-.word-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.word-main{font-weight:700;font-size:var(--fs-xl)}
+.word-item{border-radius:12px;border:1px solid var(--border);padding:8px 10px;margin-bottom:8px;background:#151515;overflow:hidden}
+.word-top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.word-main{font-weight:700;font-size:var(--fs-xl);min-width:0;flex:1 1 auto}
+
+/* 右側（覚えた/デフォルト等）のセレクトが画面外へはみ出すのを防止 */
+.word-top > div:last-child{margin-left:auto;max-width:100%}
+.word-top > div:last-child .select.small{max-width:9.5rem}
+@media (max-width:420px){
+  .word-top > div:last-child .select.small{max-width:8.5rem}
+}
 .word-meaning{margin-top:6px;font-size:var(--fs-lg)}
 .word-meta{margin-top:6px;font-size:var(--fs-sm);color:var(--sub)}
 .word-actions{margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
