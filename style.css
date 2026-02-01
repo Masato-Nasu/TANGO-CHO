@@ -581,3 +581,7 @@ select option{
   margin-top: 0;          /* two-col内はブロック側で余白を持つ（過剰余白防止） */
 }
 
+
+
+/* v47.1.6: ensure action-row has spacing after later margin reset */
+.field-row.action-row{margin-bottom:var(--gap);}
