@@ -9,8 +9,6 @@
 
 ## スクリーンショット / Screenshots
 
-> リポジトリ直下に `screenshot1.png`〜`screenshot4.png` を置いている前提です。
-
 <table>
   <tr>
     <td><img src="screenshot1.png" alt="screenshot1" width="420"></td>
