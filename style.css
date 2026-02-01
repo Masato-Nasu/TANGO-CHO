@@ -699,15 +699,18 @@ select option{
   margin-bottom: var(--frameGap) !important;
 }
 
-
-/* --- Fix: iOSで単語カード右側(カテゴリselect)が縮んで文字がはみ出す問題 ---
-   右側コンテナを折り返し可能にし、select自体を縮ませない（内容幅を維持） */
-.word-top > div:last-child{
-  flex-wrap:wrap;
-  justify-content:flex-end;
-}
-.word-top .select.small{
-  flex:0 0 auto;
-  flex-shrink:0;
-  width:auto;
+/* ===== iOS: 単語 + ステータス(デフォルト等) を常に2段・両方左寄せ =====
+   iOS(PWA/Safari)は字面が大きくなりやすく、右側だけ右寄せだと違和感が出るため。
+   Android/PCの見た目は維持し、iOSのみ上書き。 */
+@supports (-webkit-touch-callout: none) {
+  .word-top{
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+  /* 右側コンテナの自動右寄せを無効化 */
+  .word-top > div:last-child{
+    margin-left: 0 !important;
+    max-width: 100%;
+  }
 }
