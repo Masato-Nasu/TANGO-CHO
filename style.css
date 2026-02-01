@@ -285,3 +285,32 @@ html, body{
   body{ min-height: 100dvh; }
   .fortune-wrap{ height: calc(100dvh - 260px); }
 }
+
+/* iOS PWA (standalone): select (デフォルト/タグ等) が読めない問題の対策 */
+select,
+.select{
+  -webkit-appearance: none;
+  appearance: none;
+
+  color: var(--text);
+  -webkit-text-fill-color: var(--text);
+
+  background: var(--card);
+  border: 1px solid var(--line);
+
+  font-size: 16px;              /* iOSの勝手ズーム防止 */
+  padding: 12px 44px 12px 14px; /* 右側(矢印)の余白 */
+  line-height: 1.2;
+}
+
+select:disabled,
+.select:disabled{
+  opacity: 1;                   /* 薄くなりすぎ防止 */
+  color: var(--text);
+  -webkit-text-fill-color: var(--text);
+}
+
+/* iOSで文字サイズが勝手に変わるのを抑える */
+html{
+  -webkit-text-size-adjust: 100%;
+}
