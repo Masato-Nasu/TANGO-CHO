@@ -633,3 +633,21 @@ select option{
 .section.active .card:last-child{
   margin-bottom: 0 !important;
 }
+
+
+
+/* ===== v47.2.3 spacing refinements ===== */
+/* 1) メモ前（例文textarea→メモラベル）の空きが大きく見えるので少しだけ詰める */
+#addSection label.field-label[for="memo"]{
+  margin-top: 6px !important;
+}
+/* 念のため：textarea直後のラベル全般は詰めすぎない（既存8pxを維持/上書き） */
+#addSection textarea + label.field-label{
+  margin-top: 6px !important;
+}
+
+/* 2) 接続設定カード（details#connSettingsCard）の上下余白が詰まって見えるので、枠間リズムを合わせる */
+#addSection #connSettingsCard{
+  margin-top: var(--frameGap) !important;
+  margin-bottom: var(--frameGap) !important;
+}
