@@ -1,14 +1,14 @@
 /* TANGO-CHO Service Worker (stable updates)
- * Build: v47.1.6
+ * Build: v47.2.5
  */
-const CACHE_NAME = 'tango-cho-cache-v47.1.6';
+const CACHE_NAME = 'tango-cho-cache-v47.2.5';
 
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./bank_enja.js",
   "./vocab_pool.js",
-  "./style.v47.1.6.css",
+  "./style.css",
   "./script.js",
   "./manifest.json",
   "./share-target.html",
@@ -99,4 +99,12 @@ self.addEventListener("fetch", (event) => {
       return Response.error();
     }
   })());
+});
+
+
+// Allow the page to trigger immediate activation
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
