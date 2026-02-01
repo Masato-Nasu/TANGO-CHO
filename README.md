@@ -7,6 +7,23 @@
 
 ---
 
+## スクリーンショット / Screenshots
+
+> リポジトリ直下に `screenshot1.png`〜`screenshot4.png` を置いている前提です。
+
+<table>
+  <tr>
+    <td><img src="screenshot1.png" alt="screenshot1" width="420"></td>
+    <td><img src="screenshot2.png" alt="screenshot2" width="420"></td>
+  </tr>
+  <tr>
+    <td><img src="screenshot3.png" alt="screenshot3" width="420"></td>
+    <td><img src="screenshot4.png" alt="screenshot4" width="420"></td>
+  </tr>
+</table>
+
+---
+
 ## できること / Features
 
 - 📥 **単語の取り込み**
@@ -98,5 +115,3 @@ PWAはキャッシュが強いです。次の順でお試しください。
 ## データとプライバシー / Privacy
 - 単語帳データは基本的に端末内（ブラウザストレージ）に保存されます。
 - 翻訳のために、入力された単語がDeepLへ送信されます（翻訳取得時）。
-
----
