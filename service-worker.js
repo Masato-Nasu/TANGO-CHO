@@ -1,7 +1,7 @@
 /* TANGO-CHO Service Worker (stable updates)
- * Build: v47.0.7
+ * Build: v47.0.8
  */
-const CACHE_NAME = "tango-cho-cache-v47.0.7";
+const CACHE_NAME = "tango-cho-cache-v47.0.8";
 
 const CORE_ASSETS = [
   "./",
