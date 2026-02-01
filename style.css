@@ -571,3 +571,13 @@ select option{
   margin-top: 10px;
 }
 
+
+
+/* ===== Patch v47.1.4: two-col spacing rhythm (カテゴリ/タグ行だけ狭い問題) ===== */
+#addSection .two-col{
+  margin-top: var(--gap); /* ブロック間の縦リズムを統一 */
+}
+#addSection .two-col label.field-label{
+  margin-top: 0;          /* two-col内はブロック側で余白を持つ（過剰余白防止） */
+}
+
