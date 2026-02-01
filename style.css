@@ -314,3 +314,17 @@ select:disabled,
 html{
   -webkit-text-size-adjust: 100%;
 }
+
+
+/* --- Mobile (Android) small width: prevent list filter selects from clipping --- */
+@media (max-width: 420px){
+  .list-header{flex-wrap:wrap; gap:8px; align-items:flex-start}
+  .list-controls{flex-wrap:wrap; justify-content:flex-start; width:100%}
+  .list-controls .select.small{
+    flex:1 1 140px;
+    min-width: 130px;
+    padding:10px 12px;
+    font-size:16px; /* readable + iOS zoom-safe */
+  }
+}
+
