@@ -50,11 +50,11 @@ body{min-height:100vh;display:flex;flex-direction:column}
 
 
 #fortuneControlsCard{margin-bottom:calc(var(--gap) * 1.8)}
-#connSettingsCard{margin-bottom:calc(var(--gap) * 1.6)}
+#connSettingsCard{margin-bottom:calc(var(--gap) * 1.8)}
 .field-row{display:flex;gap:var(--gap);align-items:center}
 .field-row>*{min-width:0}
 
-.action-row{flex-wrap:wrap;margin-bottom:var(--gap)}
+.action-row{flex-wrap:wrap}
 .action-row #translateBtn{flex:2 1 180px}
 .action-row #randomBtn{flex:1 1 120px}
 .action-row #clearBtn{flex:1 1 120px}
@@ -571,123 +571,3 @@ select option{
   margin-top: 10px;
 }
 
-
-
-/* ===== Patch v47.1.4: two-col spacing rhythm (カテゴリ/タグ行だけ狭い問題) ===== */
-#addSection .two-col{
-  margin-top: var(--gap); /* ブロック間の縦リズムを統一 */
-}
-#addSection .two-col label.two-col .field-label{
-  margin-top: 0;          /* two-col内はブロック側で余白を持つ（過剰余白防止） */
-}
-
-
-
-/* v47.1.6: ensure action-row has spacing after later margin reset */
-.field-row.action-row{margin-bottom:var(--gap);}
-
-
-/* ===== spacing fix: 英単語入力 ↔ 翻訳ボタン / 翻訳ボタン ↔ 日本語訳ラベル ===== */
-/* 既存の .field-row{margin:0} 等に負けないよう !important で最小ピンポイント上書き */
-.field-row.action-row{
-  margin-top: 12px !important;      /* 英単語入力欄の下に空きを作る */
-  margin-bottom: 12px !important;   /* 次の「日本語訳」へ呼吸を作る */
-}
-.field-row.action-row + .field-label{
-  margin-top: 12px !important;      /* 念のため、ラベル側にも上余白 */
-}
-/* 英単語入力行（スピーカーボタン付き）と action-row の間が詰まるケース対策 */
-.field-row.word-row{
-  margin-bottom: 12px !important;
-}
-
-
-/* ===== spacing tweak: textareaの直後だけ、次ラベルの上余白を少し詰める（メモ前など） ===== */
-#addSection textarea + label.field-label{
-  margin-top: 8px !important;
-}
-
-
-
-/* ===== unify spacing between frames (cards / blocks) =====
-   Goal: 枠同士の隙間を統一（トップの接続設定カード〜入力カード等）
-   Note: 既存CSS内で .card に margin-bottom の上書きが混在していたため、末尾で統一します。
-*/
-:root{
-  --frameGap: var(--gap);
-}
-
-/* Cards: use a single, consistent bottom gap; no extra top gap */
-.card{
-  margin-top: 0 !important;
-  margin-bottom: var(--frameGap) !important;
-}
-
-/* Special cards should not have custom gaps */
-#fortuneControlsCard,
-#connSettingsCard{
-  margin-bottom: var(--frameGap) !important;
-}
-
-/* Last card inside each section: no trailing gap */
-.section.active .card:last-child{
-  margin-bottom: 0 !important;
-}
-
-
-
-/* ===== v47.2.3 spacing refinements ===== */
-/* 1) メモ前（例文textarea→メモラベル）の空きが大きく見えるので少しだけ詰める */
-#addSection label.field-label[for="memo"]{
-  margin-top: 6px !important;
-}
-/* 念のため：textarea直後のラベル全般は詰めすぎない（既存8pxを維持/上書き） */
-#addSection textarea + label.field-label{
-  margin-top: 6px !important;
-}
-
-/* 2) 接続設定カード（details#connSettingsCard）の上下余白が詰まって見えるので、枠間リズムを合わせる */
-#addSection #connSettingsCard{
-  margin-top: var(--frameGap) !important;
-  margin-bottom: var(--frameGap) !important;
-}
-
-
-
-/* ===== v47.2.4 unify gaps around tab-bar / cards ===== */
-/* Goal: タブ列 ↔ 接続設定カード ↔ 次カード の隙間をすべて同じにする */
-:root{
-  --frameGap: var(--gap);
-}
-
-/* 1) タブバーの下に“必ず”同じ隙間を作る（main側のpaddingでバラつかせない） */
-.tab-bar{
-  padding-bottom: var(--frameGap) !important;
-}
-
-/* 2) mainの上paddingを0に（タブバー側で制御） */
-.main{
-  padding-top: 0 !important;
-}
-
-/* 3) 最初のカードの上marginを0に固定（余計な8px等を無効化） */
-.section.active .card:first-child{
-  margin-top: 0 !important;
-}
-
-/* 4) カード同士の隙間は常に frameGap に統一 */
-.card{
-  margin-top: 0 !important;
-  margin-bottom: var(--frameGap) !important;
-}
-
-/* 5) 末尾カードは余白なし（スクロール末尾の無駄を減らす） */
-.section.active .card:last-child{
-  margin-bottom: 0 !important;
-}
-
-/* 6) connSettingsCard は特別扱いしない（上/下とも統一ルールに従う） */
-#addSection #connSettingsCard{
-  margin-top: 0 !important;
-  margin-bottom: var(--frameGap) !important;
-}
