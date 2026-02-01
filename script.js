@@ -1,5 +1,5 @@
 const STORAGE_KEY = "tangoChoWords";
-const APP_VERSION = "v42";
+const APP_VERSION = "v46";
 
 const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
@@ -195,7 +195,6 @@ function loadWords() {
         ...x,
         word: w,
         meaning: m,
-        posCandidates: inferPosCandidates(w, m),
         status: st,
       });
     }
@@ -610,66 +609,6 @@ function normalizeWordInput(s){
   // trim leading/trailing hyphen/apostrophe
   return t.replace(/^[-']+/, '').replace(/[-']+$/, '');
 }
-
-// POS candidates (heuristic; shows *all* plausible POS rather than forcing a single one)
-// NOTE: This is intentionally conservative. If unsure, it returns [] (hide POS line).
-function inferPosCandidates(word, meaningJa) {
-  const w = String(word || "").trim().toLowerCase();
-  if (!w) return [];
-  // keep simple: only single-token a-z words (allow ' and -)
-  if (!/^[a-z][a-z'\-]+$/.test(w)) return [];
-
-  const cand = new Set();
-
-  // curated (minimum) lists: fixes obvious misses like "good"
-  const ADJ_WHITELIST = new Set(["good","bad","new","old","big","small","large","little","high","low","early","late","long","short","easy","hard","important","different","difficult","possible","available","responsible","necessary","effective","efficient"]);
-  const VERB_BASE = new Set(["be","have","do","make","take","get","go","come","put","give","find","think","tell","become","show","leave","feel","keep","let","begin","seem","help","talk","turn","start","can","will","must","should"]);
-  const ADJ_LY = new Set(["friendly","likely","lonely","lovely","deadly","costly","orderly","timely","worldly","weekly","monthly","yearly","daily","early"]);
-
-  if (ADJ_WHITELIST.has(w)) cand.add("adj");
-  if (VERB_BASE.has(w)) cand.add("v");
-
-  // suffix rules
-  if (w.endsWith("ly") && w.length > 3) {
-    if (ADJ_LY.has(w)) {
-      cand.add("adj");
-      if (w === "likely" || w === "early") cand.add("adv");
-    } else {
-      cand.add("adv");
-    }
-  }
-  const NOUN_SUFFIX = ["tion","sion","ment","ness","ity","ance","ence","ship","ism","age","ery","or","er","ist","hood","dom","cy","ure","al","ing"];
-  for (const s of NOUN_SUFFIX) {
-    if (w.endsWith(s) && w.length > s.length + 1) { cand.add("n"); break; }
-  }
-  const VERB_SUFFIX = ["ate","ify","ize","ise","en","fy"];
-  for (const s of VERB_SUFFIX) {
-    if (w.endsWith(s) && w.length > s.length + 1) { cand.add("v"); break; }
-  }
-  const ADJ_SUFFIX = ["ous","ful","able","ible","al","ic","ive","less","ary","ory","ent","ant"];
-  for (const s of ADJ_SUFFIX) {
-    if (w.endsWith(s) && w.length > s.length + 1) { cand.add("adj"); break; }
-  }
-  if (/(ed|ing)$/.test(w)) { cand.add("v"); cand.add("adj"); }
-
-  const mj = String(meaningJa || "");
-  if (mj.includes("する")) cand.add("v");
-
-  const order = ["n","v","adj","adv"];
-  return order.filter(x => cand.has(x));
-}
-
-function sanitizePosCandidates(arr) {
-  if (!Array.isArray(arr)) return [];
-  const allow = new Set(["n","v","adj","adv"]);
-  const out = [];
-  for (const x of arr) {
-    const t = String(x || "").trim();
-    if (!allow.has(t)) continue;
-    if (!out.includes(t)) out.push(t);
-  }
-  return out;
-}
 function isGoodRandomCandidate(token){
   const w = String(token||'').trim().toLowerCase();
   if (!w) return false;
@@ -856,6 +795,7 @@ function setupAddForm() {
   const exampleEl = document.getElementById("example");
   const memoEl = document.getElementById("memo");
   const tagsEl = document.getElementById("tags");
+  const posEl = document.getElementById("pos");
   const synonymsEl = document.getElementById("synonyms");
   const synFetchBtn = document.getElementById("synFetchBtn");
   const translateBtn = document.getElementById("translateBtn");
@@ -881,6 +821,7 @@ function setupAddForm() {
     memoEl.value = "";
     tagsEl.value = "";
     if (synonymsEl) synonymsEl.value = "";
+    if (posEl) posEl.value = "";
     setState("未翻訳");
     if (!afterSave) setMsg("", "");
   }
@@ -894,6 +835,7 @@ function setupAddForm() {
     memoEl.value = item.memo || "";
     tagsEl.value = item.tags || "";
     if (synonymsEl) synonymsEl.value = item.synonyms || "";
+    if (posEl) posEl.value = item.pos || "";
 
     if (editBanner) editBanner.style.display = "flex";
     if (editSub) editSub.textContent = `${(item.word || "").trim()} を編集中`;
@@ -1136,11 +1078,11 @@ document.addEventListener("tangocho:incomingword", (ev) => {
           ...prev,
           word: w,
           meaning: m,
-          posCandidates: inferPosCandidates(w, m),
           status: statusEl.value || "default",
           example: exampleEl.value.trim(),
           memo: memoEl.value.trim(),
           tags: tagsEl.value.trim(),
+          pos: (posEl ? posEl.value.trim() : (prev.pos || "")),
           synonyms: synonymsEl ? synonymsEl.value.trim() : (prev.synonyms || ""),
           updatedAt: now,
         };
@@ -1160,6 +1102,7 @@ document.addEventListener("tangocho:incomingword", (ev) => {
         example: exampleEl.value.trim(),
         memo: memoEl.value.trim(),
         tags: tagsEl.value.trim(),
+        pos: (posEl ? posEl.value.trim() : ""),
         synonyms: synonymsEl ? synonymsEl.value.trim() : "",
         source: "manual",
         createdAt: now,
@@ -1204,7 +1147,6 @@ document.addEventListener("tangocho:incomingword", (ev) => {
         id: `${baseId}-syn-${Math.random().toString(36).slice(2, 8)}`,
         word: t,
         meaning: meaningSyn,
-        posCandidates: inferPosCandidates(t, meaningSyn),
         status: statusEl.value || "default",
         example: "",
         memo: `同義語（${w}）`,
@@ -1505,16 +1447,15 @@ listEl.innerHTML = "";
 
     item.appendChild(top);
     item.appendChild(meaning);
+    if (synEl) item.appendChild(synEl);
 
-    const __pc = sanitizePosCandidates(w.posCandidates);
-    if (__pc.length) {
+
+    if (w.pos) {
       const p = document.createElement("div");
       p.className = "word-meta";
-      p.textContent = `POS: ${__pc.join(" / ")}`;
+      p.textContent = `POS: ${String(w.pos)}`;
       item.appendChild(p);
     }
-
-    if (synEl) item.appendChild(synEl);
 
     if (w.example) {
       const ex = document.createElement("div");
@@ -2045,13 +1986,10 @@ function normalizeImportedItem(x) {
   const word = String(x.word || "").trim();
   const meaning = String(x.meaning || "").trim();
   if (!word || !meaning) return null;
-  const __pc = sanitizePosCandidates(x.posCandidates || x.posc);
-  const posCandidates = __pc.length ? __pc : inferPosCandidates(word, meaning);
   return {
     id: String(x.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
     word,
     meaning,
-    posCandidates,
     status: (x.status === "forgot" || x.status === "default" || x.status === "learned") ? x.status : "default",
     example: String(x.example || "").trim(),
     memo: String(x.memo || "").trim(),

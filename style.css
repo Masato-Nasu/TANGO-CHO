@@ -265,23 +265,25 @@ details summary::-webkit-details-marker{display:none}
 }
 
 
-/* iOS safe-area & viewport stability (for iPhone 16 / iOS Safari & PWA) */
-@supports (padding: env(safe-area-inset-top)) {
-  body{
-    padding-top: env(safe-area-inset-top);
-    padding-right: env(safe-area-inset-right);
-    padding-bottom: env(safe-area-inset-bottom);
-    padding-left: env(safe-area-inset-left);
+/* ---- iOS safe-area & viewport height stability (minimal, non-breaking) ---- */
+:root{
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+}
+body{
+  padding-top: var(--safe-top);
+  padding-right: var(--safe-right);
+  padding-bottom: var(--safe-bottom);
+  padding-left: var(--safe-left);
+}
+/* Prefer dynamic viewport height on modern iOS */
+.app, #app, main{
+  min-height: 100vh;
+}
+@supports (height: 100dvh){
+  .app, #app, main{
+    min-height: 100dvh;
   }
-}
-
-html, body{
-  width: 100%;
-  overflow-x: hidden;
-}
-
-/* Prefer dynamic viewport units when available (fixes iOS 100vh issues) */
-@supports (height: 100dvh) {
-  body{ min-height: 100dvh; }
-  .fortune-wrap{ height: calc(100dvh - 260px); }
 }

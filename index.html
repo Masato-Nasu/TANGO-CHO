@@ -90,7 +90,17 @@
           <button id="synFetchBtn" class="secondary-btn" type="button">類義語取得</button>
         </div>
 
-        <label class="field-label" for="example">例文（任意）</label>
+        
+        <label class="field-label" for="pos">品詞（確定・任意）</label>
+        <select id="pos" class="select">
+          <option value="">（未設定）</option>
+          <option value="n">名詞 (n)</option>
+          <option value="v">動詞 (v)</option>
+          <option value="adj">形容詞 (adj)</option>
+          <option value="adv">副詞 (adv)</option>
+        </select>
+
+<label class="field-label" for="example">例文（任意）</label>
         <textarea id="example" rows="2" placeholder="例: I was curious about it."></textarea>
 
         <label class="field-label" for="memo">メモ（任意）</label>
@@ -225,7 +235,7 @@
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./service-worker.js?v=40").catch(console.error);
+        navigator.serviceWorker.register("./service-worker.js?v=38").catch(console.error);
       });
     }
   </script>
