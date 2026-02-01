@@ -97,7 +97,7 @@ input[type="text"],input[type="date"],textarea,select{
 }
 textarea{resize:vertical;line-height:var(--lh-body)}
 .select{appearance:auto}
-.select.small{padding:12px var(--controlPX);font-size:var(--controlFS);border-radius:var(--controlR);min-height:var(--controlH)}
+.select.small{padding:12px var(--controlPX);font-size:var(--controlFS);border-radius:var(--controlR);min-height:var(--controlH);width:auto;max-width:100%}
 
 select:disabled{opacity:0.75;cursor:not-allowed}
 .primary-btn,.secondary-btn,.ghost-btn{
@@ -315,24 +315,26 @@ html{
   -webkit-text-size-adjust: 100%;
 }
 
-
 /* --- Mobile (Android) small width: prevent list filter selects from clipping --- */
-@media (max-width: 520px){
+@media (max-width: 640px){
   .list-header{
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: stretch;
     gap: 8px;
-    align-items: flex-start;
   }
   .list-controls{
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    max-width: 100%;
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  /* 3つ目（並び順）は1段目に収まらないので2段目で全幅に */
+  #sortOrder{
+    grid-column: 1 / -1;
   }
   .list-controls .select.small{
-    flex: 1 1 140px;
-    min-width: 0;              /* allow shrink inside card */
-    padding: 10px 12px;
-    font-size: 16px;           /* readable + iOS zoom-safe */
+    width: 100%;
+    min-width: 0;
+    font-size: 16px;
   }
 }
-
