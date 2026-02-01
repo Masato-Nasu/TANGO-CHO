@@ -651,3 +651,43 @@ select option{
   margin-top: var(--frameGap) !important;
   margin-bottom: var(--frameGap) !important;
 }
+
+
+
+/* ===== v47.2.4 unify gaps around tab-bar / cards ===== */
+/* Goal: タブ列 ↔ 接続設定カード ↔ 次カード の隙間をすべて同じにする */
+:root{
+  --frameGap: var(--gap);
+}
+
+/* 1) タブバーの下に“必ず”同じ隙間を作る（main側のpaddingでバラつかせない） */
+.tab-bar{
+  padding-bottom: var(--frameGap) !important;
+}
+
+/* 2) mainの上paddingを0に（タブバー側で制御） */
+.main{
+  padding-top: 0 !important;
+}
+
+/* 3) 最初のカードの上marginを0に固定（余計な8px等を無効化） */
+.section.active .card:first-child{
+  margin-top: 0 !important;
+}
+
+/* 4) カード同士の隙間は常に frameGap に統一 */
+.card{
+  margin-top: 0 !important;
+  margin-bottom: var(--frameGap) !important;
+}
+
+/* 5) 末尾カードは余白なし（スクロール末尾の無駄を減らす） */
+.section.active .card:last-child{
+  margin-bottom: 0 !important;
+}
+
+/* 6) connSettingsCard は特別扱いしない（上/下とも統一ルールに従う） */
+#addSection #connSettingsCard{
+  margin-top: 0 !important;
+  margin-bottom: var(--frameGap) !important;
+}
