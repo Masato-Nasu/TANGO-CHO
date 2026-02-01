@@ -1,5 +1,5 @@
 const STORAGE_KEY = "tangoChoWords";
-const APP_VERSION = "v43";
+const APP_VERSION = "v42";
 
 const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
@@ -20,51 +20,6 @@ const STATUS_LABEL = {
   default: "デフォルト",
   learned: "覚えた",
 };
-
-// --- POS (Part of Speech) inference ---
-// Minimal, heuristic-based estimation. We keep this lightweight and do NOT change the existing word data.
-// If we cannot infer reliably, we show "不明" so it still appears in the UI.
-const POS_LABEL = {
-  n: "名詞",
-  v: "動詞",
-  adj: "形容詞",
-  adv: "副詞",
-  prep: "前置詞",
-  conj: "接続詞",
-  pron: "代名詞",
-  det: "限定詞",
-  interj: "間投詞",
-  unk: "不明",
-};
-
-function inferPosCode(word, meaning){
-  const w = String(word || "").trim().toLowerCase();
-  const m = String(meaning || "").trim();
-  if (!w) return "unk";
-
-  // JP meaning hints (very light)
-  if (/する$/.test(m) || /を?行う$/.test(m) || /\bdo\b/i.test(m)) return "v";
-  if (/的$/.test(m)) return "adj";
-
-  // English morphology (rough)
-  if (w.endsWith("ly")) return "adv";
-  if (/(ize|ise|ify|ate|en)$/.test(w)) return "v";
-  if (/(tion|sion|ment|ness|ity|ship|ance|ence|ism|ist|age|ery|hood)$/.test(w)) return "n";
-  if (/(able|ible|al|ial|ic|ical|ive|ous|ful|less|ary|ent|ant)$/.test(w)) return "adj";
-
-  // Short function words
-  if (["in","on","at","by","for","with","about","from","to","into","over","under","between","among","through","across","within","without","during","after","before","around","behind","beyond","despite","toward","towards","against","along","beneath","beside","except","inside","outside","since","until","upon","via"].includes(w)) return "prep";
-  if (["and","or","but","so","because","although","though","while","whereas","if","when","unless","since"].includes(w)) return "conj";
-  if (["he","she","it","they","we","i","you","me","him","her","them","us"].includes(w)) return "pron";
-  if (["a","an","the","this","that","these","those","my","your","his","her","its","our","their"].includes(w)) return "det";
-
-  return "unk";
-}
-
-function posLabel(code){
-  const c = String(code || "").trim().toLowerCase();
-  return POS_LABEL[c] || "不明";
-}
 
 // --- Quiz SFX (no external audio files) ---
 // iOS (Safari/PWA) can be picky about WebAudio. We keep WebAudio, and add a tiny
@@ -1459,9 +1414,7 @@ listEl.innerHTML = "";
     const created = w.createdAt ? new Date(w.createdAt).toLocaleString() : "";
     const tags = w.tags ? ` / タグ: ${w.tags}` : "";
     const st = ` / ${STATUS_LABEL[w.status || "default"]}`;
-    const pos = posLabel(inferPosCode(w.word, w.meaning));
-    const posPart = ` / 品詞: ${pos}`;
-    meta.textContent = `登録: ${created}${tags}${st}${posPart}`;
+    meta.textContent = `登録: ${created}${tags}${st}`;
 
     const actions = document.createElement("div");
     actions.className = "word-actions";
