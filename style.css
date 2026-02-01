@@ -499,3 +499,53 @@ select option{
 .toast.ok{ border-color: rgba(0,255,180,0.45); }
 .toast.err{ border-color: rgba(255,80,80,0.55); }
 
+
+/* ===== v47.1.1: prevent “右が切れる” by giving selects a minimum readable width (Android wraps), iOS stacks ===== */
+
+/* Android含む既定：横並びだが、狭い時は“縮めて切る”より“折り返す”を優先 */
+.list-controls{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  align-items:center;
+}
+.list-controls select.select.small{
+  flex: 0 1 170px;     /* だいたいこの幅を確保しつつ */
+  min-width: 140px;    /* これ以下に縮めない（文字切れを防ぐ） */
+  max-width: 100%;
+}
+
+/* かなり狭い幅：2段+1段（3つ目は全幅）で確実に収める */
+@media (max-width: 520px){
+  .list-header{align-items:stretch}
+  .list-controls{
+    width:100%;
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap:8px;
+  }
+  #sortOrder{grid-column: 1 / -1;}
+  .list-controls select.select.small{
+    width:100%;
+    min-width:0;
+    flex: 0 0 auto;
+  }
+}
+
+/* iPhone(iOS Safari/PWA)：縦3段 */
+@supports (-webkit-touch-callout: none){
+  @media (hover:none) and (pointer:coarse){
+    .list-controls{
+      display:flex;
+      flex-direction:column;
+      flex-wrap:nowrap;
+      align-items:stretch;
+      width:100%;
+    }
+    .list-controls select.select.small{
+      width:100%;
+      min-width:0;
+      flex: 0 0 auto;
+    }
+  }
+}

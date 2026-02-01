@@ -1342,10 +1342,12 @@ document.addEventListener("tangocho:incomingword", (ev) => {
       exitEditMode(false);
       setMsg(`更新しました（入力をクリアしました）。${synAdded ? ` 類似語カード +${synAdded}` : ""}${synFailNote}`.trim());
       flashSaveIndicator(true);
+      showToast(`更新しました` , "ok");
     } else {
       clearForm(true);
       setMsg(`保存しました（入力をクリアしました）。${synAdded ? ` 類似語カード +${synAdded}` : ""}${synFailNote}`.trim(), "ok");
       flashSaveIndicator(false);
+      showToast(`保存しました` , "ok");
     }
 
     renderWordList();
