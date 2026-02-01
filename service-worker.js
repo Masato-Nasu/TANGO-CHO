@@ -1,5 +1,5 @@
 /* TANGO-CHO Service Worker (stable updates)
- * Build: v43.0.0
+ * Build: v42.0.1
  */
 const CACHE_NAME = "tango-cho-cache-v43.0.0";
 

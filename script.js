@@ -21,12 +21,50 @@ const STATUS_LABEL = {
   learned: "覚えた",
 };
 
+// --- POS (Part of Speech) inference ---
+// Minimal, heuristic-based estimation. We keep this lightweight and do NOT change the existing word data.
+// If we cannot infer reliably, we show "不明" so it still appears in the UI.
 const POS_LABEL = {
-  v: "動詞",
   n: "名詞",
+  v: "動詞",
   adj: "形容詞",
   adv: "副詞",
+  prep: "前置詞",
+  conj: "接続詞",
+  pron: "代名詞",
+  det: "限定詞",
+  interj: "間投詞",
+  unk: "不明",
 };
+
+function inferPosCode(word, meaning){
+  const w = String(word || "").trim().toLowerCase();
+  const m = String(meaning || "").trim();
+  if (!w) return "unk";
+
+  // JP meaning hints (very light)
+  if (/する$/.test(m) || /を?行う$/.test(m) || /\bdo\b/i.test(m)) return "v";
+  if (/的$/.test(m)) return "adj";
+
+  // English morphology (rough)
+  if (w.endsWith("ly")) return "adv";
+  if (/(ize|ise|ify|ate|en)$/.test(w)) return "v";
+  if (/(tion|sion|ment|ness|ity|ship|ance|ence|ism|ist|age|ery|hood)$/.test(w)) return "n";
+  if (/(able|ible|al|ial|ic|ical|ive|ous|ful|less|ary|ent|ant)$/.test(w)) return "adj";
+
+  // Short function words
+  if (["in","on","at","by","for","with","about","from","to","into","over","under","between","among","through","across","within","without","during","after","before","around","behind","beyond","despite","toward","towards","against","along","beneath","beside","except","inside","outside","since","until","upon","via"].includes(w)) return "prep";
+  if (["and","or","but","so","because","although","though","while","whereas","if","when","unless","since"].includes(w)) return "conj";
+  if (["he","she","it","they","we","i","you","me","him","her","them","us"].includes(w)) return "pron";
+  if (["a","an","the","this","that","these","those","my","your","his","her","its","our","their"].includes(w)) return "det";
+
+  return "unk";
+}
+
+function posLabel(code){
+  const c = String(code || "").trim().toLowerCase();
+  return POS_LABEL[c] || "不明";
+}
 
 // --- Quiz SFX (no external audio files) ---
 // iOS (Safari/PWA) can be picky about WebAudio. We keep WebAudio, and add a tiny
@@ -198,17 +236,11 @@ function loadWords() {
       if (st !== st0) changed = true;
 
       // Keep other fields as-is; only normalize essentials.
-      const pos0 = x.pos;
-      const pos = normalizePos(pos0, w, m);
-      if (pos && pos !== pos0) changed = true;
-
       out.push({
         ...x,
         word: w,
         meaning: m,
-        pos: normalizePos('', w, m),
         status: st,
-        pos: pos || pos0 || "",
       });
     }
 
@@ -299,39 +331,6 @@ function normalizeStatus(st){
   return "default";
 }
 
-function inferPosCode(word, meaning){
-  const w = String(word || "").trim().toLowerCase();
-  const m = String(meaning || "").trim();
-  if (!w) return "";
-
-  // Japanese meaning hint (very rough)
-  if (/(する|させる|した|して|される)\s*$/.test(m)) return "v";
-
-  // English morphology (very rough)
-  if (w.endsWith("ly") && w.length > 3) return "adv";
-  if (/(ize|ise|ify|ate|en)$/.test(w)) return "v";
-  if (/(tion|sion|ment|ness|ity|ship|ance|ence|er|or|ist|ism|age|ery|ure|hood|dom)$/.test(w)) return "n";
-  if (/(able|ible|al|ous|ive|ic|ical|ary|ful|less|ish|y)$/.test(w)) return "adj";
-
-  // Unknown
-  return "";
-}
-
-function normalizePos(pos, fallbackWord, fallbackMeaning){
-  const v = String(pos ?? "").trim().toLowerCase();
-  if (!v) return inferPosCode(fallbackWord, fallbackMeaning);
-  if (v === "v" || v === "verb" || v === "動詞") return "v";
-  if (v === "n" || v === "noun" || v === "名詞") return "n";
-  if (v === "adj" || v === "adjective" || v === "形容詞") return "adj";
-  if (v === "adv" || v === "adverb" || v === "副詞") return "adv";
-  return inferPosCode(fallbackWord, fallbackMeaning);
-}
-
-function posLabel(code){
-  const c = String(code || "").trim().toLowerCase();
-  return POS_LABEL[c] || "";
-}
-
 function sanitizeImportedWords(arr) {
   if (!Array.isArray(arr)) return [];
   const out = [];
@@ -344,7 +343,6 @@ function sanitizeImportedWords(arr) {
       id: x.id ? String(x.id) : (crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()),
       word: w,
       meaning: m,
-      pos: normalizePos(x.pos, w, m),
       status: normalizeStatus(x.status),
       example: x.example ? String(x.example) : "",
       memo: x.memo ? String(x.memo) : "",
@@ -1122,7 +1120,6 @@ document.addEventListener("tangocho:incomingword", (ev) => {
           ...prev,
           word: w,
           meaning: m,
-          pos: normalizePos(prev.pos, w, m),
           status: statusEl.value || "default",
           example: exampleEl.value.trim(),
           memo: memoEl.value.trim(),
@@ -1190,7 +1187,6 @@ document.addEventListener("tangocho:incomingword", (ev) => {
         id: `${baseId}-syn-${Math.random().toString(36).slice(2, 8)}`,
         word: t,
         meaning: meaningSyn,
-        pos: normalizePos('', t, meaningSyn),
         status: statusEl.value || "default",
         example: "",
         memo: `同義語（${w}）`,
@@ -1463,9 +1459,8 @@ listEl.innerHTML = "";
     const created = w.createdAt ? new Date(w.createdAt).toLocaleString() : "";
     const tags = w.tags ? ` / タグ: ${w.tags}` : "";
     const st = ` / ${STATUS_LABEL[w.status || "default"]}`;
-    const posCode = normalizePos(w.pos, w.word, w.meaning);
-    const posTxt = posLabel(posCode);
-    const posPart = posTxt ? ` / 品詞（推定）: ${posTxt}` : "";
+    const pos = posLabel(inferPosCode(w.word, w.meaning));
+    const posPart = ` / 品詞: ${pos}`;
     meta.textContent = `登録: ${created}${tags}${st}${posPart}`;
 
     const actions = document.createElement("div");
@@ -2029,8 +2024,7 @@ function normalizeImportedItem(x) {
     id: String(x.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
     word,
     meaning,
-    status: normalizeStatus(x.status),
-    pos: normalizePos(x.pos, word, meaning),
+    status: (x.status === "forgot" || x.status === "default" || x.status === "learned") ? x.status : "default",
     example: String(x.example || "").trim(),
     memo: String(x.memo || "").trim(),
     tags: String(x.tags || "").trim(),
