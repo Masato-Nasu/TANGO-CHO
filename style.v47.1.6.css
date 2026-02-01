@@ -1,0 +1,573 @@
+:root{
+  /* Typography scale (keep app-wide balance consistent) */
+  --fs-base: 1rem;
+  --fs-lg: 1.05rem;
+  --fs-xl: 1.15rem;
+  --fs-xxl: 1.5rem;
+  --fs-sm: 0.92rem;
+  --fs-xs: 0.82rem;
+  --fs-xxs: 0.75rem;
+  --fs-micro: 0.55rem;
+
+  /* Line-height scale */
+  --lh-body: 1.55;
+  --lh-ui: 1.25;
+  --lh-tight: 1.10;
+
+  --padX:12px;
+  --padCard:16px;
+  --gap:10px;
+  --controlH:52px;
+  --controlR:16px;
+  --controlPX:16px;
+  --controlPY:14px;
+  --controlFS: var(--fs-lg);
+  --bg:#111; --card:#1f1f1f; --border:#333;
+  --accent:#00c896; --accentSoft:rgba(0,200,150,.12);
+  --text:#f5f5f5; --sub:#bbb; --danger:#ff4f4f;
+  --r:16px;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+html,body{margin:0;padding:0;background:radial-gradient(circle at top,#252525,#050505);color:var(--text);
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:22px;line-height:var(--lh-body)}
+body{min-height:100vh;display:flex;flex-direction:column}
+.app-header{padding:16px var(--padX) 8px;text-align:center;max-width:760px;width:100%;margin:0 auto;box-sizing:border-box}
+.app-header h1{margin:0;font-size:2.0rem;letter-spacing:.04em}
+.app-subtitle{margin:6px 0 0;font-size:var(--fs-base);color:var(--sub)}
+.tab-bar{display:flex;flex-direction:column;gap:var(--gap);position:static;
+  max-width:760px;width:100%;margin:0 auto;box-sizing:border-box;
+  padding:10px var(--padX) 0;background:transparent}
+
+.tab-button{width:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:var(--controlPY) var(--controlPX);font-size:var(--controlFS);line-height:var(--lh-ui);box-sizing:border-box;border-radius:var(--controlR);border:1px solid var(--border);background:rgba(0,0,0,.4);color:var(--sub);cursor:pointer;min-height:var(--controlH)}
+.tab-button.active{background:var(--accentSoft);border-color:var(--accent);color:var(--accent);font-weight:600}
+.main{flex:1;padding:8px var(--padX) 16px;max-width:760px;width:100%;margin:0 auto}
+.section{display:none}
+.section.active{display:block}
+.section h2{margin:8px 0 4px;font-size:var(--fs-xl)}
+.card{background:var(--card);border-radius:var(--r);border:1px solid var(--border);padding:var(--padCard);
+  box-shadow:0 12px 30px rgba(0,0,0,.25);margin-bottom:var(--gap);font-size:var(--fs-base);color:var(--sub);margin-top:8px;margin-bottom:4px}
+
+
+#fortuneControlsCard{margin-bottom:calc(var(--gap) * 1.8)}
+#connSettingsCard{margin-bottom:calc(var(--gap) * 1.8)}
+.field-row{display:flex;gap:var(--gap);align-items:center}
+.field-row>*{min-width:0}
+
+.action-row{flex-wrap:wrap}
+.action-row #translateBtn{flex:2 1 180px}
+.action-row #randomBtn{flex:1 1 120px}
+.action-row #clearBtn{flex:1 1 120px}
+.action-row #translateState{flex:0 0 auto}
+@media (max-width: 430px){
+  html{font-size:22px}
+
+  .action-row #translateBtn{flex:1 1 100%}
+  .action-row #randomBtn,.action-row #clearBtn,.action-row #translateState{flex:1 1 120px}
+}
+
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap)}
+@media (max-width:640px){.two-col{grid-template-columns:1fr}}
+
+/* iPhone/Safari: date input indicator can cause a broken right-side block.
+   On small screens we hide the native indicator to keep the control visually consistent. */
+@media (max-width:640px){
+  input[type="date"]{
+    -webkit-appearance:none;
+    appearance:none;
+    background-image:none;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator{
+    opacity:0;
+    display:none;
+  }
+  input[type="date"]::-webkit-clear-button,
+  input[type="date"]::-webkit-inner-spin-button{
+    display:none;
+  }
+  input[type="date"]::-webkit-datetime-edit{
+    text-align:center;
+  }
+}
+
+
+input[type="text"],input[type="date"],textarea,select{
+  width:100%;padding:14px 18px;border-radius:16px;border:1px solid var(--border);
+  background:#151515;color:var(--text);font-size:var(--fs-lg);min-height:52px;line-height:var(--lh-ui)
+}
+textarea{resize:vertical;line-height:var(--lh-body)}
+.select{appearance:auto}
+.select.small{padding:12px var(--controlPX);font-size:var(--controlFS);border-radius:var(--controlR);min-height:var(--controlH);width:auto;max-width:100%}
+
+select:disabled{opacity:0.75;cursor:not-allowed}
+.primary-btn,.secondary-btn,.ghost-btn{
+  border-radius:var(--controlR);border:1px solid transparent;padding:var(--controlPY) var(--controlPX);font-size:var(--controlFS);cursor:pointer;white-space:nowrap;min-height:var(--controlH)
+}
+
+.primary-btn{background:var(--accent);color:#000;font-weight:700}
+.secondary-btn{background:transparent;border-color:var(--accent);color:var(--accent)}
+.ghost-btn{background:transparent;border-color:var(--border);color:var(--sub)}
+.ghost-btn.small{padding:10px 14px;font-size:var(--fs-sm);min-height:44px}
+.full-width{width:100%;margin-top:12px}
+.note{margin:8px 0 0;color:var(--sub);font-size:var(--fs-xs);line-height:1.4}
+.pill{
+  padding:10px 14px;border-radius:14px;border:1px solid var(--border);
+  background:#141414;color:var(--sub);font-size:var(--fs-sm);min-width:88px;text-align:center;white-space:nowrap}
+.msg{margin-top:10px;font-size:var(--fs-sm)}
+.msg.ok{color:var(--accent)}
+.msg.err{color:var(--danger)}
+.summary{cursor:pointer;color:var(--accent);font-weight:700;list-style:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+details.card[open] > summary.summary{margin-bottom:var(--gap)}
+details summary{user-select:none}
+details summary::-webkit-details-marker{display:none}
+
+.word-list{max-height:60vh;overflow-y:auto;padding-right:4px;margin-top:8px}
+.word-item{border-radius:12px;border:1px solid var(--border);padding:8px 10px;margin-bottom:8px;background:#151515}
+.word-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.word-main{font-weight:700;font-size:var(--fs-xl)}
+.word-meaning{margin-top:6px;font-size:var(--fs-lg)}
+.word-meta{margin-top:6px;font-size:var(--fs-sm);color:var(--sub)}
+.word-actions{margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.delete-btn{border-radius:999px;border:1px solid var(--danger);background:transparent;color:var(--danger);
+  font-size:var(--fs-base);padding:4px 10px;cursor:pointer}
+.tts-btn{border-radius:999px;border:1px solid var(--border);padding:6px 10px;font-size:var(--fs-xs);background:#111;color:var(--sub);cursor:pointer}
+
+.quiz-term{display:inline-block}
+.quiz-tts{margin-left:8px;padding:4px 10px;vertical-align:middle;}
+
+.list-header{display:flex;justify-content:space-between;align-items:center;font-size:var(--fs-xs);margin-bottom:6px}
+.list-controls{display:flex;gap:6px;align-items:center}
+
+.list-counts{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  align-items:center;
+  margin-top:8px;
+  font-size:var(--fs-xs);
+  color:var(--muted);
+}
+.count-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,0.10);
+  background:rgba(255,255,255,0.04);
+  white-space:nowrap;
+}
+.count-pill b{color:var(--fg);font-weight:800}
+
+
+.quiz-area{margin-top:12px;padding:10px;border-radius:12px;background:#151515;border:1px dashed var(--border);min-height:120px}
+
+/* --- Fortune --- */
+.fortune-results{display:flex;flex-direction:column;gap:12px}
+.fortune-item{border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:16px;background:#101010}
+.fortune-head{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--gap)}
+.fortune-title{font-weight:800;font-size:var(--fs-xxl);line-height:var(--lh-tight);align-items:center;gap:8px;flex-wrap:wrap}
+.fortune-pill{font-size:var(--fs-micro);padding:4px 8px;border-radius:999px;background:rgba(0,200,150,0.16);border:1px solid rgba(0,200,150,0.32)}
+.fortune-score{font-size:var(--fs-micro);opacity:0.85}
+
+.fortune-meta{display:flex;flex-direction:column;align-items:flex-end;gap:8px;min-width:140px}
+.fortune-bar{width:180px;max-width:46vw;height:10px;border-radius:999px;background:rgba(0,200,150,0.12);border:1px solid rgba(0,200,150,0.22);overflow:hidden}
+.fortune-bar-fill{height:100%;width:0%;border-radius:999px;background:rgba(0,200,150,0.62);transition:width 260ms ease}
+@media (max-width:430px){
+  .fortune-meta{min-width:120px}
+  .fortune-bar{width:150px}
+}
+
+.fortune-text{margin-top:10px;line-height:1.65;font-size:var(--fs-xl)}
+.fortune-text .w{display:inline-block;padding:1px 2px;border-radius:6px;cursor:pointer}
+.fortune-text .w:hover{background:rgba(255,255,255,0.08)}
+.fortune-actions{display:flex;gap:var(--gap);flex-wrap:wrap;margin-top:10px}
+.fortune-actions button{padding:10px 14px;border-radius:var(--controlR);min-height:44px;font-size:var(--fs-sm)}
+.fortune-jp{margin-top:8px;opacity:0.92;line-height:var(--lh-body);font-size:var(--fs-xl)}
+.quiz-q{font-size:var(--fs-lg);font-weight:700;margin:0 0 10px}
+.quiz-choices{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media (max-width:520px){.quiz-choices{grid-template-columns:1fr}}
+.choice-btn{
+  border-radius:var(--controlR);border-radius:16px;border:2px solid var(--border);background:#111;color:var(--text);
+  padding:16px 52px 16px 16px;text-align:left;cursor:pointer;font-size:var(--fs-lg);min-height:56px;position:relative
+}
+
+/* 日→英クイズ: 選択肢（英単語）の下に日本語訳を表示 */
+.choice-main{font-weight:700;line-height:var(--lh-ui);font-size:var(--fs-sm);color:var(--sub);line-height:1.25}
+.choice-sub:empty{display:none}
+.choice-btn.correct{border-color:var(--accent);background:rgba(0,200,150,.12)}
+.choice-btn.wrong{border-color:var(--danger);background:rgba(255,79,79,.10)}
+.quiz-foot{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.quiz-mini{font-size:var(--fs-xs);color:var(--sub)}
+
+.small-btn{
+  border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--sub);
+  padding:6px 10px;font-size:var(--fs-xs);cursor:pointer
+}
+.small-btn.accent{border-color:var(--accent);color:var(--accent)}
+.small-btn.danger{border-color:var(--danger);color:var(--danger)}
+.app-footer{padding:6px 12px 10px;display:flex;align-items:center;gap:8px;font-size:var(--fs-xxs);color:var(--sub);
+  border-top:1px solid #141414;background:#050505}
+.footer-text{flex:1}
+@media (max-width:400px){html,body{font-size:22px}}
+
+/* Synonyms line */
+.word-synonyms{
+  margin-top:6px;
+  font-size:var(--fs-sm);
+  color: var(--sub);
+}
+
+/* ===== Select readability (Android / iOS PWA) =====
+   Some environments render select with a light background but keep text white.
+   Force the closed control to respect our dark theme, and make option lists readable.
+*/
+select,
+.select{
+  background:#151515 !important;
+  color:var(--text) !important;
+  -webkit-text-fill-color:var(--text);
+  border:1px solid var(--border);
+}
+
+select option{
+  color:#111;
+  background:#fff;
+}
+
+/* Save button flash (quick "登録しました" indicator) */
+.btn-flash{
+  box-shadow:0 0 0 3px rgba(0,200,150,.22);
+}
+
+/* inline row for input + button */
+.row{
+  display:flex;
+  gap:var(--gap);
+  align-items:stretch;
+}
+.row > input[type="text"]{flex:1}
+
+.conn-status{font-size:0.9rem;color: var(--sub);margin-left:0;;}
+
+.edit-banner{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px 14px;border:1px solid var(--border);background:#0f1412;border-radius:16px;margin:10px 0 12px;}
+.edit-title{font-weight:800;font-size:var(--fs-lg);color:var(--text)}
+.edit-sub{flex:1;color:var(--sub);font-size:var(--fs-sm);line-height:1.2}
+
+
+/* Quiz result feedback */
+.quiz-result{margin-top:10px;font-size:var(--fs-xl);font-weight:800;display:flex;align-items:center;gap:10px;}
+.quiz-result .mark{font-size:var(--fs-h1);line-height:var(--lh-ui);}
+.quiz-result.correct{color:var(--accent);}
+.quiz-result.wrong{color:var(--danger);}
+
+.quiz-reveal{margin-top:6px;margin-bottom:6px;}
+.quiz-reveal-word{font-size:var(--fs-lg);font-weight:800;letter-spacing:0.01em;}
+.quiz-reveal-meaning{margin-top:4px;font-size:var(--fs-sm);opacity:0.9;}
+.quiz-next-wrap{margin-top:10px;}
+.quiz-next-btn{height:46px;}
+
+.choice-btn.correct::after{content:"○";position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:var(--fs-xxl);font-weight:900;color:var(--accent)}
+.choice-btn.wrong::after{content:"✕";position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:var(--fs-xxl);font-weight:900;color:var(--danger)}
+
+
+/* Fortune (embedded horoscope) */
+.fortune-wrap {
+  width: 100%;
+  height: calc(100vh - 260px);
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+#fortuneFrame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+}
+
+
+/* iOS safe-area & viewport stability (for iPhone 16 / iOS Safari & PWA) */
+@supports (padding: env(safe-area-inset-top)) {
+  body{
+    padding-top: env(safe-area-inset-top);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+  }
+}
+
+html, body{
+  width: 100%;
+  overflow-x: hidden;
+}
+
+/* Prefer dynamic viewport units when available (fixes iOS 100vh issues) */
+@supports (height: 100dvh) {
+  body{ min-height: 100dvh; }
+  .fortune-wrap{ height: calc(100dvh - 260px); }
+}
+
+/* iOS PWA (standalone): select (デフォルト/タグ等) が読めない問題の対策 */
+select,
+.select{
+  -webkit-appearance: none;
+  appearance: none;
+
+  color: var(--text);
+  -webkit-text-fill-color: var(--text);
+
+  background: var(--card);
+  border: 1px solid var(--line);
+
+  font-size: 16px;              /* iOSの勝手ズーム防止 */
+  padding: 12px 44px 12px 14px; /* 右側(矢印)の余白 */
+  line-height: 1.2;
+}
+
+select:disabled,
+.select:disabled{
+  opacity: 1;                   /* 薄くなりすぎ防止 */
+  color: var(--text);
+  -webkit-text-fill-color: var(--text);
+}
+
+/* iOSで文字サイズが勝手に変わるのを抑える */
+html{
+  -webkit-text-size-adjust: 100%;
+}
+
+/* --- Mobile (Android) small width: prevent list filter selects from clipping --- */
+@media (max-width: 640px){
+  .list-header{
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .list-controls{
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  /* 3つ目（並び順）は1段目に収まらないので2段目で全幅に */
+  #sortOrder{
+    grid-column: 1 / -1;
+  }
+  .list-controls .select.small{
+    width: 100%;
+    min-width: 0;
+    font-size: 16px;
+  }
+}
+
+/* ===== list-controls: Androidは横並び、iPhone(iOS)は縦並び + “選べる感”強化 ===== */
+
+/* 既定（Android含む）：横並び。狭い幅では折り返して“切れ”を防ぐ */
+.list-controls{
+  flex-wrap: wrap;
+}
+.list-controls > *{
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+/* ドロップダウンが“押せる部品”に見えるように（共通） */
+.list-controls select{
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.22);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.list-controls select:focus{
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accentSoft), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+/* iPhone(iOS Safari / iOS PWA)：縦並び（3段）にして確実に読みやすく */
+@supports (-webkit-touch-callout: none){
+  @media (hover: none) and (pointer: coarse){
+    .list-controls{
+      width: 100%;
+      flex-direction: column;
+      align-items: stretch;
+      flex-wrap: nowrap;
+    }
+    .list-controls > *{
+      width: 100%;
+      flex: 0 0 auto;
+    }
+
+    /* iOSはselectの見た目が薄くなりがちなので、明示的に上書き */
+    .list-controls select{
+      -webkit-appearance: none;
+      appearance: none;
+      color: var(--text);
+      -webkit-text-fill-color: var(--text);
+      padding-right: 44px;
+
+      /* ▼を背景で付与（iOSで矢印が弱い/消える対策） */
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23bbbbbb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      background-size: 18px 18px;
+    }
+  }
+}
+
+
+
+/* ===== v47.1.0 hotfix: prevent right-clip + improve select readability + visible save feedback ===== */
+
+/* Allow header to wrap instead of clipping */
+.list-header{
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Controls: keep row on Android, but allow wrapping/shrinking to avoid clipping */
+.list-controls{
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 100%;
+}
+.list-controls > *{
+  min-width: 0;
+}
+
+/* iOS (Safari/PWA): stack controls vertically (3段) */
+@supports (-webkit-touch-callout: none){
+  @media (hover: none) and (pointer: coarse){
+    .list-controls{
+      width: 100%;
+      flex-direction: column;
+      align-items: stretch;
+      flex-wrap: nowrap;
+    }
+    .list-controls > *{
+      width: 100%;
+      flex: 0 0 auto;
+    }
+  }
+}
+
+/* Select readability across platforms: ensure closed select is dark, opened options are readable */
+select,
+.select,
+.list-controls select{
+  background-color: #151515 !important;
+  background: #151515 !important;
+  color: #f2f2f2 !important;
+  -webkit-text-fill-color: #f2f2f2 !important;
+  border-color: rgba(255,255,255,0.18) !important;
+  color-scheme: dark;
+}
+select option{
+  color: #111 !important;
+  background: #fff !important;
+}
+
+/* Save button flash: make it unmistakable */
+.btn-flash{
+  box-shadow: 0 0 0 2px rgba(0,255,180,0.55), 0 10px 30px rgba(0,255,180,0.12);
+  transform: translateY(-1px);
+}
+
+/* Toast (fixed) */
+.toast{
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(0,0,0,0.78);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.2;
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease;
+  max-width: calc(100vw - 24px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.toast.show{ opacity: 1; }
+.toast.ok{ border-color: rgba(0,255,180,0.45); }
+.toast.err{ border-color: rgba(255,80,80,0.55); }
+
+/* ===== v47.1.2: Androidは横並び維持（2列にしない）。iOSは縦並びで切れ回避 ===== */
+
+/* 既定（Android含む）：横並び。幅はこれまでのままを維持し、収まらない場合は横スクロールで逃がす */
+.list-controls{
+  display:flex;
+  flex-wrap:nowrap;
+  gap:8px;
+  align-items:center;
+  overflow-x:auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px; /* スクロールバーの段差でガタつかないように */
+}
+.list-controls > *{
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.list-controls select.select.small{
+  width: 170px;     /* ほぼ現状の幅感 */
+  max-width: 170px;
+}
+
+/* iPhone(iOS Safari/PWA)：縦3段（切れない・タップしやすい） */
+@supports (-webkit-touch-callout: none){
+  @media (hover:none) and (pointer:coarse){
+    .list-controls{
+      overflow-x: visible;
+      flex-direction:column;
+      align-items:stretch;
+      width:100%;
+    }
+    .list-controls select.select.small{
+      width:100%;
+      max-width:100%;
+    }
+  }
+}
+
+
+/* ===== Add screen: spacing rhythm unify (Android/iPhone共通) ===== */
+#addSection details.card{ margin: 0 0 var(--gap) 0; }
+
+#addSection > .card{
+  margin: 0 0 var(--gap) 0;
+}
+
+#addSection label.field-label{
+  display:block;
+  margin: 12px 0 6px 0;
+  line-height: var(--lh-ui);
+}
+
+#addSection .card label.field-label:first-of-type{
+  margin-top: 0;
+}
+
+/* Ensure rows don't introduce random margins; rely on label rhythm */
+#addSection .field-row,
+#addSection .row,
+#addSection .two-col{
+  margin: 0;
+}
+
+/* Action row top spacing: keep consistent, remove inline margin in HTML */
+#addSection .action-row{
+  margin-top: 2px;
+}
+
+/* Message area spacing */
+#addSection #msg{
+  margin-top: 10px;
+}
+
