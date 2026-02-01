@@ -1,5 +1,5 @@
 const STORAGE_KEY = "tangoChoWords";
-const APP_VERSION = "v47";
+const APP_VERSION = "v47.0.2";
 
 const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
@@ -432,6 +432,8 @@ function sanitizeImportedWords(arr) {
       memo: x.memo ? String(x.memo) : "",
       tags: x.tags ? String(x.tags) : "",
       synonyms: x.synonyms ? String(x.synonyms) : "",
+      posCandidates: (Array.isArray(x.posCandidates) ? x.posCandidates.filter(p => ["n","v","adj","adv"].includes(String(p))) : undefined),
+      pos: (typeof x.pos === "string" ? x.pos : undefined),
       source: x.source ? String(x.source) : "import",
       createdAt: x.createdAt ? String(x.createdAt) : nowIso(),
       updatedAt: x.updatedAt ? String(x.updatedAt) : undefined,
@@ -885,6 +887,7 @@ importJsonInput?.addEventListener("change", async () => {
 
       saveWords(imported);
       setMsg(`単語を復元しました（${imported.length}件）。`, "ok");
+      __bootstrapPosForExistingWords();
       try { renderWordList(); } catch (_) {}
     } catch (e) {
       setMsg("単語の復元に失敗しました。ファイル形式を確認してください。", "ng");
