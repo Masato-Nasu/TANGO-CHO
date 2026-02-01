@@ -600,3 +600,36 @@ select option{
 .field-row.word-row{
   margin-bottom: 12px !important;
 }
+
+
+/* ===== spacing tweak: textareaの直後だけ、次ラベルの上余白を少し詰める（メモ前など） ===== */
+#addSection textarea + label.field-label{
+  margin-top: 8px !important;
+}
+
+
+
+/* ===== unify spacing between frames (cards / blocks) =====
+   Goal: 枠同士の隙間を統一（トップの接続設定カード〜入力カード等）
+   Note: 既存CSS内で .card に margin-bottom の上書きが混在していたため、末尾で統一します。
+*/
+:root{
+  --frameGap: var(--gap);
+}
+
+/* Cards: use a single, consistent bottom gap; no extra top gap */
+.card{
+  margin-top: 0 !important;
+  margin-bottom: var(--frameGap) !important;
+}
+
+/* Special cards should not have custom gaps */
+#fortuneControlsCard,
+#connSettingsCard{
+  margin-bottom: var(--frameGap) !important;
+}
+
+/* Last card inside each section: no trailing gap */
+.section.active .card:last-child{
+  margin-bottom: 0 !important;
+}
