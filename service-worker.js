@@ -1,7 +1,7 @@
 /* TANGO-CHO Service Worker (stable updates)
- * Build: v42.0.1
+ * Build: v47.0.0
  */
-const CACHE_NAME = "tango-cho-cache-v42.0.1";
+const CACHE_NAME = "tango-cho-cache-v47.0.0";
 
 const CORE_ASSETS = [
   "./",
@@ -15,6 +15,11 @@ const CORE_ASSETS = [
   "./icons/icon-192-v26.png",
   "./icons/icon-512-v26.png",
   "./icons/apple-touch-icon-v26.png",
+  "./data/pos_noun.txt",
+  "./data/pos_verb.txt",
+  "./data/pos_adj.txt",
+  "./data/pos_adv.txt",
+  "./data/WORDNET_LICENSE.txt",
 ];
 
 // Allowlist a small set of cross-origin static assets (offline support).

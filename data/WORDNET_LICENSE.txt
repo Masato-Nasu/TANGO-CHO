@@ -1,0 +1,8 @@
+Princeton WordNet License
+
+This application bundles a part-of-speech word list derived from Princeton WordNet data.
+
+WordNet License / Terms of Use:
+- https://wordnet.princeton.edu/license-and-commercial-use
+
+(Please refer to the URL above for the full text and the latest terms.)

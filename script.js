@@ -1,5 +1,5 @@
 const STORAGE_KEY = "tangoChoWords";
-const APP_VERSION = "v46";
+const APP_VERSION = "v47";
 
 const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
@@ -20,6 +20,130 @@ const STATUS_LABEL = {
   default: "デフォルト",
   learned: "覚えた",
 };
+
+// --- POS (Part of Speech) offline dictionary (WordNet-based) ---
+// We only show POS when it is confirmed by the bundled dictionary.
+// If not found, POS is omitted (no guessing).
+const __POS_FILES = {
+  n: "./data/pos_noun.txt",
+  v: "./data/pos_verb.txt",
+  adj: "./data/pos_adj.txt",
+  adv: "./data/pos_adv.txt",
+};
+let __posSets = null;
+let __posLoadPromise = null;
+
+async function __loadPosSets() {
+  if (__posSets) return __posSets;
+  if (__posLoadPromise) return __posLoadPromise;
+  __posLoadPromise = (async () => {
+    try {
+      const [nounT, verbT, adjT, advT] = await Promise.all([
+        fetch(__POS_FILES.n).then(r => r.ok ? r.text() : ""),
+        fetch(__POS_FILES.v).then(r => r.ok ? r.text() : ""),
+        fetch(__POS_FILES.adj).then(r => r.ok ? r.text() : ""),
+        fetch(__POS_FILES.adv).then(r => r.ok ? r.text() : ""),
+      ]);
+      __posSets = {
+        n: new Set(nounT.split(/\r?\n/).filter(Boolean)),
+        v: new Set(verbT.split(/\r?\n/).filter(Boolean)),
+        adj: new Set(adjT.split(/\r?\n/).filter(Boolean)),
+        adv: new Set(advT.split(/\r?\n/).filter(Boolean)),
+      };
+    } catch (e) {
+      __posSets = { n: new Set(), v: new Set(), adj: new Set(), adv: new Set() };
+    } finally {
+      __posLoadPromise = null;
+    }
+    return __posSets;
+  })();
+  return __posLoadPromise;
+}
+
+function __normalizeForPos(raw) {
+  if (!raw) return "";
+  let w = String(raw).trim().toLowerCase();
+  // keep letters/numbers, apostrophes, hyphens, underscores, dots, spaces
+  w = w.replace(/^[^a-z0-9'\-_. ]+|[^a-z0-9'\-_. ]+$/g, "");
+  // spaces -> underscore (WordNet multiword format)
+  w = w.replace(/\s+/g, "_");
+  return w;
+}
+
+function __posVariants(word) {
+  const w = __normalizeForPos(word);
+  const vars = new Set();
+  if (w) vars.add(w);
+
+  const add = (x) => { if (x && x.length >= 2) vars.add(x); };
+
+  // basic morphological backoff (best-effort).
+  // We still do NOT guess: we only output POS if a variant exists in the dictionary.
+  if (w.endsWith("ies") && w.length > 3) add(w.slice(0, -3) + "y");
+  if (w.endsWith("ied") && w.length > 3) add(w.slice(0, -3) + "y");
+
+  if (w.endsWith("ing") && w.length > 4) {
+    add(w.slice(0, -3)); // playing -> play
+    // double consonant: running -> run
+    if (w.length > 5 && w[w.length - 4] === w[w.length - 5]) add(w.slice(0, -4));
+    add(w.slice(0, -3) + "e"); // making -> make
+  }
+  if (w.endsWith("ed") && w.length > 3) {
+    add(w.slice(0, -2)); // worked -> work
+    if (w.length > 4 && w[w.length - 3] === w[w.length - 4]) add(w.slice(0, -3)); // stopped -> stop
+    add(w.slice(0, -1)); // liked -> like
+  }
+  if (w.endsWith("es") && w.length > 3) add(w.slice(0, -2));
+  if (w.endsWith("s") && w.length > 2) add(w.slice(0, -1));
+
+  return Array.from(vars);
+}
+
+function __inferPosCandidatesSync(word) {
+  if (!__posSets) return [];
+  const out = new Set();
+  const vars = __posVariants(word);
+  for (const v of vars) {
+    if (__posSets.n.has(v)) out.add("n");
+    if (__posSets.v.has(v)) out.add("v");
+    if (__posSets.adj.has(v)) out.add("adj");
+    if (__posSets.adv.has(v)) out.add("adv");
+  }
+  const order = ["n", "v", "adj", "adv"];
+  return order.filter(x => out.has(x));
+}
+
+async function __inferPosCandidates(word) {
+  await __loadPosSets();
+  return __inferPosCandidatesSync(word);
+}
+
+function __bootstrapPosForExistingWords() {
+  // Defer so initial render stays snappy.
+  setTimeout(async () => {
+    try {
+      await __loadPosSets();
+      const all = loadWords();
+      let changed = false;
+      for (const w of all) {
+        if (!w || !w.word) continue;
+        if (!Array.isArray(w.posCandidates)) {
+          const c = __inferPosCandidatesSync(w.word);
+          if (c && c.length) {
+            w.posCandidates = c;
+            changed = true;
+          }
+        }
+      }
+      if (changed) {
+        saveWords(all);
+        renderWordList();
+      }
+    } catch (_) {}
+  }, 0);
+}
+
+
 
 // --- Quiz SFX (no external audio files) ---
 // iOS (Safari/PWA) can be picky about WebAudio. We keep WebAudio, and add a tiny
@@ -795,7 +919,6 @@ function setupAddForm() {
   const exampleEl = document.getElementById("example");
   const memoEl = document.getElementById("memo");
   const tagsEl = document.getElementById("tags");
-  const posEl = document.getElementById("pos");
   const synonymsEl = document.getElementById("synonyms");
   const synFetchBtn = document.getElementById("synFetchBtn");
   const translateBtn = document.getElementById("translateBtn");
@@ -821,7 +944,6 @@ function setupAddForm() {
     memoEl.value = "";
     tagsEl.value = "";
     if (synonymsEl) synonymsEl.value = "";
-    if (posEl) posEl.value = "";
     setState("未翻訳");
     if (!afterSave) setMsg("", "");
   }
@@ -835,7 +957,6 @@ function setupAddForm() {
     memoEl.value = item.memo || "";
     tagsEl.value = item.tags || "";
     if (synonymsEl) synonymsEl.value = item.synonyms || "";
-    if (posEl) posEl.value = item.pos || "";
 
     if (editBanner) editBanner.style.display = "flex";
     if (editSub) editSub.textContent = `${(item.word || "").trim()} を編集中`;
@@ -1064,6 +1185,9 @@ document.addEventListener("tangocho:incomingword", (ev) => {
     if (!w) return setMsg("英単語が空です。", "err");
     if (!m) return setMsg("日本語訳が空です（翻訳 or 手入力してください）。", "err");
 
+    // POS candidates (WordNet-based; confirmed only)
+    const __posBase = await __inferPosCandidates(w);
+
     const words = loadWords();
     const now = nowIso();
 
@@ -1082,9 +1206,9 @@ document.addEventListener("tangocho:incomingword", (ev) => {
           example: exampleEl.value.trim(),
           memo: memoEl.value.trim(),
           tags: tagsEl.value.trim(),
-          pos: (posEl ? posEl.value.trim() : (prev.pos || "")),
           synonyms: synonymsEl ? synonymsEl.value.trim() : (prev.synonyms || ""),
           updatedAt: now,
+          posCandidates: __posBase,
         };
       } else {
         // If the item disappeared, fall back to adding as new.
@@ -1102,10 +1226,10 @@ document.addEventListener("tangocho:incomingword", (ev) => {
         example: exampleEl.value.trim(),
         memo: memoEl.value.trim(),
         tags: tagsEl.value.trim(),
-        pos: (posEl ? posEl.value.trim() : ""),
         synonyms: synonymsEl ? synonymsEl.value.trim() : "",
         source: "manual",
         createdAt: now,
+        posCandidates: __posBase,
       });
     }
 
@@ -1143,6 +1267,9 @@ document.addEventListener("tangocho:incomingword", (ev) => {
         continue;
       }
 
+      // POS for synonym card (confirmed only)
+      const __posSyn = await __inferPosCandidates(t);
+
       words.push({
         id: `${baseId}-syn-${Math.random().toString(36).slice(2, 8)}`,
         word: t,
@@ -1154,6 +1281,7 @@ document.addEventListener("tangocho:incomingword", (ev) => {
         synonyms: "",
         source: "synonym",
         createdAt: nowIso(),
+        posCandidates: __posSyn,
       });
       existingWordLower.add(tl);
       synAdded += 1;
@@ -1418,8 +1546,9 @@ listEl.innerHTML = "";
     meta.className = "word-meta";
     const created = w.createdAt ? new Date(w.createdAt).toLocaleString() : "";
     const tags = w.tags ? ` / タグ: ${w.tags}` : "";
+    const pos = (Array.isArray(w.posCandidates) && w.posCandidates.length) ? ` / POS: ${w.posCandidates.join(" ")}` : "";
     const st = ` / ${STATUS_LABEL[w.status || "default"]}`;
-    meta.textContent = `登録: ${created}${tags}${st}`;
+    meta.textContent = `登録: ${created}${tags}${pos}${st}`;
 
     const actions = document.createElement("div");
     actions.className = "word-actions";
@@ -1448,14 +1577,6 @@ listEl.innerHTML = "";
     item.appendChild(top);
     item.appendChild(meaning);
     if (synEl) item.appendChild(synEl);
-
-
-    if (w.pos) {
-      const p = document.createElement("div");
-      p.className = "word-meta";
-      p.textContent = `POS: ${String(w.pos)}`;
-      item.appendChild(p);
-    }
 
     if (w.example) {
       const ex = document.createElement("div");
@@ -1995,6 +2116,7 @@ function normalizeImportedItem(x) {
     memo: String(x.memo || "").trim(),
     tags: String(x.tags || "").trim(),
     synonyms: String(x.synonyms || "").trim(),
+    posCandidates: (Array.isArray(x.posCandidates) ? x.posCandidates.filter(p => ["n","v","adj","adv"].includes(String(p))) : undefined),
     source: String(x.source || "import"),
     createdAt: String(x.createdAt || new Date().toISOString()),
   };
@@ -2079,6 +2201,7 @@ document.addEventListener("DOMContentLoaded", () => {
   setupFortune();
 
   renderWordList();
+  __bootstrapPosForExistingWords();
   renderQuiz();
 });
 
