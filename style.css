@@ -698,3 +698,16 @@ select option{
   margin-top: 0 !important;
   margin-bottom: var(--frameGap) !important;
 }
+
+
+/* --- Fix: iOSで単語カード右側(カテゴリselect)が縮んで文字がはみ出す問題 ---
+   右側コンテナを折り返し可能にし、select自体を縮ませない（内容幅を維持） */
+.word-top > div:last-child{
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+.word-top .select.small{
+  flex:0 0 auto;
+  flex-shrink:0;
+  width:auto;
+}
