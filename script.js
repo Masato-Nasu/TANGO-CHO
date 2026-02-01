@@ -939,6 +939,21 @@ function setupAddForm() {
   const editSub = document.getElementById("editSub");
   const cancelEditBtn = document.getElementById("cancelEditBtn");
 
+  // Quick, unmistakable feedback on Save (especially when the message area is out of view).
+  function flashSaveIndicator(isUpdate=false){
+    try{
+      if (!saveBtn) return;
+      const prevText = saveBtn.textContent;
+      saveBtn.classList.add("btn-flash");
+      saveBtn.textContent = isUpdate ? "更新しました" : "登録しました";
+      window.clearTimeout(flashSaveIndicator.__t);
+      flashSaveIndicator.__t = window.setTimeout(() => {
+        saveBtn.textContent = prevText;
+        saveBtn.classList.remove("btn-flash");
+      }, 1200);
+    }catch(_){ }
+  }
+
   function setState(text) {
     if (!statePill) return;
     statePill.textContent = text;
@@ -1305,9 +1320,11 @@ document.addEventListener("tangocho:incomingword", (ev) => {
     if (editId) {
       exitEditMode(false);
       setMsg(`更新しました（入力をクリアしました）。${synAdded ? ` 類似語カード +${synAdded}` : ""}${synFailNote}`.trim());
+      flashSaveIndicator(true);
     } else {
       clearForm(true);
       setMsg(`保存しました（入力をクリアしました）。${synAdded ? ` 類似語カード +${synAdded}` : ""}${synFailNote}`.trim(), "ok");
+      flashSaveIndicator(false);
     }
 
     renderWordList();

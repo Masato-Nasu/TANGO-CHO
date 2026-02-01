@@ -218,6 +218,28 @@ details summary::-webkit-details-marker{display:none}
   color: var(--sub);
 }
 
+/* ===== Select readability (Android / iOS PWA) =====
+   Some environments render select with a light background but keep text white.
+   Force the closed control to respect our dark theme, and make option lists readable.
+*/
+select,
+.select{
+  background:#151515 !important;
+  color:var(--text) !important;
+  -webkit-text-fill-color:var(--text);
+  border:1px solid var(--border);
+}
+
+select option{
+  color:#111;
+  background:#fff;
+}
+
+/* Save button flash (quick "登録しました" indicator) */
+.btn-flash{
+  box-shadow:0 0 0 3px rgba(0,200,150,.22);
+}
+
 /* inline row for input + button */
 .row{
   display:flex;
