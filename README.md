@@ -126,3 +126,16 @@ PWAはキャッシュが強いです。次の順でお試しください。
 ## データとプライバシー / Privacy
 - 単語帳データは基本的に端末内（ブラウザストレージ）に保存されます。
 - 翻訳のために、入力された単語がDeepLへ送信されます（翻訳取得時）。
+
+---
+
+## ライセンス / Third-party licenses
+
+### Princeton WordNet
+本アプリは、Princeton WordNet のデータに基づく「品詞（名詞/動詞/形容詞/副詞）ワードリスト」を同梱しています。  
+Princeton WordNet のライセンス/利用条件については、以下を参照してください。
+
+- WordNet License / Terms of Use:
+  https://wordnet.princeton.edu/license-and-commercial-use
+
+（同梱データの注記: `data/WORDNET_LICENSE.txt`）
