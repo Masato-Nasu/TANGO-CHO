@@ -138,4 +138,4 @@ Princeton WordNet のライセンス/利用条件については、以下を参�
 - WordNet License / Terms of Use:
   https://wordnet.princeton.edu/license-and-commercial-use
 
-（同梱データの注記: `data/WORDNET_LICENSE.txt`）
+（同梱データの注記: `https://github.com/Masato-Nasu/TANGO-CHO/blob/main/data/WORDNET_LICENSE.txt`）
