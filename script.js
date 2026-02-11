@@ -1,5 +1,5 @@
 const STORAGE_KEY = "tangoChoWords";
-const APP_VERSION = "v47.0.2";
+const APP_VERSION = "v47.0.3";
 
 const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
@@ -740,6 +740,22 @@ function normalizeWordInput(s){
   // trim leading/trailing hyphen/apostrophe
   return t.replace(/^[-']+/, '').replace(/[-']+$/, '');
 }
+
+// Normalize an English phrase (spaces allowed). We keep original casing, only trim/collapse spaces.
+function normalizePhraseInput(s){
+  const str = String(s || '').replace(/\u3000/g, ' ').trim();
+  // Pick the first latin phrase (spaces / hyphen / apostrophe allowed)
+  const m = str.match(/[A-Za-z][A-Za-z\-\u2019\' ]{0,160}/);
+  if (!m) return '';
+  let t = m[0].replace(/\u2019/g, "'").replace(/\s+/g, ' ').trim();
+  // trim leading/trailing hyphen/apostrophe
+  t = t.replace(/^[-']+/, '').replace(/[-']+$/, '');
+  return t;
+}
+
+function __isSingleWordTerm(term){
+  return !!(term && !/\s/.test(String(term)));
+}
 function isGoodRandomCandidate(token){
   const w = String(token||'').trim().toLowerCase();
   if (!w) return false;
@@ -773,7 +789,8 @@ function getIncomingTextFromUrl() {
     const word = (p.get('word') || p.get('text') || p.get('q') || p.get('t') || '').trim();
     const title = (p.get('title') || '').trim();
     const url = (p.get('url') || '').trim();
-    return (word || title || url) ? [word, title, url].filter(Boolean).join(' ') : '';
+    if (word) return word;
+    return (title || url) ? [title, url].filter(Boolean).join(' ') : '';
   } catch (_) {
     return '';
   }
@@ -792,15 +809,30 @@ function applyIncomingWordToAddForm() {
   const shareText = consumeSharePayloadText();
   const raw = (urlText || shareText || '').trim();
   if (!raw) return;
-  const token = extractFirstEnglishToken(raw);
-  if (!token) { cleanupIncomingParams(); return; }
+  let value = '';
+  // Prefer explicit selection text in query params (word/text/q/t) -> keep phrases.
+  try{
+    const p = new URLSearchParams(location.search);
+    const wq = (p.get('word') || p.get('text') || p.get('q') || p.get('t') || '').trim();
+    if (wq) value = normalizePhraseInput(wq);
+  }catch(_){}
+  if (!value) {
+    // If it's likely a snippet (no URL) and not too long, keep it as a phrase.
+    if (!/https?:\/\/|www\./i.test(raw) && raw.split(/\s+/).length <= 6) {
+      value = normalizePhraseInput(raw);
+    }
+    // Fallback: pick a single token (for shared page titles/URLs).
+    if (!value) value = extractFirstEnglishToken(raw);
+  }
+  if (!value) { cleanupIncomingParams(); return; }
+  if (__isSingleWordTerm(value)) value = normalizeWordInput(value) || value;
 
   const wordEl = document.getElementById('word');
   if (!wordEl) { cleanupIncomingParams(); return; }
 
   // Move user to Add tab and prefill the word field (no UI changes)
   switchToAddTab();
-  wordEl.value = token;
+  wordEl.value = value;
   try { wordEl.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
   setTimeout(() => {
     try {
@@ -1007,8 +1039,9 @@ function setState(text) {
 document.addEventListener("tangocho:incomingword", (ev) => {
   try{
     const w = (ev && ev.detail && ev.detail.word) ? String(ev.detail.word) : "";
-    const token = normalizeWordInput(w);
+    let token = normalizePhraseInput(w);
     if (!token) return;
+    if (__isSingleWordTerm(token)) token = normalizeWordInput(token) || token;
     // If user was editing an existing card, exit edit mode so Save won't overwrite it.
     if (editId) exitEditMode(false);
     else clearForm(false);
@@ -1124,11 +1157,15 @@ document.addEventListener("tangocho:incomingword", (ev) => {
 
   translateBtn.addEventListener("click", async () => {
     const raw = wordEl.value;
-    const w = normalizeWordInput(raw);
-    if (!w) return setMsg("英単語（アルファベット）を入力してください。", "err");
+    const phrase = normalizePhraseInput(raw);
+    if (!phrase) return setMsg("英語（アルファベット）を入力してください。", "err");
 
-    // If user pasted a sentence, keep only the first English token (quietly).
-    if (String(raw||"").trim().toLowerCase() !== w) {
+    const isSingle = __isSingleWordTerm(phrase);
+    const w = isSingle ? (normalizeWordInput(phrase) || "") : phrase;
+    if (!w) return setMsg("英語（アルファベット）を入力してください。", "err");
+
+    // Normalize gently. (Single word keeps old behavior: lowercase token.)
+    if (String(raw||"").trim() !== w) {
       wordEl.value = w;
     }
 
@@ -1183,8 +1220,12 @@ document.addEventListener("tangocho:incomingword", (ev) => {
   if (synFetchBtn) {
     synFetchBtn.addEventListener("click", async () => {
       const raw = wordEl.value;
-      const w = normalizeWordInput(raw);
-      if (!w) return setMsg("英単語（アルファベット）を入力してください。", "err");
+      const phrase = normalizePhraseInput(raw);
+      if (!phrase) return setMsg("英語（アルファベット）を入力してください。", "err");
+      if (!__isSingleWordTerm(phrase)) return setMsg("類義語は1語のみ対応です（フレーズは未対応）。", "ok");
+
+      const w = normalizeWordInput(phrase);
+      if (!w) return setMsg("英語（アルファベット）を入力してください。", "err");
       if (String(raw||"").trim().toLowerCase() !== w) wordEl.value = w;
       try {
         const syns = await getSynonymsSmart(w, 8);
@@ -3220,8 +3261,9 @@ function escapeHtml(s){
 }
 
 function sendWordToAdd(word){
-  const w = normalizeWordInput(word);
+  let w = normalizePhraseInput(word);
   if (!w) return;
+  if (__isSingleWordTerm(w)) w = normalizeWordInput(w) || w;
 
   // Move tab first
   try { switchToAddTab(); } catch(_) {}
