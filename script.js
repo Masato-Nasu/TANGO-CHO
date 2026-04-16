@@ -1,5 +1,5 @@
 const STORAGE_KEY = "tangoChoWords";
-const APP_VERSION = "v47.0.3";
+const APP_VERSION = "v47.0.4";
 
 const HF_BASE_KEY = "tangoChoHfBase";
 const HF_TOKEN_KEY = "tangoChoAppToken";
@@ -536,6 +536,55 @@ function normalizeHfBase(raw) {
   }
 }
 
+function __delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function __looksLikeHtml(text) {
+  const s = String(text || "").trim().toLowerCase();
+  return s.startsWith("<!doctype html") || s.startsWith("<html") || s.includes("<body") || s.includes("hugging face");
+}
+
+async function __wakeSpace(base, token) {
+  const b = base.replace(/\/+$/, "");
+  const headers = {
+    "Accept": "application/json, text/plain, */*",
+    ...(token ? { "X-App-Token": token } : {}),
+  };
+
+  const probes = ["/health", "/health/", "/"];
+  for (const ep of probes) {
+    const url = `${b}${ep}`;
+    try {
+      if (typeof AbortController !== "undefined") {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 10000);
+        try {
+          await fetch(url, {
+            method: "GET",
+            headers,
+            mode: "cors",
+            credentials: "omit",
+            cache: "no-store",
+            signal: ctrl.signal,
+          });
+        } finally {
+          clearTimeout(t);
+        }
+      } else {
+        await fetch(url, {
+          method: "GET",
+          headers,
+          mode: "cors",
+          credentials: "omit",
+          cache: "no-store",
+        });
+      }
+      return;
+    } catch (_) {}
+  }
+}
+
 async function postJsonWithFallback(base, endpoints, payload, token) {
   const b = base.replace(/\/+$/, "");
   const headers = {
@@ -549,16 +598,31 @@ async function postJsonWithFallback(base, endpoints, payload, token) {
 
   // Small timeout to avoid iOS Safari sometimes hanging on failed connections.
   const timeoutMs = 15000;
+  const wakeRetryDelays = [3500, 5000];
 
-  for (const ep of endpoints) {
-    const url = `${b}${ep.startsWith("/") ? ep : `/${ep}`}`;
+  for (let attempt = 0; attempt <= wakeRetryDelays.length; attempt++) {
+    for (const ep of endpoints) {
+      const url = `${b}${ep.startsWith("/") ? ep : `/${ep}`}`;
 
-    let res;
-    try {
-      if (typeof AbortController !== "undefined") {
-        const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), timeoutMs);
-        try {
+      let res;
+      try {
+        if (typeof AbortController !== "undefined") {
+          const ctrl = new AbortController();
+          const t = setTimeout(() => ctrl.abort(), timeoutMs);
+          try {
+            res = await fetch(url, {
+              method: "POST",
+              headers,
+              body: JSON.stringify(payload),
+              mode: "cors",
+              credentials: "omit",
+              cache: "no-store",
+              signal: ctrl.signal,
+            });
+          } finally {
+            clearTimeout(t);
+          }
+        } else {
           res = await fetch(url, {
             method: "POST",
             headers,
@@ -566,50 +630,58 @@ async function postJsonWithFallback(base, endpoints, payload, token) {
             mode: "cors",
             credentials: "omit",
             cache: "no-store",
-            signal: ctrl.signal,
           });
-        } finally {
-          clearTimeout(t);
         }
-      } else {
-        res = await fetch(url, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(payload),
-          mode: "cors",
-          credentials: "omit",
-          cache: "no-store",
-        });
-      }
-    } catch (e) {
-      lastText = String(e?.message || e);
-      lastStatus = 0;
-      continue;
-    }
-
-    const text = await res.text().catch(() => "");
-    lastText = text;
-    lastStatus = res.status;
-
-    // If endpoint is missing, try the next candidate
-    if (res.status === 404) continue;
-
-    // Parse JSON when possible
-    let data = null;
-    try { data = text ? JSON.parse(text) : null; } catch (_) {}
-
-    if (!res.ok) {
-      const detail = (data && (data.detail || data.message)) ? (data.detail || data.message) : text;
-
-      // DeepL legacy auth deprecation hint
-      if (res.status === 502 && /Legacy authentication method/i.test(detail || "")) {
-        throw new Error("DeepL認証方式が更新されました。Spaces側をヘッダ認証（Authorization: DeepL-Auth-Key）に更新してください。");
+      } catch (e) {
+        lastText = String(e?.message || e);
+        lastStatus = 0;
+        continue;
       }
 
-      throw new Error(`Spaces error: ${res.status} ${detail || ""}`.trim());
-    }
+      const text = await res.text().catch(() => "");
+      lastText = text;
+      lastStatus = res.status;
 
-    return data || {};
+      // If endpoint is missing, try the next candidate
+      if (res.status === 404) continue;
+
+      // Parse JSON when possible
+      let data = null;
+      try { data = text ? JSON.parse(text) : null; } catch (_) {}
+
+      if (!res.ok) {
+        const detail = (data && (data.detail || data.message)) ? (data.detail || data.message) : text;
+        const shouldWakeRetry = (
+          attempt < wakeRetryDelays.length && (
+            res.status === 500 ||
+            res.status === 502 ||
+            res.status === 503 ||
+            res.status === 504 ||
+            __looksLikeHtml(text)
+          )
+        );
+
+        if (shouldWakeRetry) {
+          setMsg("翻訳サーバー起動中です…", "");
+          try { await __wakeSpace(b, token); } catch (_) {}
+          await __delay(wakeRetryDelays[attempt]);
+          break;
+        }
+
+        // DeepL legacy auth deprecation hint
+        if (res.status === 502 && /Legacy authentication method/i.test(detail || "")) {
+          throw new Error("DeepL認証方式が更新されました。Spaces側をヘッダ認証（Authorization: DeepL-Auth-Key）に更新してください。");
+        }
+
+        if (__looksLikeHtml(detail)) {
+          throw new Error("翻訳サーバーが応答準備中です。少し待ってからもう一度お試しください。");
+        }
+
+        throw new Error(`Spaces error: ${res.status} ${detail || ""}`.trim());
+      }
+
+      return data || {};
+    }
   }
 
   // All endpoints 404 (or network failed)
@@ -621,8 +693,12 @@ async function postJsonWithFallback(base, endpoints, payload, token) {
   if (!lastStatus) {
     const msg = (lastText || "").toLowerCase();
     if (msg.includes("failed to fetch") || msg.includes("load failed") || msg.includes("network") || msg.includes("abort")) {
-      throw new Error("通信に失敗しました。iPhoneの場合、回線/キャッシュの影響でSpacesへの接続が失敗することがあります。①⚙️接続設定のキーワードを再保存 ②強制リロード（またはPWA再追加）をお試しください。");
+      throw new Error("翻訳サーバーの起動待ち、または通信に失敗しました。少し待って再試行してください。iPhoneでは強制リロードやPWAの再追加も有効です。");
     }
+  }
+
+  if (__looksLikeHtml(lastText) || [500, 502, 503, 504].includes(lastStatus)) {
+    throw new Error("翻訳サーバーが起動待ち、または一時的に不安定です。少し待ってからもう一度お試しください。");
   }
 
   throw new Error(`Spaces error: ${lastStatus || ""} ${lastText || ""}`.trim());
