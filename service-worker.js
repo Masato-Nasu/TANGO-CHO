@@ -1,15 +1,16 @@
 /* TANGO-CHO Service Worker (stable updates)
- * Build: v48.0.1-byok-storage-fix
+ * Build: v48.0.2-openai-empty-output-fix
  */
-const CACHE_NAME = 'tango-cho-cache-v48.0.1-byok-storage-fix';
+const CACHE_NAME = 'tango-cho-cache-v48.0.2-openai-empty-output-fix';
 
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./bank_enja.js",
   "./vocab_pool.js",
-  "./style.css?v=48.0.1",
-  "./script.js?v=48.0.1",
+  "./style.css?v=48.0.2",
+  "./script.js?v=48.0.2",
+  "./api-response-fix.js?v=48.0.2",
   "./manifest.json",
   "./share-target.html",
   "./icons/icon-192-v26.png",
