@@ -738,3 +738,5 @@ button:disabled{opacity:.58;cursor:wait}
   .api-key-row input{min-width:0}
   .api-key-row button{padding-left:12px;padding-right:12px}
 }
+
+.ai-settings-msg{margin-top:8px;min-height:1.4em;}

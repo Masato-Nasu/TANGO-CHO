@@ -1,3 +1,14 @@
+# TANGO-CHO v48.0.1 BYOK版 — APIキー保存修正
+
+- APIキーとAI設定の保存先をIndexedDB優先に変更
+- 単語帳データでlocalStorage容量が逼迫していても保存しやすく改善
+- IndexedDB非対応時はlocalStorageへ自動フォールバック
+- 保存結果をAI設定欄の直下に表示
+- 「未保存の変更あり」「APIキー保存済み」を明確に表示
+- 保存後に読み戻して検証
+- Enterキーでも設定を保存可能
+- PWAキャッシュを `v48.0.1-byok-storage-fix` に更新
+
 # TANGO-CHO v48.0.0 BYOK版 — 変更内容
 
 ## 追加・変更

@@ -1,11 +1,20 @@
 const STORAGE_KEY = "tangoChoWords";
-const APP_VERSION = "v48.0.0-byok";
+const APP_VERSION = "v48.0.1-byok";
 
-const OPENAI_API_KEY_KEY = "tangoChoOpenAiApiKey";
+const OPENAI_API_KEY_KEY = "tangoChoOpenAiApiKey"; // legacy localStorage key (migration/fallback)
 const OPENAI_MODEL_KEY = "tangoChoOpenAiModel";
 const OPENAI_LEVEL_KEY = "tangoChoAiLevel";
 const DEFAULT_OPENAI_MODEL = "gpt-5-mini";
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
+
+// API settings are stored in IndexedDB first. This avoids localStorage quota
+// failures when a large vocabulary collection already occupies the browser store.
+const AI_SETTINGS_DB_NAME = "tangoChoPrivateSettings";
+const AI_SETTINGS_DB_VERSION = 1;
+const AI_SETTINGS_STORE = "settings";
+const AI_SETTINGS_RECORD_KEY = "openai";
+let __aiSettingsMemory = { apiKey: "", model: DEFAULT_OPENAI_MODEL, level: "adult", loaded: false };
+let __aiSettingsLoadPromise = null;
 
 const FILTER_KEY = "tangoChoFilter";
 const SORT_KEY = "tangoChoSort";
@@ -520,28 +529,148 @@ function setListMsg(text, kind) {
 }
 
 
+function __openAiSettingsDbOpen() {
+  return new Promise((resolve, reject) => {
+    if (!("indexedDB" in window)) {
+      reject(new Error("IndexedDB is not available"));
+      return;
+    }
+    let req;
+    try { req = indexedDB.open(AI_SETTINGS_DB_NAME, AI_SETTINGS_DB_VERSION); }
+    catch (e) { reject(e); return; }
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(AI_SETTINGS_STORE)) db.createObjectStore(AI_SETTINGS_STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error || new Error("IndexedDB open failed"));
+    req.onblocked = () => reject(new Error("IndexedDB is blocked"));
+  });
+}
+
+async function __readAiSettingsFromDb() {
+  const db = await __openAiSettingsDbOpen();
+  try {
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(AI_SETTINGS_STORE, "readonly");
+      const req = tx.objectStore(AI_SETTINGS_STORE).get(AI_SETTINGS_RECORD_KEY);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error || new Error("IndexedDB read failed"));
+    });
+  } finally {
+    try { db.close(); } catch (_) {}
+  }
+}
+
+async function __writeAiSettingsToDb(settings) {
+  const db = await __openAiSettingsDbOpen();
+  try {
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(AI_SETTINGS_STORE, "readwrite");
+      tx.objectStore(AI_SETTINGS_STORE).put(settings, AI_SETTINGS_RECORD_KEY);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error || new Error("IndexedDB write failed"));
+      tx.onabort = () => reject(tx.error || new Error("IndexedDB write aborted"));
+    });
+  } finally {
+    try { db.close(); } catch (_) {}
+  }
+}
+
+function __readLegacyAiSettings() {
+  try {
+    return {
+      apiKey: String(localStorage.getItem(OPENAI_API_KEY_KEY) || "").trim(),
+      model: String(localStorage.getItem(OPENAI_MODEL_KEY) || DEFAULT_OPENAI_MODEL).trim() || DEFAULT_OPENAI_MODEL,
+      level: String(localStorage.getItem(OPENAI_LEVEL_KEY) || "adult").trim() || "adult",
+    };
+  } catch (_) {
+    return { apiKey: "", model: DEFAULT_OPENAI_MODEL, level: "adult" };
+  }
+}
+
+function __normalizeAiSettings(raw) {
+  return {
+    apiKey: String(raw?.apiKey || "").trim(),
+    model: String(raw?.model || DEFAULT_OPENAI_MODEL).trim() || DEFAULT_OPENAI_MODEL,
+    level: String(raw?.level || "adult").trim() || "adult",
+  };
+}
+
+async function ensureAiSettingsLoaded() {
+  if (__aiSettingsMemory.loaded) return __aiSettingsMemory;
+  if (__aiSettingsLoadPromise) return __aiSettingsLoadPromise;
+  __aiSettingsLoadPromise = (async () => {
+    const legacy = __readLegacyAiSettings();
+    let stored = null;
+    try { stored = await __readAiSettingsFromDb(); } catch (_) {}
+    const merged = __normalizeAiSettings(stored || legacy);
+    __aiSettingsMemory = { ...merged, loaded: true };
+
+    // Migrate older localStorage settings to IndexedDB when possible.
+    if (!stored && (legacy.apiKey || legacy.model !== DEFAULT_OPENAI_MODEL || legacy.level !== "adult")) {
+      try {
+        await __writeAiSettingsToDb(merged);
+        try { localStorage.removeItem(OPENAI_API_KEY_KEY); } catch (_) {}
+      } catch (_) {}
+    }
+    return __aiSettingsMemory;
+  })();
+  try { return await __aiSettingsLoadPromise; }
+  finally { __aiSettingsLoadPromise = null; }
+}
+
+async function saveAiSettingsToDevice(settings) {
+  const normalized = __normalizeAiSettings(settings);
+  let savedToDb = false;
+  try {
+    await __writeAiSettingsToDb(normalized);
+    const verified = __normalizeAiSettings(await __readAiSettingsFromDb());
+    if (verified.apiKey !== normalized.apiKey || verified.model !== normalized.model || verified.level !== normalized.level) {
+      throw new Error("Saved settings could not be verified");
+    }
+    savedToDb = true;
+  } catch (_) {}
+
+  if (!savedToDb) {
+    // Fallback for browsers where IndexedDB is unavailable.
+    try {
+      if (normalized.apiKey) localStorage.setItem(OPENAI_API_KEY_KEY, normalized.apiKey);
+      else localStorage.removeItem(OPENAI_API_KEY_KEY);
+      localStorage.setItem(OPENAI_MODEL_KEY, normalized.model);
+      localStorage.setItem(OPENAI_LEVEL_KEY, normalized.level);
+    } catch (e) {
+      throw new Error("端末の保存領域を利用できません。通常タブで開くか、ブラウザのサイトデータ容量をご確認ください。");
+    }
+  } else {
+    // Remove only the legacy copy of the secret. Non-secret preferences may remain.
+    try { localStorage.removeItem(OPENAI_API_KEY_KEY); } catch (_) {}
+  }
+
+  __aiSettingsMemory = { ...normalized, loaded: true };
+  return __aiSettingsMemory;
+}
+
 function getOpenAiApiKey() {
   const field = document.getElementById("openAiApiKey");
   const fromField = String(field?.value || "").trim();
   if (fromField) return fromField;
-  try { return String(localStorage.getItem(OPENAI_API_KEY_KEY) || "").trim(); }
-  catch (_) { return ""; }
+  if (__aiSettingsMemory.apiKey) return __aiSettingsMemory.apiKey;
+  return __readLegacyAiSettings().apiKey;
 }
 
 function getOpenAiModel() {
   const field = document.getElementById("aiModel");
   const fromField = String(field?.value || "").trim();
   if (fromField) return fromField;
-  try { return String(localStorage.getItem(OPENAI_MODEL_KEY) || DEFAULT_OPENAI_MODEL).trim() || DEFAULT_OPENAI_MODEL; }
-  catch (_) { return DEFAULT_OPENAI_MODEL; }
+  return __aiSettingsMemory.model || __readLegacyAiSettings().model || DEFAULT_OPENAI_MODEL;
 }
 
 function getAiLevel() {
   const field = document.getElementById("aiLevel");
   const fromField = String(field?.value || "").trim();
   if (fromField) return fromField;
-  try { return String(localStorage.getItem(OPENAI_LEVEL_KEY) || "adult").trim() || "adult"; }
-  catch (_) { return "adult"; }
+  return __aiSettingsMemory.level || __readLegacyAiSettings().level || "adult";
 }
 
 function __aiLevelInstruction(level) {
@@ -586,6 +715,7 @@ function __openAiErrorMessage(status, data, text) {
 }
 
 async function callOpenAiJson({ instruction, input, maxOutputTokens = 700 }) {
+  await ensureAiSettingsLoaded();
   const apiKey = getOpenAiApiKey();
   if (!apiKey) throw new Error("⚙️ AI設定でOpenAI APIキーを入力してください。");
   const model = getOpenAiModel();
@@ -853,7 +983,7 @@ function applyIncomingWordToAddForm() {
 }
 
 
-function setupSettings() {
+async function setupSettings() {
   const apiKeyEl = document.getElementById("openAiApiKey");
   const modelEl = document.getElementById("aiModel");
   const levelEl = document.getElementById("aiLevel");
@@ -862,42 +992,67 @@ function setupSettings() {
   const testBtn = document.getElementById("testAiBtn");
   const clearBtn = document.getElementById("clearAiKeyBtn");
   const connStatus = document.getElementById("connStatus");
+  const settingsMsg = document.getElementById("aiSettingsMsg");
   const exportJsonBtn = document.getElementById("exportJsonBtn");
   const importJsonBtn = document.getElementById("importJsonBtn");
   const importJsonInput = document.getElementById("importJsonInput");
 
-  try {
-    if (apiKeyEl) apiKeyEl.value = localStorage.getItem(OPENAI_API_KEY_KEY) || "";
-    if (modelEl) modelEl.value = localStorage.getItem(OPENAI_MODEL_KEY) || DEFAULT_OPENAI_MODEL;
-    if (levelEl) levelEl.value = localStorage.getItem(OPENAI_LEVEL_KEY) || "adult";
-  } catch (_) {}
+  function setSettingsMsg(text, kind) {
+    if (!settingsMsg) { setMsg(text, kind); return; }
+    settingsMsg.className = "msg ai-settings-msg";
+    settingsMsg.textContent = text || "";
+    if (kind === "ok") settingsMsg.classList.add("ok");
+    if (kind === "err") settingsMsg.classList.add("err");
+  }
 
   function updateConnBadge() {
     if (!connStatus) return;
-    const key = String(apiKeyEl?.value || "").trim();
-    connStatus.textContent = key ? "✅ APIキー設定済み" : "⚠️ APIキー未設定";
+    const typed = String(apiKeyEl?.value || "").trim();
+    const saved = String(__aiSettingsMemory.apiKey || "").trim();
+    if (!typed && !saved) connStatus.textContent = "⚠️ APIキー未設定";
+    else if (typed && typed === saved) connStatus.textContent = "✅ APIキー保存済み";
+    else if (typed) connStatus.textContent = "● 未保存の変更あり";
+    else connStatus.textContent = "✅ APIキー保存済み";
   }
 
-  function persistAiSettings(showMessage = true) {
+  setSettingsMsg("保存済み設定を読み込んでいます…", "");
+  try {
+    const loaded = await ensureAiSettingsLoaded();
+    if (apiKeyEl) apiKeyEl.value = loaded.apiKey || "";
+    if (modelEl) modelEl.value = loaded.model || DEFAULT_OPENAI_MODEL;
+    if (levelEl) levelEl.value = loaded.level || "adult";
+    setSettingsMsg("", "");
+  } catch (_) {
+    if (modelEl) modelEl.value = DEFAULT_OPENAI_MODEL;
+    if (levelEl) levelEl.value = "adult";
+    setSettingsMsg("保存済み設定を読み込めませんでした。入力後に「設定を保存」を押してください。", "err");
+  }
+  updateConnBadge();
+
+  async function persistAiSettings(showMessage = true) {
     const key = String(apiKeyEl?.value || "").trim();
     const model = String(modelEl?.value || DEFAULT_OPENAI_MODEL).trim() || DEFAULT_OPENAI_MODEL;
     const level = String(levelEl?.value || "adult").trim() || "adult";
+    const previousText = saveBtn?.textContent || "設定を保存";
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "保存中…"; }
     try {
-      if (key) localStorage.setItem(OPENAI_API_KEY_KEY, key);
-      else localStorage.removeItem(OPENAI_API_KEY_KEY);
-      localStorage.setItem(OPENAI_MODEL_KEY, model);
-      localStorage.setItem(OPENAI_LEVEL_KEY, level);
-    } catch (_) {
-      if (showMessage) setMsg("ブラウザに設定を保存できませんでした。", "err");
+      await saveAiSettingsToDevice({ apiKey: key, model, level });
+      if (modelEl) modelEl.value = model;
+      if (levelEl) levelEl.value = level;
+      updateConnBadge();
+      if (showMessage) setSettingsMsg(key ? "APIキーとAI設定をこの端末に保存しました。" : "AI設定を保存しました（APIキーは未入力です）。", "ok");
+      if (saveBtn) saveBtn.textContent = "保存しました";
+      return true;
+    } catch (e) {
+      if (showMessage) setSettingsMsg(String(e?.message || e), "err");
+      updateConnBadge();
       return false;
+    } finally {
+      setTimeout(() => {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = previousText; }
+      }, 900);
     }
-    if (modelEl) modelEl.value = model;
-    updateConnBadge();
-    if (showMessage) setMsg("AI設定をこの端末に保存しました。", "ok");
-    return true;
   }
-
-  updateConnBadge();
 
   toggleBtn?.addEventListener("click", () => {
     if (!apiKeyEl) return;
@@ -906,38 +1061,53 @@ function setupSettings() {
     toggleBtn.textContent = show ? "隠す" : "表示";
   });
 
-  saveBtn?.addEventListener("click", () => persistAiSettings(true));
-  modelEl?.addEventListener("change", () => persistAiSettings(false));
-  levelEl?.addEventListener("change", () => persistAiSettings(false));
-  apiKeyEl?.addEventListener("input", updateConnBadge);
+  saveBtn?.addEventListener("click", () => { void persistAiSettings(true); });
+  modelEl?.addEventListener("change", updateConnBadge);
+  levelEl?.addEventListener("change", updateConnBadge);
+  apiKeyEl?.addEventListener("input", () => { updateConnBadge(); setSettingsMsg("", ""); });
+  apiKeyEl?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") { event.preventDefault(); void persistAiSettings(true); }
+  });
 
-  clearBtn?.addEventListener("click", () => {
-    try { localStorage.removeItem(OPENAI_API_KEY_KEY); } catch (_) {}
-    if (apiKeyEl) apiKeyEl.value = "";
-    updateConnBadge();
-    setMsg("保存済みのAPIキーを削除しました。", "ok");
+  clearBtn?.addEventListener("click", async () => {
+    try {
+      await saveAiSettingsToDevice({
+        apiKey: "",
+        model: String(modelEl?.value || DEFAULT_OPENAI_MODEL).trim() || DEFAULT_OPENAI_MODEL,
+        level: String(levelEl?.value || "adult").trim() || "adult",
+      });
+      if (apiKeyEl) apiKeyEl.value = "";
+      updateConnBadge();
+      setSettingsMsg("保存済みのAPIキーを削除しました。", "ok");
+    } catch (e) {
+      setSettingsMsg(String(e?.message || e), "err");
+    }
   });
 
   testBtn?.addEventListener("click", async () => {
     if (!String(apiKeyEl?.value || "").trim()) {
-      setMsg("OpenAI APIキーを入力してください。", "err");
+      setSettingsMsg("OpenAI APIキーを入力してください。", "err");
       return;
     }
-    persistAiSettings(false);
+    const saved = await persistAiSettings(false);
+    if (!saved) {
+      setSettingsMsg("APIキーを保存できなかったため、接続テストを中止しました。", "err");
+      return;
+    }
     const prev = testBtn.textContent;
     testBtn.disabled = true;
     testBtn.textContent = "確認中…";
-    setMsg("OpenAI APIへ接続しています…", "");
+    setSettingsMsg("OpenAI APIへ接続しています…", "");
     try {
       const result = await callOpenAiJson({
         instruction: "Return only valid JSON, with no markdown.",
         input: 'Return exactly {"ok":true}.',
         maxOutputTokens: 200,
       });
-      if (result?.ok === true) setMsg("接続できました。AI機能を利用できます。", "ok");
-      else setMsg("接続はできましたが、応答形式を確認できませんでした。", "err");
+      if (result?.ok === true) setSettingsMsg("接続できました。AI機能を利用できます。", "ok");
+      else setSettingsMsg("接続はできましたが、応答形式を確認できませんでした。", "err");
     } catch (e) {
-      setMsg(String(e?.message || e), "err");
+      setSettingsMsg(String(e?.message || e), "err");
     } finally {
       testBtn.disabled = false;
       testBtn.textContent = prev;
@@ -948,9 +1118,9 @@ function setupSettings() {
     try {
       const ymd = new Date().toISOString().slice(0,10).replaceAll("-", "");
       downloadJson(`tangocho-backup-${ymd}.json`, buildBackupPayload());
-      setMsg("単語を保存しました。", "ok");
+      setSettingsMsg("単語を保存しました。APIキーはバックアップに含まれません。", "ok");
     } catch (e) {
-      setMsg("単語の保存に失敗しました。", "err");
+      setSettingsMsg("単語の保存に失敗しました。", "err");
     }
   });
 
@@ -973,11 +1143,11 @@ function setupSettings() {
       if (!ok) return;
 
       saveWords(imported);
-      setMsg(`単語を復元しました（${imported.length}件）。`, "ok");
+      setSettingsMsg(`単語を復元しました（${imported.length}件）。`, "ok");
       __bootstrapPosForExistingWords();
       try { renderWordList(); } catch (_) {}
     } catch (e) {
-      setMsg("単語の復元に失敗しました。ファイル形式を確認してください。", "err");
+      setSettingsMsg("単語の復元に失敗しました。ファイル形式を確認してください。", "err");
     } finally {
       try { importJsonInput.value = ""; } catch (_) {}
     }

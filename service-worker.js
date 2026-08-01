@@ -1,15 +1,15 @@
 /* TANGO-CHO Service Worker (stable updates)
- * Build: v48.0.0-byok
+ * Build: v48.0.1-byok-storage-fix
  */
-const CACHE_NAME = 'tango-cho-cache-v48.0.0-byok';
+const CACHE_NAME = 'tango-cho-cache-v48.0.1-byok-storage-fix';
 
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./bank_enja.js",
   "./vocab_pool.js",
-  "./style.css",
-  "./script.js",
+  "./style.css?v=48.0.1",
+  "./script.js?v=48.0.1",
   "./manifest.json",
   "./share-target.html",
   "./icons/icon-192-v26.png",

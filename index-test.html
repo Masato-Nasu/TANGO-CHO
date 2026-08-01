@@ -14,7 +14,7 @@
 
   <meta name="theme-color" content="#00c896" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="style.css?v=48.0.1" />
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <header class="app-header">
@@ -63,7 +63,6 @@
           <button id="testAiBtn" class="ghost-btn" type="button">接続テスト</button>
           <button id="clearAiKeyBtn" class="ghost-btn danger-outline" type="button">キーを削除</button>
         </div>
-        <div id="aiSettingsMsg" class="msg ai-settings-msg" aria-live="polite"></div>
 
         <p class="note security-note">
           公共・共有端末では保存しないでください。利用料金はAPI提供元のアカウントに発生します。
@@ -250,13 +249,22 @@
   <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
   <script src="bank_enja.js"></script>
   <script src="vocab_pool.js"></script>
-  <script src="script.js?v=48.0.1"></script>
+  <script src="script.js"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./service-worker.js?v=48.0.1").catch(console.error);
+        navigator.serviceWorker.register("./service-worker.js?v=48").catch(console.error);
       });
     }
   </script>
+<script>
+window.addEventListener("load",()=>{setTimeout(()=>{
+ const k=document.getElementById("openAiApiKey"); const b=document.getElementById("saveAiSettingsBtn");
+ k.value="sk-test-123"; k.dispatchEvent(new Event("input",{bubbles:true})); b.click();
+ const out=document.createElement("pre"); out.id="probe";
+ out.textContent=JSON.stringify({saved:localStorage.getItem("tangoChoOpenAiApiKey"),msg:document.getElementById("msg")?.textContent,status:document.getElementById("connStatus")?.textContent});
+ document.body.appendChild(out);
+},300)});
+</script>
 </body>
 </html>

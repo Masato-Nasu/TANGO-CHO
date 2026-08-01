@@ -175,6 +175,12 @@ Princeton WordNet のライセンス/利用条件については、以下を参�
 （同梱データの注記: [`data/WORDNET_LICENSE.txt`](data/WORDNET_LICENSE.txt)）
 
 
+## v48.0.1 — APIキー保存修正
+
+- APIキーとAI設定をIndexedDB優先で端末内保存
+- 保存成否を設定欄の直下に表示
+- localStorage容量不足時の保存失敗を回避
+
 ## v48.0.0 — BYOK AI版
 
 固定のHugging Face Spaces／キーワード方式を廃止し、利用者自身のOpenAI APIキーでAI機能を使う構成に変更しました。
