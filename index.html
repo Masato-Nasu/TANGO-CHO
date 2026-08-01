@@ -14,7 +14,7 @@
 
   <meta name="theme-color" content="#00c896" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=48.0.1" />
 </head>
 <body>
   <header class="app-header">
@@ -63,6 +63,7 @@
           <button id="testAiBtn" class="ghost-btn" type="button">接続テスト</button>
           <button id="clearAiKeyBtn" class="ghost-btn danger-outline" type="button">キーを削除</button>
         </div>
+        <div id="aiSettingsMsg" class="msg ai-settings-msg" aria-live="polite"></div>
 
         <p class="note security-note">
           公共・共有端末では保存しないでください。利用料金はAPI提供元のアカウントに発生します。
@@ -249,11 +250,12 @@
   <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
   <script src="bank_enja.js"></script>
   <script src="vocab_pool.js"></script>
-  <script src="script.js"></script>
+  <script src="script.js?v=48.0.0"></script>
+  <script src="byok-storage-fix.js?v=48.0.1"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./service-worker.js?v=48").catch(console.error);
+        navigator.serviceWorker.register("./service-worker.js?v=48.0.1").catch(console.error);
       });
     }
   </script>
