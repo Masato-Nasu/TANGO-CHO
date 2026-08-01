@@ -1,3 +1,13 @@
+# TANGO-CHO BYOK changes
+
+## v48.0.2
+
+- Fixed an empty-output error with `gpt-5-mini`.
+- Sends GPT-5 requests with minimal reasoning effort for dictionary tasks.
+- Raises the visible-output allowance and retries once when a response is incomplete.
+- Shows clearer messages for incomplete, failed, or refused responses.
+- Keeps the IndexedDB-based API-key storage fix from v48.0.1.
+
 # TANGO-CHO v48.0.1 BYOK版 — APIキー保存修正
 
 - APIキーとAI設定の保存先をIndexedDB優先に変更

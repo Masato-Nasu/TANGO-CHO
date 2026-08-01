@@ -58,6 +58,8 @@
       store: false,
     };
 
+    // GPT-5 family models otherwise default to a larger reasoning budget.
+    // For dictionary tasks, minimal reasoning leaves room for the visible JSON answer.
     if (isGpt5Family(model)) body.reasoning = { effort: "minimal" };
 
     let res;
@@ -126,6 +128,8 @@
     let outputText = extractResponseText(data);
     let reason = incompleteReason(data);
 
+    // A reasoning model can consume the output budget before producing visible text.
+    // Retry once with a larger allowance when that happens.
     if (!outputText && (data?.status === "incomplete" || reason)) {
       const retryLimit = Math.min(6000, Math.max(2400, firstLimit * 2));
       data = await requestOnce({
@@ -150,5 +154,6 @@
     return JSON.parse(outputText);
   }
 
+  // Replace the original function before DOMContentLoaded handlers use it.
   window.callOpenAiJson = fixedCallOpenAiJson;
 })();
