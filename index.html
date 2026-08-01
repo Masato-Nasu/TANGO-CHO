@@ -14,7 +14,7 @@
 
   <meta name="theme-color" content="#00c896" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="style.css?v=48.0.1" />
+  <link rel="stylesheet" href="style.css?v=48.0.2" />
 </head>
 <body>
   <header class="app-header">
@@ -250,11 +250,12 @@
   <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
   <script src="bank_enja.js"></script>
   <script src="vocab_pool.js"></script>
-  <script src="script.js?v=48.0.1"></script>
+  <script src="script.js?v=48.0.2"></script>
+  <script src="api-response-fix.js?v=48.0.2"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./service-worker.js?v=48.0.1").catch(console.error);
+        navigator.serviceWorker.register("./service-worker.js?v=48.0.2").catch(console.error);
       });
     }
   </script>
