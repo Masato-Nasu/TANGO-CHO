@@ -1,9 +1,11 @@
 const STORAGE_KEY = "tangoChoWords";
-const APP_VERSION = "v47.0.4";
+const APP_VERSION = "v48.0.0-byok";
 
-const HF_BASE_KEY = "tangoChoHfBase";
-const HF_TOKEN_KEY = "tangoChoAppToken";
-const DEFAULT_HF_BASE = "https://mazzgogo-tango-cho.hf.space";
+const OPENAI_API_KEY_KEY = "tangoChoOpenAiApiKey";
+const OPENAI_MODEL_KEY = "tangoChoOpenAiModel";
+const OPENAI_LEVEL_KEY = "tangoChoAiLevel";
+const DEFAULT_OPENAI_MODEL = "gpt-5-mini";
+const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 
 const FILTER_KEY = "tangoChoFilter";
 const SORT_KEY = "tangoChoSort";
@@ -518,244 +520,173 @@ function setListMsg(text, kind) {
 }
 
 
-function normalizeHfBase(raw) {
-  let v = (raw || "").trim();
-  if (!v) return "";
+function getOpenAiApiKey() {
+  const field = document.getElementById("openAiApiKey");
+  const fromField = String(field?.value || "").trim();
+  if (fromField) return fromField;
+  try { return String(localStorage.getItem(OPENAI_API_KEY_KEY) || "").trim(); }
+  catch (_) { return ""; }
+}
 
-  // Convert Hugging Face UI URL -> hf.space (best-effort)
-  // https://huggingface.co/spaces/<owner>/<space>  ->  https://<owner>-<space>.hf.space
-  const m = v.match(/^https?:\/\/huggingface\.co\/spaces\/([^\/]+)\/([^\/?#]+)/i);
-  if (m) v = `https://${m[1]}-${m[2]}.hf.space`;
+function getOpenAiModel() {
+  const field = document.getElementById("aiModel");
+  const fromField = String(field?.value || "").trim();
+  if (fromField) return fromField;
+  try { return String(localStorage.getItem(OPENAI_MODEL_KEY) || DEFAULT_OPENAI_MODEL).trim() || DEFAULT_OPENAI_MODEL; }
+  catch (_) { return DEFAULT_OPENAI_MODEL; }
+}
 
+function getAiLevel() {
+  const field = document.getElementById("aiLevel");
+  const fromField = String(field?.value || "").trim();
+  if (fromField) return fromField;
+  try { return String(localStorage.getItem(OPENAI_LEVEL_KEY) || "adult").trim() || "adult"; }
+  catch (_) { return "adult"; }
+}
+
+function __aiLevelInstruction(level) {
+  if (level === "jhs") return "Use a short CEFR A1-A2 example sentence suitable for junior-high learners.";
+  if (level === "hs") return "Use a natural CEFR B1 example sentence suitable for high-school learners.";
+  return "Use a natural, practical CEFR B2 example sentence for adult learners.";
+}
+
+function __extractOpenAiText(data) {
+  if (typeof data?.output_text === "string" && data.output_text.trim()) return data.output_text.trim();
+  const parts = [];
+  const output = Array.isArray(data?.output) ? data.output : [];
+  for (const item of output) {
+    const content = Array.isArray(item?.content) ? item.content : [];
+    for (const part of content) {
+      if (typeof part?.text === "string") parts.push(part.text);
+      else if (typeof part?.output_text === "string") parts.push(part.output_text);
+    }
+  }
+  return parts.join("\n").trim();
+}
+
+function __parseAiJson(text) {
+  let raw = String(text || "").trim();
+  raw = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+  try { return JSON.parse(raw); } catch (_) {}
+  const first = raw.indexOf("{");
+  const last = raw.lastIndexOf("}");
+  if (first >= 0 && last > first) {
+    try { return JSON.parse(raw.slice(first, last + 1)); } catch (_) {}
+  }
+  throw new Error("AIの応答を読み取れませんでした。もう一度お試しください。");
+}
+
+function __openAiErrorMessage(status, data, text) {
+  const detail = data?.error?.message || data?.message || text || "";
+  if (status === 401) return "APIキーが正しくありません。AI設定を確認してください。";
+  if (status === 403) return "このAPIキーではモデルを利用できません。権限またはモデル名を確認してください。";
+  if (status === 429) return "APIの利用上限またはレート制限に達しました。OpenAI側の利用状況をご確認ください。";
+  if (status >= 500) return "OpenAI APIが一時的に不安定です。少ししてから再試行してください。";
+  return `OpenAI APIエラー (${status})${detail ? `: ${detail}` : ""}`;
+}
+
+async function callOpenAiJson({ instruction, input, maxOutputTokens = 700 }) {
+  const apiKey = getOpenAiApiKey();
+  if (!apiKey) throw new Error("⚙️ AI設定でOpenAI APIキーを入力してください。");
+  const model = getOpenAiModel();
+  if (!model) throw new Error("AIモデル名を入力してください。");
+
+  const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), 45000) : null;
+
+  let res;
   try {
-    const u = new URL(v);
-    // Always use origin as API base; users sometimes paste /translate, /synonyms, /docs, etc.
-    return u.origin.replace(/\/+$/, "");
-  } catch (_) {
-    return v.replace(/\/+$/, "");
-  }
-}
-
-function __delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function __looksLikeHtml(text) {
-  const s = String(text || "").trim().toLowerCase();
-  return s.startsWith("<!doctype html") || s.startsWith("<html") || s.includes("<body") || s.includes("hugging face");
-}
-
-async function __wakeSpace(base, token) {
-  const b = base.replace(/\/+$/, "");
-  const headers = {
-    "Accept": "application/json, text/plain, */*",
-    ...(token ? { "X-App-Token": token } : {}),
-  };
-
-  const probes = ["/health", "/health/", "/"];
-  for (const ep of probes) {
-    const url = `${b}${ep}`;
-    try {
-      if (typeof AbortController !== "undefined") {
-        const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), 10000);
-        try {
-          await fetch(url, {
-            method: "GET",
-            headers,
-            mode: "cors",
-            credentials: "omit",
-            cache: "no-store",
-            signal: ctrl.signal,
-          });
-        } finally {
-          clearTimeout(t);
-        }
-      } else {
-        await fetch(url, {
-          method: "GET",
-          headers,
-          mode: "cors",
-          credentials: "omit",
-          cache: "no-store",
-        });
-      }
-      return;
-    } catch (_) {}
-  }
-}
-
-async function postJsonWithFallback(base, endpoints, payload, token) {
-  const b = base.replace(/\/+$/, "");
-  const headers = {
-    "Content-Type": "application/json",
-    "Accept": "application/json",
-    ...(token ? { "X-App-Token": token } : {}),
-  };
-
-  let lastText = "";
-  let lastStatus = 0;
-
-  // Small timeout to avoid iOS Safari sometimes hanging on failed connections.
-  const timeoutMs = 15000;
-  const wakeRetryDelays = [3500, 5000];
-
-  for (let attempt = 0; attempt <= wakeRetryDelays.length; attempt++) {
-    for (const ep of endpoints) {
-      const url = `${b}${ep.startsWith("/") ? ep : `/${ep}`}`;
-
-      let res;
-      try {
-        if (typeof AbortController !== "undefined") {
-          const ctrl = new AbortController();
-          const t = setTimeout(() => ctrl.abort(), timeoutMs);
-          try {
-            res = await fetch(url, {
-              method: "POST",
-              headers,
-              body: JSON.stringify(payload),
-              mode: "cors",
-              credentials: "omit",
-              cache: "no-store",
-              signal: ctrl.signal,
-            });
-          } finally {
-            clearTimeout(t);
-          }
-        } else {
-          res = await fetch(url, {
-            method: "POST",
-            headers,
-            body: JSON.stringify(payload),
-            mode: "cors",
-            credentials: "omit",
-            cache: "no-store",
-          });
-        }
-      } catch (e) {
-        lastText = String(e?.message || e);
-        lastStatus = 0;
-        continue;
-      }
-
-      const text = await res.text().catch(() => "");
-      lastText = text;
-      lastStatus = res.status;
-
-      // If endpoint is missing, try the next candidate
-      if (res.status === 404) continue;
-
-      // Parse JSON when possible
-      let data = null;
-      try { data = text ? JSON.parse(text) : null; } catch (_) {}
-
-      if (!res.ok) {
-        const detail = (data && (data.detail || data.message)) ? (data.detail || data.message) : text;
-        const shouldWakeRetry = (
-          attempt < wakeRetryDelays.length && (
-            res.status === 500 ||
-            res.status === 502 ||
-            res.status === 503 ||
-            res.status === 504 ||
-            __looksLikeHtml(text)
-          )
-        );
-
-        if (shouldWakeRetry) {
-          setMsg("翻訳サーバー起動中です…", "");
-          try { await __wakeSpace(b, token); } catch (_) {}
-          await __delay(wakeRetryDelays[attempt]);
-          break;
-        }
-
-        // DeepL legacy auth deprecation hint
-        if (res.status === 502 && /Legacy authentication method/i.test(detail || "")) {
-          throw new Error("DeepL認証方式が更新されました。Spaces側をヘッダ認証（Authorization: DeepL-Auth-Key）に更新してください。");
-        }
-
-        if (__looksLikeHtml(detail)) {
-          throw new Error("翻訳サーバーが応答準備中です。少し待ってからもう一度お試しください。");
-        }
-
-        throw new Error(`Spaces error: ${res.status} ${detail || ""}`.trim());
-      }
-
-      return data || {};
-    }
+    res = await fetch(OPENAI_RESPONSES_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        instructions: instruction,
+        input,
+        max_output_tokens: maxOutputTokens,
+        store: false,
+      }),
+      mode: "cors",
+      credentials: "omit",
+      cache: "no-store",
+      ...(ctrl ? { signal: ctrl.signal } : {}),
+    });
+  } catch (e) {
+    if (e?.name === "AbortError") throw new Error("AIへの接続がタイムアウトしました。通信状態をご確認ください。");
+    throw new Error("AIへ接続できませんでした。通信状態、APIキー、ブラウザの制限をご確認ください。");
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 
-  // All endpoints 404 (or network failed)
-  if (lastStatus === 404) {
-    throw new Error("Spaces APIが見つかりません（HF Spaces API Base は https://xxxxx.hf.space の“ルート”にしてください。末尾に /translate や /synonyms を付けないでください）。");
-  }
+  const text = await res.text().catch(() => "");
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch (_) {}
+  if (!res.ok) throw new Error(__openAiErrorMessage(res.status, data, text));
 
-  // iOS Safari often reports only a generic network error; provide a clearer hint.
-  if (!lastStatus) {
-    const msg = (lastText || "").toLowerCase();
-    if (msg.includes("failed to fetch") || msg.includes("load failed") || msg.includes("network") || msg.includes("abort")) {
-      throw new Error("翻訳サーバーの起動待ち、または通信に失敗しました。少し待って再試行してください。iPhoneでは強制リロードやPWAの再追加も有効です。");
-    }
-  }
-
-  if (__looksLikeHtml(lastText) || [500, 502, 503, 504].includes(lastStatus)) {
-    throw new Error("翻訳サーバーが起動待ち、または一時的に不安定です。少し待ってからもう一度お試しください。");
-  }
-
-  throw new Error(`Spaces error: ${lastStatus || ""} ${lastText || ""}`.trim());
+  const outputText = __extractOpenAiText(data);
+  if (!outputText) throw new Error("AIから空の応答が返りました。もう一度お試しください。");
+  return __parseAiJson(outputText);
 }
 
-function getHfBase() {
-  // Fixed HF Spaces base (hidden from UI)
-  const v = DEFAULT_HF_BASE;
-  // Keep storage in sync for backward compatibility (safe no-op if blocked)
-  try { localStorage.setItem(HF_BASE_KEY, v); } catch (_) {}
-  return v;
+async function translateToJaViaSpace(term) {
+  const result = await callOpenAiJson({
+    instruction: "You are a precise English-Japanese dictionary assistant. Return only valid JSON, with no markdown.",
+    input: `Translate the English word or phrase below into concise, natural Japanese suitable for a vocabulary card. Return exactly this JSON shape: {"meaning":"..."}. If there are multiple common senses, separate only the most useful ones with Japanese commas.\n\nTerm: ${term}`,
+    maxOutputTokens: 400,
+  });
+  return String(result?.meaning || "").trim();
 }
 
-function getAppToken() {
-  let v = (localStorage.getItem(HF_TOKEN_KEY) || "").trim();
-
-  if (!v) {
-    const legacyKeys = ["tangoChoToken", "tangoChoAppTokenLegacy", "tangoChoApiToken"];
-    for (const k of legacyKeys) {
-      const t = (localStorage.getItem(k) || "").trim();
-      if (t) {
-        v = t;
-        localStorage.setItem(HF_TOKEN_KEY, v);
-        break;
-      }
-    }
-  }
-
-  if (!v) {
-    const el = document.getElementById("appToken");
-    if (el && el.value && el.value.trim()) v = el.value.trim();
-  }
-  return v;
-}
-
-async function translateToJaViaSpace(word) {
-  const base = getHfBase();
-  if (!base) throw new Error("HF Spaces API Base が未設定です（⚙️接続設定）。");
-  const token = getAppToken();
-
-  const data = await postJsonWithFallback(base, ["/translate", "/translate/", "/api/translate", "/api/translate/"], { text: word, target_lang: "JA" }, token);
-  return data.translated || "";
-}
-
-async function fetchSynonymsViaSpace(word, max = 8) {
-  const base = getHfBase();
-  if (!base) throw new Error("HF Spaces API Base が未設定です（⚙️接続設定）。");
-  const token = getAppToken();
-
-  const data = await postJsonWithFallback(base, ["/synonyms", "/synonyms/", "/api/synonyms", "/api/synonyms/"], { text: word, max }, token);
-  const arr = data?.synonyms || [];
-  return Array.isArray(arr) ? arr : [];
+async function fetchSynonymsViaSpace(term, max = 8) {
+  const result = await callOpenAiJson({
+    instruction: "You are a precise English thesaurus assistant. Return only valid JSON, with no markdown.",
+    input: `For the English word below, provide up to ${Math.max(1, Math.min(12, max))} genuinely useful English synonyms or near-synonyms. Use single words when possible, avoid duplicates, and do not include the original word. Return exactly this JSON shape: {"synonyms":["..."]}.\n\nWord: ${term}`,
+    maxOutputTokens: 600,
+  });
+  const arr = Array.isArray(result?.synonyms) ? result.synonyms : [];
+  return arr.map((x) => String(x || "").trim()).filter(Boolean).slice(0, max);
 }
 
 async function getSynonymsSmart(word, max = 8) {
   return await fetchSynonymsViaSpace(word, max);
 }
+
+async function enrichTermViaAi(term) {
+  const level = getAiLevel();
+  const result = await callOpenAiJson({
+    instruction: "You are a careful English-learning dictionary editor for Japanese learners. Return only valid JSON, with no markdown. Never invent an etymology; mention origin only when well established.",
+    input: `Create vocabulary-card information for the English word or phrase below. ${__aiLevelInstruction(level)} The Japanese memo should briefly explain nuance, usage, or a reliable word origin when useful. Return exactly this JSON shape: {"meaning":"concise Japanese meaning","synonyms":["up to 8 English synonyms"],"example":"one natural English example sentence","memo":"concise Japanese usage note"}. For a phrase, synonyms may be equivalent phrases.\n\nTerm: ${term}`,
+    maxOutputTokens: 1400,
+  });
+  return {
+    meaning: String(result?.meaning || "").trim(),
+    synonyms: (Array.isArray(result?.synonyms) ? result.synonyms : []).map((x) => String(x || "").trim()).filter(Boolean).slice(0, 8),
+    example: String(result?.example || "").trim(),
+    memo: String(result?.memo || "").trim(),
+  };
+}
+
+async function translateTermsToJaViaAi(terms) {
+  const clean = Array.from(new Set((terms || []).map((x) => String(x || "").trim()).filter(Boolean)));
+  if (!clean.length) return {};
+  const result = await callOpenAiJson({
+    instruction: "You are a precise English-Japanese dictionary assistant. Return only valid JSON, with no markdown.",
+    input: `Translate each English item into concise Japanese for vocabulary cards. Return exactly this JSON shape: {"items":[{"term":"original term","meaning":"Japanese meaning"}]}. Keep every original term unchanged.\n\nItems:\n${clean.map((x, i) => `${i + 1}. ${x}`).join("\n")}`,
+    maxOutputTokens: Math.min(2400, 400 + clean.length * 140),
+  });
+  const out = {};
+  const items = Array.isArray(result?.items) ? result.items : [];
+  for (const item of items) {
+    const term = String(item?.term || "").trim();
+    const meaning = String(item?.meaning || "").trim();
+    if (term && meaning) out[term.toLowerCase()] = meaning;
+  }
+  return out;
+}
+
 
 
 function setupTabs() {
@@ -923,63 +854,111 @@ function applyIncomingWordToAddForm() {
 
 
 function setupSettings() {
-  const hfBase = document.getElementById("hfBase");
-  const saveHfBaseBtn = document.getElementById("saveHfBaseBtn");
-  const appToken = document.getElementById("appToken");
-  const saveAppTokenBtn = document.getElementById("saveAppTokenBtn");
+  const apiKeyEl = document.getElementById("openAiApiKey");
+  const modelEl = document.getElementById("aiModel");
+  const levelEl = document.getElementById("aiLevel");
+  const toggleBtn = document.getElementById("toggleApiKeyBtn");
+  const saveBtn = document.getElementById("saveAiSettingsBtn");
+  const testBtn = document.getElementById("testAiBtn");
+  const clearBtn = document.getElementById("clearAiKeyBtn");
+  const connStatus = document.getElementById("connStatus");
   const exportJsonBtn = document.getElementById("exportJsonBtn");
   const importJsonBtn = document.getElementById("importJsonBtn");
   const importJsonInput = document.getElementById("importJsonInput");
 
-  // restore current settings
   try {
-    const b = normalizeHfBase(localStorage.getItem(HF_BASE_KEY) || "");
-    if (hfBase) hfBase.value = b;
-    if (appToken) appToken.value = (localStorage.getItem(HF_TOKEN_KEY) || "").trim();
+    if (apiKeyEl) apiKeyEl.value = localStorage.getItem(OPENAI_API_KEY_KEY) || "";
+    if (modelEl) modelEl.value = localStorage.getItem(OPENAI_MODEL_KEY) || DEFAULT_OPENAI_MODEL;
+    if (levelEl) levelEl.value = localStorage.getItem(OPENAI_LEVEL_KEY) || "adult";
   } catch (_) {}
 
-  const connStatus = document.getElementById("connStatus");
-
-  hfBase.value = getHfBase();
-  appToken.value = getAppToken();
-
   function updateConnBadge() {
-  if (!connStatus) return;
-  const kw = (appToken?.value || localStorage.getItem(HF_TOKEN_KEY) || '').trim();
-  connStatus.textContent = kw ? '✅ キーワード設定済み' : '⚠️ キーワード未設定';
-}
+    if (!connStatus) return;
+    const key = String(apiKeyEl?.value || "").trim();
+    connStatus.textContent = key ? "✅ APIキー設定済み" : "⚠️ APIキー未設定";
+  }
+
+  function persistAiSettings(showMessage = true) {
+    const key = String(apiKeyEl?.value || "").trim();
+    const model = String(modelEl?.value || DEFAULT_OPENAI_MODEL).trim() || DEFAULT_OPENAI_MODEL;
+    const level = String(levelEl?.value || "adult").trim() || "adult";
+    try {
+      if (key) localStorage.setItem(OPENAI_API_KEY_KEY, key);
+      else localStorage.removeItem(OPENAI_API_KEY_KEY);
+      localStorage.setItem(OPENAI_MODEL_KEY, model);
+      localStorage.setItem(OPENAI_LEVEL_KEY, level);
+    } catch (_) {
+      if (showMessage) setMsg("ブラウザに設定を保存できませんでした。", "err");
+      return false;
+    }
+    if (modelEl) modelEl.value = model;
+    updateConnBadge();
+    if (showMessage) setMsg("AI設定をこの端末に保存しました。", "ok");
+    return true;
+  }
+
   updateConnBadge();
 
-  saveHfBaseBtn?.addEventListener("click", () => {
-    // no-op (HF base is fixed)
-    setMsg("接続先はアプリ内で固定されています。", "ok");
+  toggleBtn?.addEventListener("click", () => {
+    if (!apiKeyEl) return;
+    const show = apiKeyEl.type === "password";
+    apiKeyEl.type = show ? "text" : "password";
+    toggleBtn.textContent = show ? "隠す" : "表示";
   });
 
-saveAppTokenBtn?.addEventListener("click", () => {
-    localStorage.setItem(HF_TOKEN_KEY, appToken.value.trim());
-    setMsg("キーワードを保存しました。", "ok");
-    try { updateConnBadge(); } catch(_) {}
+  saveBtn?.addEventListener("click", () => persistAiSettings(true));
+  modelEl?.addEventListener("change", () => persistAiSettings(false));
+  levelEl?.addEventListener("change", () => persistAiSettings(false));
+  apiKeyEl?.addEventListener("input", updateConnBadge);
+
+  clearBtn?.addEventListener("click", () => {
+    try { localStorage.removeItem(OPENAI_API_KEY_KEY); } catch (_) {}
+    if (apiKeyEl) apiKeyEl.value = "";
+    updateConnBadge();
+    setMsg("保存済みのAPIキーを削除しました。", "ok");
   });
 
-  // Keep the connection badge in sync while editing.
-  try{
-    appToken?.addEventListener("input", () => { try { updateConnBadge(); } catch(_) {} });
-    appToken?.addEventListener("change", () => { try { updateConnBadge(); } catch(_) {} });
-  }catch(_){}
-exportJsonBtn?.addEventListener("click", () => {
+  testBtn?.addEventListener("click", async () => {
+    if (!String(apiKeyEl?.value || "").trim()) {
+      setMsg("OpenAI APIキーを入力してください。", "err");
+      return;
+    }
+    persistAiSettings(false);
+    const prev = testBtn.textContent;
+    testBtn.disabled = true;
+    testBtn.textContent = "確認中…";
+    setMsg("OpenAI APIへ接続しています…", "");
+    try {
+      const result = await callOpenAiJson({
+        instruction: "Return only valid JSON, with no markdown.",
+        input: 'Return exactly {"ok":true}.',
+        maxOutputTokens: 200,
+      });
+      if (result?.ok === true) setMsg("接続できました。AI機能を利用できます。", "ok");
+      else setMsg("接続はできましたが、応答形式を確認できませんでした。", "err");
+    } catch (e) {
+      setMsg(String(e?.message || e), "err");
+    } finally {
+      testBtn.disabled = false;
+      testBtn.textContent = prev;
+    }
+  });
+
+  exportJsonBtn?.addEventListener("click", () => {
     try {
       const ymd = new Date().toISOString().slice(0,10).replaceAll("-", "");
       downloadJson(`tangocho-backup-${ymd}.json`, buildBackupPayload());
       setMsg("単語を保存しました。", "ok");
     } catch (e) {
-      setMsg("単語の保存に失敗しました。", "ng");
+      setMsg("単語の保存に失敗しました。", "err");
     }
   });
 
   importJsonBtn?.addEventListener("click", () => {
     try { importJsonInput?.click(); } catch (_) {}
   });
-importJsonInput?.addEventListener("change", async () => {
+
+  importJsonInput?.addEventListener("change", async () => {
     const file = importJsonInput.files && importJsonInput.files[0];
     if (!file) return;
     try {
@@ -998,29 +977,10 @@ importJsonInput?.addEventListener("change", async () => {
       __bootstrapPosForExistingWords();
       try { renderWordList(); } catch (_) {}
     } catch (e) {
-      setMsg("単語の復元に失敗しました。ファイル形式を確認してください。", "ng");
+      setMsg("単語の復元に失敗しました。ファイル形式を確認してください。", "err");
     } finally {
       try { importJsonInput.value = ""; } catch (_) {}
     }
-  });
-// Auto-save (user may forget pressing "保存")
-  hfBase?.addEventListener("blur", () => {
-    try { hfBase.value = DEFAULT_HF_BASE; } catch (_) {}
-    try { localStorage.setItem(HF_BASE_KEY, DEFAULT_HF_BASE); } catch (_) {}
-    updateConnBadge();
-  });
-
-hfBase?.addEventListener("change", () => {
-    try { hfBase.value = DEFAULT_HF_BASE; } catch (_) {}
-    try { localStorage.setItem(HF_BASE_KEY, DEFAULT_HF_BASE); } catch (_) {}
-    updateConnBadge();
-  });
-
-appToken.addEventListener("blur", () => {
-    localStorage.setItem(HF_TOKEN_KEY, appToken.value.trim());
-  });
-  appToken.addEventListener("change", () => {
-    localStorage.setItem(HF_TOKEN_KEY, appToken.value.trim());
   });
 }
 
@@ -1038,6 +998,7 @@ function setupAddForm() {
   const synonymsEl = document.getElementById("synonyms");
   const synFetchBtn = document.getElementById("synFetchBtn");
   const translateBtn = document.getElementById("translateBtn");
+  const aiAssistBtn = document.getElementById("aiAssistBtn");
   const randomBtn = document.getElementById("randomBtn");
   const saveBtn = document.getElementById("saveBtn");
   const clearBtn = document.getElementById("clearBtn");
@@ -1319,6 +1280,36 @@ document.addEventListener("tangocho:incomingword", (ev) => {
   }
 
 
+  aiAssistBtn?.addEventListener("click", async () => {
+    const raw = wordEl.value;
+    const phrase = normalizePhraseInput(raw);
+    if (!phrase) return setMsg("英語（アルファベット）を入力してください。", "err");
+    const term = __isSingleWordTerm(phrase) ? (normalizeWordInput(phrase) || phrase) : phrase;
+    if (String(raw || "").trim() !== term) wordEl.value = term;
+
+    const previousText = aiAssistBtn.textContent;
+    aiAssistBtn.disabled = true;
+    aiAssistBtn.textContent = "AIで補完中…";
+    setMsg("意味・類義語・例文・メモを作成しています…", "");
+    try {
+      const result = await enrichTermViaAi(term);
+      let filled = 0;
+      if (!meaningEl.value.trim() && result.meaning) { meaningEl.value = result.meaning; filled++; setState("AI補完済み"); }
+      if (synonymsEl && !synonymsEl.value.trim() && result.synonyms.length) { synonymsEl.value = result.synonyms.join(", "); filled++; }
+      if (!exampleEl.value.trim() && result.example) { exampleEl.value = result.example; filled++; }
+      if (!memoEl.value.trim() && result.memo) { memoEl.value = result.memo; filled++; }
+      if (filled) setMsg(`AIで空欄を補完しました（${filled}項目）。内容は編集できます。`, "ok");
+      else setMsg("入力済みの項目は上書きしませんでした。空欄を作って再度お試しください。", "ok");
+      __lastWordFromRandom = false;
+    } catch (e) {
+      setMsg(String(e?.message || e), "err");
+    } finally {
+      aiAssistBtn.disabled = false;
+      aiAssistBtn.textContent = previousText;
+    }
+  });
+
+
   saveBtn.addEventListener("click", async () => {
     const w = wordEl.value.trim();
     const m = meaningEl.value.trim();
@@ -1385,25 +1376,29 @@ document.addEventListener("tangocho:incomingword", (ev) => {
     let synAdded = 0;
     const synFailed = [];
 
+    const newSynonyms = [];
     for (const t of synTokens) {
       const tl = t.toLowerCase();
-      if (!t || tl === baseLower) continue;
-      if (seen.has(tl)) continue;
+      if (!t || tl === baseLower || seen.has(tl) || existingWordLower.has(tl)) continue;
       seen.add(tl);
+      newSynonyms.push(t);
+    }
 
-      // already exists -> skip (do not overwrite)
-      if (existingWordLower.has(tl)) continue;
-
-      // re-translate each synonym before carding (avoid "meaning" reuse)
-      let meaningSyn = "";
+    let synonymMeanings = {};
+    if (newSynonyms.length) {
       try {
-        meaningSyn = await translateToJaViaSpace(t);
+        setMsg(`類似語カード用に${newSynonyms.length}語をまとめて翻訳しています…`, "");
+        synonymMeanings = await translateTermsToJaViaAi(newSynonyms);
       } catch (e) {
-        synFailed.push(t);
-        continue;
+        newSynonyms.forEach((t) => synFailed.push(t));
       }
+    }
+
+    for (const t of newSynonyms) {
+      const tl = t.toLowerCase();
+      const meaningSyn = String(synonymMeanings[tl] || "").trim();
       if (!meaningSyn) {
-        synFailed.push(t);
+        if (!synFailed.includes(t)) synFailed.push(t);
         continue;
       }
 
