@@ -1,4 +1,4 @@
-/* TANGO-CHO v48.0.2: OpenAI Responses API empty-output fix */
+/* TANGO-CHO v48.0.4: OpenAI Responses API empty-output fix + AI assist defaults */
 (() => {
   const RESPONSES_URL = "https://api.openai.com/v1/responses";
 
@@ -154,6 +154,32 @@
     return JSON.parse(outputText);
   }
 
-  // Replace the original function before DOMContentLoaded handlers use it.
+  // Replace the original API helper before DOMContentLoaded handlers use it.
   window.callOpenAiJson = fixedCallOpenAiJson;
+
+  // Default AI assist fills meaning, example, and memo only.
+  // Synonyms remain opt-in via the dedicated 「類義語取得」 button.
+  async function enrichTermWithoutSynonyms(term) {
+    const level = typeof getAiLevel === "function" ? getAiLevel() : "adult";
+    const levelInstruction = typeof __aiLevelInstruction === "function" ? __aiLevelInstruction(level) : "";
+
+    if (typeof setMsg === "function") {
+      setMsg("意味・例文・メモを作成しています…", "");
+    }
+
+    const result = await fixedCallOpenAiJson({
+      instruction: "You are a careful English-learning dictionary editor for Japanese learners. Return only valid JSON, with no markdown. Never invent an etymology; mention origin only when well established.",
+      input: `Create vocabulary-card information for the English word or phrase below. ${levelInstruction} The Japanese memo should briefly explain nuance, usage, or a reliable word origin when useful. Return exactly this JSON shape: {"meaning":"concise Japanese meaning","example":"one natural English example sentence","memo":"concise Japanese usage note"}. Do not include synonyms or a synonyms field.\n\nTerm: ${term}`,
+      maxOutputTokens: 1100,
+    });
+
+    return {
+      meaning: String(result?.meaning || "").trim(),
+      synonyms: [],
+      example: String(result?.example || "").trim(),
+      memo: String(result?.memo || "").trim(),
+    };
+  }
+
+  window.enrichTermViaAi = enrichTermWithoutSynonyms;
 })();
