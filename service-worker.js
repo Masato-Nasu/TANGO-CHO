@@ -1,7 +1,7 @@
 /* TANGO-CHO Service Worker (stable updates)
- * Build: v48.0.3-mobile-ai-button-fix
+ * Build: v48.0.4-ai-assist-no-default-synonyms
  */
-const CACHE_NAME = 'tango-cho-cache-v48.0.3-mobile-ai-button-fix';
+const CACHE_NAME = 'tango-cho-cache-v48.0.4-ai-assist-no-default-synonyms';
 
 const CORE_ASSETS = [
   "./",
@@ -10,7 +10,7 @@ const CORE_ASSETS = [
   "./vocab_pool.js",
   "./style.css?v=48.0.3",
   "./script.js?v=48.0.3",
-  "./api-response-fix.js?v=48.0.3",
+  "./api-response-fix.js?v=48.0.4",
   "./manifest.json",
   "./share-target.html",
   "./icons/icon-192-v26.png",
