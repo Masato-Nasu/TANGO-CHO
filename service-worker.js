@@ -1,16 +1,16 @@
 /* TANGO-CHO Service Worker (stable updates)
- * Build: v48.0.2-openai-empty-output-fix
+ * Build: v48.0.3-mobile-ai-button-fix
  */
-const CACHE_NAME = 'tango-cho-cache-v48.0.2-openai-empty-output-fix';
+const CACHE_NAME = 'tango-cho-cache-v48.0.3-mobile-ai-button-fix';
 
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./bank_enja.js",
   "./vocab_pool.js",
-  "./style.css?v=48.0.2",
-  "./script.js?v=48.0.2",
-  "./api-response-fix.js?v=48.0.2",
+  "./style.css?v=48.0.3",
+  "./script.js?v=48.0.3",
+  "./api-response-fix.js?v=48.0.3",
   "./manifest.json",
   "./share-target.html",
   "./icons/icon-192-v26.png",
