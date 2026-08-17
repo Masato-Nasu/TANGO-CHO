@@ -1,7 +1,7 @@
 /* TANGO-CHO Service Worker (stable updates)
- * Build: v48.0.4-ai-assist-no-default-synonyms
+ * Build: v48.0.5-persistent-byok
  */
-const CACHE_NAME = 'tango-cho-cache-v48.0.4-ai-assist-no-default-synonyms';
+const CACHE_NAME = 'tango-cho-cache-v48.0.5-persistent-byok';
 
 const CORE_ASSETS = [
   "./",
@@ -10,7 +10,7 @@ const CORE_ASSETS = [
   "./vocab_pool.js",
   "./style.css?v=48.0.3",
   "./script.js?v=48.0.3",
-  "./api-response-fix.js?v=48.0.4",
+  "./api-response-fix.js?v=48.0.5",
   "./manifest.json",
   "./share-target.html",
   "./icons/icon-192-v26.png",
@@ -60,6 +60,7 @@ self.addEventListener("fetch", (event) => {
 
   const accept = event.request.headers.get("accept") || "";
   const isNav = event.request.mode === "navigate" || accept.includes("text/html");
+  const isAppCode = url.origin === self.location.origin && /\.(?:js|css|json)$/.test(url.pathname);
 
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME);
@@ -77,10 +78,10 @@ self.addEventListener("fetch", (event) => {
       }
     }
 
-    // HTML navigation: network-first (so updates apply), fallback to cache.
+    // HTML navigation: network-first so a normal relaunch picks up updates.
     if (isNav) {
       try {
-        const fresh = await fetch(event.request);
+        const fresh = await fetch(event.request, { cache: "no-store" });
         if (fresh && fresh.ok) cache.put("./index.html", fresh.clone());
         return fresh;
       } catch (_) {
@@ -88,7 +89,19 @@ self.addEventListener("fetch", (event) => {
       }
     }
 
-    // Static assets: cache-first, fallback to network.
+    // App code: network-first and bypass HTTP cache. This avoids the old
+    // "delete site data to get an update" workflow, which also deleted BYOK data.
+    if (isAppCode) {
+      try {
+        const fresh = await fetch(event.request, { cache: "no-store" });
+        if (fresh && fresh.ok) cache.put(event.request, fresh.clone());
+        return fresh;
+      } catch (_) {
+        return (await cache.match(event.request)) || Response.error();
+      }
+    }
+
+    // Large/static assets: cache-first, fallback to network.
     const cached = await cache.match(event.request);
     if (cached) return cached;
 
@@ -102,8 +115,7 @@ self.addEventListener("fetch", (event) => {
   })());
 });
 
-
-// Allow the page to trigger immediate activation
+// Allow the page to trigger immediate activation.
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
