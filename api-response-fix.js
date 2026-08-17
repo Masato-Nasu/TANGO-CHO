@@ -1,6 +1,26 @@
-/* TANGO-CHO v48.0.4: OpenAI Responses API empty-output fix + AI assist defaults */
+/* TANGO-CHO v48.0.5: OpenAI Responses API fix + persistent BYOK storage */
 (() => {
   const RESPONSES_URL = "https://api.openai.com/v1/responses";
+
+  // Ask the browser to keep this origin's storage persistent when supported.
+  // TANGO-CHO stores the BYOK API key in IndexedDB, so this reduces the chance
+  // of the browser evicting it under storage pressure. It never sends the key
+  // anywhere except the OpenAI API when an AI feature is used.
+  async function requestPersistentStorage() {
+    try {
+      if (!navigator.storage?.persist) return false;
+      if (navigator.storage.persisted && await navigator.storage.persisted()) return true;
+      return await navigator.storage.persist();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // Try on load and once again after the user's first interaction. Some browsers
+  // are more willing to grant persistence to an installed/engaged PWA.
+  void requestPersistentStorage();
+  window.addEventListener("pointerdown", () => { void requestPersistentStorage(); }, { once: true, passive: true });
+  window.addEventListener("keydown", () => { void requestPersistentStorage(); }, { once: true });
 
   function isGpt5Family(model) {
     return /^gpt-5(?:[.\-]|$)/i.test(String(model || "").trim());
