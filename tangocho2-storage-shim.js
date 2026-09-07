@@ -54,4 +54,14 @@
   Storage.prototype.removeItem = function(key) {
     return originalRemoveItem.call(this, this === window.localStorage ? mappedKey(key) : key);
   };
+
+  // Load TANGO-CHO2-only behavior without modifying the original TANGO-CHO core.
+  // The example-sync module makes 5 WORDS and AI Assist share one canonical
+  // example sentence per word.
+  try {
+    const syncScript = document.createElement('script');
+    syncScript.src = './tangocho2-example-sync.js?v=0.1.1';
+    syncScript.async = false;
+    document.head.appendChild(syncScript);
+  } catch (_) {}
 })();
