@@ -2,12 +2,12 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>TANGO-CHO</title>
+  <title>TANGO-CHO2</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <!-- iOS (Safari) standalone support -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="TANGO-CHO" />
+  <meta name="apple-mobile-web-app-title" content="TANGO-CHO2" />
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon-v26.png" />
   <link rel="icon" sizes="192x192" href="./icons/icon-192-v26.png" />
   <link rel="icon" sizes="512x512" href="./icons/icon-512-v26.png" />
@@ -25,14 +25,14 @@
 </head>
 <body>
   <header class="app-header">
-    <h1>TANGO-CHO</h1>
-</header>
+    <h1>TANGO-CHO2</h1>
+  </header>
 
   <nav class="tab-bar">
     <button class="tab-button active" data-section="addSection">追加</button>
     <button class="tab-button" data-section="listSection">単語帳</button>
     <button class="tab-button" data-section="quizSection">クイズ</button>
-    <button class="tab-button" data-section="fortuneSection">Fortune</button>
+    <button class="tab-button" data-section="fortuneSection">5 WORDS</button>
   </nav>
 
   <main class="main">
@@ -257,12 +257,14 @@
   <script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
   <script src="bank_enja.js"></script>
   <script src="vocab_pool.js"></script>
+  <script src="tangocho2-storage-shim.js?v=0.1.0"></script>
   <script src="script.js?v=48.0.3"></script>
   <script src="api-response-fix.js?v=48.0.4"></script>
+  <script src="tangocho2-fivewords.js?v=0.1.0"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./service-worker.js?v=48.0.4").catch(console.error);
+        navigator.serviceWorker.register("./service-worker.js?v=2.0.0").catch(console.error);
       });
     }
   </script>
