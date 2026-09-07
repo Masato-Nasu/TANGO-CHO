@@ -1,5 +1,6 @@
 /* TANGO-CHO2 Service Worker */
-const CACHE_NAME = 'tango-cho2-cache-v0.1.0';
+const CACHE_PREFIX = 'tango-cho2-cache-';
+const CACHE_NAME = `${CACHE_PREFIX}v0.1.0`;
 
 const CORE_ASSETS = [
   "./",
@@ -41,7 +42,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.map((k) => (k === CACHE_NAME ? null : caches.delete(k))));
+    await Promise.all(keys.map((k) => (k.startsWith(CACHE_PREFIX) && k !== CACHE_NAME ? caches.delete(k) : null)));
     await self.clients.claim();
   })());
 });
