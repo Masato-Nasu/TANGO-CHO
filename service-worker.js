@@ -1,7 +1,7 @@
 /* TANGO-CHO Service Worker (stable updates)
- * Build: v48.0.5-persistent-byok
+ * Build: v48.1.0-part5
  */
-const CACHE_NAME = 'tango-cho-cache-v48.0.5-persistent-byok';
+const CACHE_NAME = 'tango-cho-cache-v48.1.0-part5';
 
 const CORE_ASSETS = [
   "./",
@@ -9,7 +9,9 @@ const CORE_ASSETS = [
   "./bank_enja.js",
   "./vocab_pool.js",
   "./style.css?v=48.0.3",
+  "./part5.css?v=1.0.0",
   "./script.js?v=48.0.3",
+  "./part5.js?v=1.0.0",
   "./api-response-fix.js?v=48.0.5",
   "./manifest.json",
   "./share-target.html",
