@@ -15,7 +15,6 @@
   <meta name="theme-color" content="#00c896" />
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="style.css?v=48.0.3" />
-  <link rel="stylesheet" href="part5.css?v=1.0.0" />
   <style>
     .ai-assist-btn{
       width:100%;max-width:100%;box-sizing:border-box;
@@ -33,7 +32,6 @@
     <button class="tab-button active" data-section="addSection">追加</button>
     <button class="tab-button" data-section="listSection">単語帳</button>
     <button class="tab-button" data-section="quizSection">クイズ</button>
-    <button class="tab-button" data-section="part5Section">PART 5</button>
     <button class="tab-button" data-section="fortuneSection">Fortune</button>
   </nav>
 
@@ -214,55 +212,6 @@
         </div>
       </div>
     </section>
-
-    <section id="part5Section" class="section">
-      <h2>PART 5</h2>
-
-      <div class="card">
-        <div class="two-col">
-          <div>
-            <label class="field-label" for="part5Mode">問題タイプ</label>
-            <select id="part5Mode" class="select">
-              <option value="mix" selected>MIX</option>
-              <option value="vocab">VOCAB</option>
-              <option value="form">WORD FORM</option>
-            </select>
-          </div>
-          <div>
-            <label class="field-label" for="part5Pool">出題元</label>
-            <select id="part5Pool" class="select">
-              <option value="priority" selected>覚えてない・うろ覚え優先</option>
-              <option value="all">全て</option>
-              <option value="forgot">覚えてない</option>
-              <option value="fuzzy">うろ覚え</option>
-              <option value="learned">覚えた</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="two-col" style="margin-top:10px;">
-          <div>
-            <label class="field-label" for="part5Count">練習量</label>
-            <select id="part5Count" class="select">
-              <option value="5" selected>5語</option>
-              <option value="10">10語</option>
-              <option value="30">30語</option>
-            </select>
-          </div>
-          <div>
-            <label class="field-label">現在</label>
-            <div class="pill" id="part5ScorePill">0 / 0</div>
-          </div>
-        </div>
-
-        <div class="field-row action-row" style="margin-top:12px;">
-          <button id="part5StartBtn" class="primary-btn" type="button">スタート</button>
-        </div>
-
-        <div id="part5Msg" class="msg" aria-live="polite"></div>
-        <div id="part5Area" class="part5-area"></div>
-      </div>
-    </section>
     <section id="fortuneSection" class="section">
       <h2>Fortune (EN) × TANGO-CHO</h2>
 
@@ -310,11 +259,10 @@
   <script src="vocab_pool.js"></script>
   <script src="script.js?v=48.0.3"></script>
   <script src="api-response-fix.js?v=48.0.4"></script>
-  <script src="part5.js?v=1.0.0"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./service-worker.js?v=48.1.0-part5").catch(console.error);
+        navigator.serviceWorker.register("./service-worker.js?v=48.0.4").catch(console.error);
       });
     }
   </script>
